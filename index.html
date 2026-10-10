@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a0c11">
 <meta name="color-scheme" content="dark">
-<title>Réseau d'idées</title>
+<title>Bcorps Labs</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230f1218'/%3E%3Cpath d='M16 16 8 9M16 16l9-4M16 16l-3 9' stroke='%237cc7ff' stroke-opacity='.6' stroke-width='1.6'/%3E%3Ccircle cx='16' cy='16' r='4.5' fill='%237cc7ff'/%3E%3Ccircle cx='8' cy='9' r='2.4' fill='%23a78bfa'/%3E%3Ccircle cx='25' cy='12' r='2.4' fill='%2334d399'/%3E%3Ccircle cx='13' cy='25' r='2.4' fill='%23f472b6'/%3E%3C/svg%3E">
 <style>
 :root{
@@ -187,11 +187,53 @@ button.brand:focus-visible{outline:2px solid var(--acc-border)}
   body.panel-open #dock,body.panel-open #help{display:none}
   .mouse-only{display:none}
 }
+/* animation d'arrivée : terminal sécurisé Bcorps Labs */
+#intro{position:fixed;inset:0;z-index:100;display:grid;place-items:center;overflow:hidden;cursor:pointer;
+  background:radial-gradient(90% 70% at 50% 45%,#0d1219 0%,#07090d 70%);
+  font:14px/1.9 ui-monospace,"Cascadia Code","Cascadia Mono",Consolas,"SF Mono",Menlo,monospace;
+  transition:opacity .5s ease}
+#intro.out{opacity:0;pointer-events:none}
+#intro::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:.5;
+  background:repeating-linear-gradient(0deg,rgba(255,255,255,.022) 0 1px,transparent 1px 3px)}
+#intro>*{grid-area:1/1}
+.term{width:min(560px,calc(100% - 48px));color:#93a1b5;transition:opacity .35s ease,transform .35s ease}
+.term .head{display:flex;align-items:center;gap:8px;margin-bottom:14px;padding-bottom:10px;
+  border-bottom:1px solid rgba(255,255,255,.08);color:#5b6577;font-size:11px;letter-spacing:1.6px}
+.term .head i{width:7px;height:7px;border-radius:50%;background:#f08a8a;box-shadow:0 0 8px #f08a8a;animation:blink 1s steps(2) infinite}
+.term .line{white-space:pre-wrap;word-break:break-word;min-height:1.9em}
+.term .p{color:#4b5566}
+.term .dim{color:#5f6a7c}
+.term .code{color:#e4e7ee;letter-spacing:1.5px}
+.term .ok{color:#5eead4}
+.term .line.ok{font-weight:600;letter-spacing:2px;text-shadow:0 0 14px rgba(94,234,212,.45)}
+.term .cur{display:inline-block;width:8px;height:1.05em;margin-left:2px;vertical-align:-2px;background:#7cc7ff;animation:blink .9s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+.gate{display:flex;flex-direction:column;align-items:center;gap:14px;opacity:0;transform:scale(.96);
+  transition:opacity .45s ease,transform .6s ease;text-align:center}
+.gate svg{width:64px;height:64px;stroke:none;filter:drop-shadow(0 0 18px rgba(124,199,255,.45))}
+.gate b{font:600 24px/1.2 var(--font);letter-spacing:.42em;margin-right:-.42em;color:#eef1f6}
+.gate span{color:#5eead4;font-size:12px;letter-spacing:2.4px}
+#intro.granted .term{opacity:0;transform:translateY(-8px)}
+#intro.granted .gate{opacity:1;transform:none;transition-delay:.32s}
+.skip{align-self:end;margin-bottom:calc(22px + env(safe-area-inset-bottom));color:#4b5566;font-size:11px;letter-spacing:.6px}
 @keyframes sheet-in{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
-@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/* l'animation d'arrivée est voulue : elle joue même si le système réduit les animations */
+@media (prefers-reduced-motion:reduce){*:not(#intro,#intro *){animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
+<div id="intro" aria-hidden="true">
+  <div class="term">
+    <div class="head"><i></i>BCORPS LABS · CANAL CHIFFRÉ</div>
+    <div id="introLines"></div>
+  </div>
+  <div class="gate">
+    <svg viewBox="0 0 32 32"><path d="M16 16 8 9M16 16l9-4M16 16l-3 9" stroke="#7cc7ff" stroke-opacity=".55" stroke-width="1.4"/><circle cx="16" cy="16" r="4.5" fill="#7cc7ff"/><circle cx="8" cy="9" r="2.4" fill="#a78bfa"/><circle cx="25" cy="12" r="2.4" fill="#34d399"/><circle cx="13" cy="25" r="2.4" fill="#f472b6"/></svg>
+    <b>BCORPS LABS</b>
+    <span>ACCÈS AUTORISÉ</span>
+  </div>
+  <div class="skip">Clique ou appuie sur une touche pour passer</div>
+</div>
 <canvas id="c"></canvas>
 
 <header id="bar">
@@ -684,7 +726,7 @@ function miniBtn(icon,label,cls){
 }
 function renderBoards(editId){
   $('boardName').textContent=state.name;
-  document.title=state.name+' · Réseau d\'idées';
+  document.title=state.name+' · Bcorps Labs';
   var ul=$('boardList'); ul.textContent='';
   store.boards.forEach(function(b){
     var li=document.createElement('li'); if(b===state) li.className='on';
@@ -927,6 +969,60 @@ if(startId) store.boards.forEach(function(b){
 switchBoard(first);
 var start=startId?byId(startId):null;
 if(start){ select(start); fit(); reveal(start); }
+
+/* ---------- animation d'arrivée ---------- */
+(function(){
+  var el=$('intro'), box=$('introLines'), done=false;
+  var SCRIPT=[
+    {t:'BCORPS LABS // TERMINAL SÉCURISÉ',cls:'dim'},
+    {t:'Connexion au serveur chiffré…',after:' OK'},
+    {t:'Code d\'accès : ',code:'X7Q4-9KZ2-BC0R-PS1L'},
+    {t:'Vérification de l\'identité…',after:' OK'},
+    {t:'ACCÈS AUTORISÉ',cls:'ok',speed:22}
+  ];
+  var wait=function(ms){return new Promise(function(r){setTimeout(r,ms);});};
+  function finish(){
+    if(done) return; done=true;
+    el.classList.add('out');
+    window.removeEventListener('keydown',onKey,true);
+    setTimeout(function(){el.remove();},550);
+  }
+  function onKey(e){
+    if(e.ctrlKey||e.metaKey||e.altKey||/^(F\d+|Shift|Control|Alt|Meta)$/.test(e.key)) return;
+    e.stopPropagation(); finish();
+  }
+  el.addEventListener('pointerdown',finish);
+  window.addEventListener('keydown',onKey,true);
+
+  (async function(){
+    var cur=document.createElement('span'); cur.className='cur';
+    for(var i=0;i<SCRIPT.length;i++){
+      var s=SCRIPT[i], row=document.createElement('div'), pre=document.createElement('span'), tx=document.createElement('span'), j;
+      row.className='line '+(s.cls||''); pre.className='p'; pre.textContent='> ';
+      row.appendChild(pre); row.appendChild(tx); row.appendChild(cur); box.appendChild(row);
+      for(j=0;j<s.t.length;j++){ tx.textContent+=s.t[j]; await wait(s.speed||8); if(done) return; }
+      if(s.code){
+        /* le code se tape touche par touche, puis se masque comme un mot de passe */
+        var cd=document.createElement('span'), shown=''; cd.className='code'; row.insertBefore(cd,cur);
+        await wait(180);
+        for(j=0;j<s.code.length;j++){
+          var ch=s.code[j]; cd.textContent=shown+ch; shown+=ch==='-'?'-':'•';
+          await wait(35+Math.random()*45); if(done) return;
+        }
+        cd.textContent=shown; await wait(160);
+      }
+      if(s.after){
+        await wait(180); if(done) return;
+        var ok=document.createElement('span'); ok.className='ok'; ok.textContent=s.after; row.insertBefore(ok,cur);
+      }
+      await wait(110); if(done) return;
+    }
+    cur.remove(); await wait(260); if(done) return;
+    el.classList.add('granted');
+    await wait(1500);
+    finish();
+  })();
+})();
 requestAnimationFrame(draw);
 })();
 </script>
