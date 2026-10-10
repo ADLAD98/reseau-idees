@@ -61,7 +61,14 @@ input:focus,textarea:focus{border-color:rgba(110,231,255,.6)}
 #swatches{display:flex;gap:8px}
 #swatches button{width:26px;height:26px;padding:0;border-radius:50%;border:2px solid transparent}
 #swatches button.on{border-color:#fff}
-#fNotes{flex:1;min-height:110px;resize:none;font-size:16px;line-height:1.5}
+.sizes{display:flex;gap:6px}
+.sizes button{flex:1;padding:6px 4px;font-size:12.5px}
+.sizes button.on{background:rgba(110,231,255,.16);border-color:rgba(110,231,255,.55);color:#d9f9ff}
+#empty{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2;text-align:center;
+  color:var(--mut);pointer-events:none;width:min(420px,calc(100% - 48px));line-height:1.6}
+#empty[hidden]{display:none}
+#empty b{display:block;color:var(--txt);font-size:18px;margin-bottom:6px}
+#fNotes{flex:1;min-height:90px;resize:none;font-size:16px;line-height:1.5}
 .actions{display:flex;gap:8px;flex-wrap:wrap}
 #panel h3{margin:4px 0 0;font-size:12px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.6px}
 #links{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;max-height:26%;overflow:auto}
@@ -106,8 +113,14 @@ input:focus,textarea:focus{border-color:rgba(110,231,255,.6)}
 <div id="linkBanner" hidden><span id="linkText"></span><button id="linkCancel">Annuler</button></div>
 
 <div id="hint">
-  <span class="mouse">Double-clic dans le vide : nouvelle idée · Glisser : déplacer · Molette : zoom</span>
-  <span class="touch">Double-tape dans le vide : nouvelle idée · Pince pour zoomer</span>
+  <span class="mouse">Double-clic dans le vide : idée globale · Clic long sur une idée puis glisser : sous-idée ou liaison · Molette : zoom</span>
+  <span class="touch">Double-tape : idée globale · Appui long sur une idée puis glisser : sous-idée ou liaison</span>
+</div>
+
+<div id="empty" hidden>
+  <b>Ton réseau est vide</b>
+  Double-clique n'importe où (ou « + Idée ») pour poser ta première idée globale.<br>
+  Ensuite, reste appuyé sur une idée et glisse : une idée plus petite pousse là où tu relâches.
 </div>
 
 <aside id="panel" hidden>
@@ -116,6 +129,7 @@ input:focus,textarea:focus{border-color:rgba(110,231,255,.6)}
     <button id="pClose" aria-label="Fermer">✕</button>
   </div>
   <div id="swatches"></div>
+  <div id="sizes" class="sizes"></div>
   <textarea id="fNotes" placeholder="Notes…"></textarea>
   <div class="actions">
     <button id="pChild" class="primary">+ Sous-idée</button>
@@ -144,19 +158,30 @@ var alpha=0, W=0, H=0, dpr=1, degree={}, saveTimer=null;
 /* ---------- données ---------- */
 function uid(){return 'n'+Date.now().toString(36)+Math.floor(Math.random()*1e5).toString(36);}
 
-function seed(){
-  var mk=function(id,title,color,notes){return {id:id,title:title,notes:notes||'',color:color,x:0,y:0};};
-  var nodes=[
-    mk('n1','Mon travail',COLORS[0],"Bienvenue !\n\nClique sur une idée pour l'ouvrir et écrire tes notes.\n\n• « + Sous-idée » crée une idée reliée à celle-ci.\n• « Relier à… » la connecte à une idée qui existe déjà.\n• Double-clic dans le vide : nouvelle idée libre.\n\nCes idées sont des exemples, tu peux les supprimer."),
-    mk('n2','Projets',COLORS[1]),
-    mk('n3','Idées en vrac',COLORS[2]),
-    mk('n4','À faire',COLORS[3]),
-    mk('n5','Projet exemple',COLORS[1],'Une sous-idée de « Projets », reliée aussi à « Idées en vrac ».'),
-    mk('n6','Ressources',COLORS[4])
-  ];
-  nodes.forEach(function(n,i){var a=i/nodes.length*Math.PI*2;n.x=Math.cos(a)*120;n.y=Math.sin(a)*120;});
-  nodes[0].x=0;nodes[0].y=0;
-  return {nodes:nodes,links:[{a:'n1',b:'n2'},{a:'n1',b:'n3'},{a:'n1',b:'n4'},{a:'n1',b:'n6'},{a:'n2',b:'n5'},{a:'n3',b:'n5'}]};
+var RAD=[30,20,14,10], SIZE_NAMES=['Globale','Moyenne','Petite','Mini'];
+/* anciens exemples de la première version : retirés s'ils n'ont pas été modifiés */
+var OLD_DEMO={n1:'Mon travail',n2:'Projets',n3:'Idées en vrac',n4:'À faire',n5:'Projet exemple',n6:'Ressources'};
+
+function blank(){return {nodes:[],links:[]};}
+function plain(n){return {id:n.id,title:n.title,notes:n.notes,color:n.color,level:n.level,x:Math.round(n.x),y:Math.round(n.y)};}
+function isOldDemo(s){
+  return s.nodes.length===6&&s.nodes.every(function(n){return OLD_DEMO[n.id]===n.title;});
+}
+function inferLevels(s){
+  var todo=s.nodes.filter(function(n){return n.level==null;});
+  if(!todo.length) return;
+  var adj={}, map={};
+  s.nodes.forEach(function(n){map[n.id]=n;adj[n.id]=[];});
+  s.links.forEach(function(l){adj[l.a].push(l.b);adj[l.b].push(l.a);});
+  todo.sort(function(a,b){return adj[b.id].length-adj[a.id].length;});
+  todo.forEach(function(root){
+    if(root.level!=null) return;
+    root.level=0; var q=[root];
+    while(q.length){
+      var c=q.shift();
+      adj[c.id].forEach(function(id){var o=map[id]; if(o.level==null){o.level=Math.min(c.level+1,3);q.push(o);}});
+    }
+  });
 }
 
 function clean(obj){
@@ -169,6 +194,7 @@ function clean(obj){
     ids[id]=true;
     nodes.push({id:id,title:String(n.title||'').slice(0,80),notes:String(n.notes||''),
       color:/^#[0-9a-f]{6}$/i.test(n.color)?n.color:COLORS[0],
+      level:(n.level===0||n.level===1||n.level===2||n.level===3)?n.level:null,
       x:isFinite(n.x)?+n.x:(Math.random()-.5)*300,y:isFinite(n.y)?+n.y:(Math.random()-.5)*300});
   });
   var seen={}, links=[];
@@ -180,22 +206,22 @@ function clean(obj){
     if(seen[k]) return;
     seen[k]=true; links.push({a:a,b:b});
   });
-  return {nodes:nodes,links:links};
+  var out={nodes:nodes,links:links};
+  inferLevels(out);
+  return out;
 }
 
 function load(){
   try{
     var raw=localStorage.getItem(KEY);
-    if(raw){var s=clean(JSON.parse(raw)); if(s) return s;}
+    if(raw){var s=clean(JSON.parse(raw)); if(s&&!isOldDemo(s)) return s;}
   }catch(e){}
   return null;
 }
 function saveNow(){
   clearTimeout(saveTimer); saveTimer=null;
   try{
-    localStorage.setItem(KEY,JSON.stringify({
-      nodes:state.nodes.map(function(n){return {id:n.id,title:n.title,notes:n.notes,color:n.color,x:Math.round(n.x),y:Math.round(n.y)};}),
-      links:state.links}));
+    localStorage.setItem(KEY,JSON.stringify({nodes:state.nodes.map(plain),links:state.links}));
   }catch(e){}
 }
 function save(){ if(!saveTimer) saveTimer=setTimeout(saveNow,400); }
@@ -205,7 +231,7 @@ function recount(){
   degree={};
   state.links.forEach(function(l){degree[l.a]=(degree[l.a]||0)+1;degree[l.b]=(degree[l.b]||0)+1;});
 }
-function radius(n){return 15+Math.min(degree[n.id]||0,8)*2.2;}
+function radius(n){return RAD[n.level]||RAD[3];}
 function neighbours(n){
   var out=[];
   state.links.forEach(function(l){
@@ -221,30 +247,22 @@ function linked(a,b){
 /* ---------- simulation ---------- */
 function step(){
   if(alpha<0.004){ if(alpha>0){alpha=0;save();} return; }
-  var N=state.nodes, i, j, a, b, dx, dy, d2, d, f;
+  /* les idées restent où on les pose : on écarte seulement celles qui se chevauchent */
+  var N=state.nodes, i, j, a, b, dx, dy, d, min, push, wa, wb;
   for(i=0;i<N.length;i++){
     a=N[i];
     for(j=i+1;j<N.length;j++){
-      b=N[j]; dx=b.x-a.x; dy=b.y-a.y; d2=dx*dx+dy*dy;
-      if(d2<1){dx=Math.random()-.5;dy=Math.random()-.5;d2=1;}
-      d=Math.sqrt(d2); f=Math.min(11000/d2,7)*alpha;
-      dx=dx/d*f; dy=dy/d*f;
-      a.vx-=dx; a.vy-=dy; b.vx+=dx; b.vy+=dy;
+      b=N[j]; dx=b.x-a.x; dy=b.y-a.y; d=Math.sqrt(dx*dx+dy*dy);
+      min=radius(a)+radius(b)+30;
+      if(d>=min) continue;
+      if(d<0.5){dx=Math.random()-.5;dy=Math.random()-.5;d=Math.sqrt(dx*dx+dy*dy)||1;}
+      push=(min-d)/d*0.35;
+      wa=a===drag?0:(b===drag?1:0.5); wb=1-wa;
+      if(a===drag&&b===drag) continue;
+      a.x-=dx*push*wa; a.y-=dy*push*wa; b.x+=dx*push*wb; b.y+=dy*push*wb;
     }
-    a.vx-=a.x*0.006*alpha; a.vy-=a.y*0.006*alpha;
   }
-  state.links.forEach(function(l){
-    var p=byId(l.a), q=byId(l.b); if(!p||!q) return;
-    var ex=q.x-p.x, ey=q.y-p.y, len=Math.sqrt(ex*ex+ey*ey)||1;
-    var k=(len-150)/len*0.05*alpha;
-    p.vx+=ex*k; p.vy+=ey*k; q.vx-=ex*k; q.vy-=ey*k;
-  });
-  for(i=0;i<N.length;i++){
-    a=N[i];
-    if(a===drag){a.vx=a.vy=0;continue;}
-    a.vx*=0.8; a.vy*=0.8; a.x+=a.vx; a.y+=a.vy;
-  }
-  alpha*=0.99;
+  alpha*=0.93;
 }
 function heat(v){alpha=Math.max(alpha,v);}
 
@@ -276,9 +294,11 @@ function fit(){
 }
 function reveal(n,force){
   var a=freeArea(), sx=n.x*view.k+view.x, sy=n.y*view.k+view.y, m=50;
-  if(force||sx<a.x+m||sx>a.x+a.w-m||sy<a.y+m||sy>a.y+a.h-m){
-    view.x+=a.x+a.w/2-sx; view.y+=a.y+a.h/2-sy;
-  }
+  if(force){ view.x+=a.x+a.w/2-sx; view.y+=a.y+a.h/2-sy; return; }
+  /* sinon on décale juste ce qu'il faut pour que l'idée reste visible */
+  m=Math.min(m,a.w/2,a.h/2);
+  if(sx<a.x+m) view.x+=a.x+m-sx; else if(sx>a.x+a.w-m) view.x-=sx-(a.x+a.w-m);
+  if(sy<a.y+m) view.y+=a.y+m-sy; else if(sy>a.y+a.h-m) view.y-=sy-(a.y+a.h-m);
 }
 
 /* ---------- dessin ---------- */
@@ -299,8 +319,9 @@ function draw(t){
     var hot=sel&&(p===sel||q===sel);
     var dim=query&&!(matches(p)&&matches(q));
     ctx.globalAlpha=dim?0.12:1;
-    ctx.strokeStyle=hot?'rgba(190,225,255,.75)':'rgba(140,165,255,.3)';
-    ctx.lineWidth=hot?2:1.3;
+    var deep=Math.max(p.level,q.level);
+    ctx.strokeStyle=hot?'rgba(190,225,255,.75)':'rgba(140,165,255,.34)';
+    ctx.lineWidth=(deep<=1?2.2:deep===2?1.4:1)+(hot?0.8:0);
     ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(q.x,q.y); ctx.stroke();
     if(!reduceMotion&&!dim){
       var u=((t/2600)+idx*0.37)%1;
@@ -309,24 +330,40 @@ function draw(t){
     }
   });
 
+  var br=gesture&&gesture.type==='branch'?gesture:null;
+  if(br&&br.moved){
+    var gr=RAD[Math.min(br.node.level+1,3)];
+    ctx.globalAlpha=1; ctx.strokeStyle='rgba(110,231,255,.9)'; ctx.lineWidth=1.6;
+    ctx.setLineDash([6,6]);
+    ctx.beginPath(); ctx.moveTo(br.node.x,br.node.y); ctx.lineTo(br.wx,br.wy); ctx.stroke();
+    ctx.setLineDash([]);
+    if(!br.target){
+      ctx.fillStyle='rgba(110,231,255,.18)';
+      ctx.beginPath(); ctx.arc(br.wx,br.wy,gr,0,6.2832); ctx.fill(); ctx.stroke();
+    }
+  }
+
+  var FONTS=['600 16px','500 13px','500 12px','500 11px'];
   ctx.textAlign='center'; ctx.textBaseline='top';
-  ctx.font='500 13px system-ui,"Segoe UI",Roboto,sans-serif';
   for(i=0;i<N.length;i++){
     n=N[i]; var r=radius(n), on=n===sel;
+    ctx.font=(FONTS[n.level]||FONTS[3])+' system-ui,"Segoe UI",Roboto,sans-serif';
     ctx.globalAlpha=matches(n)?1:0.15;
     ctx.shadowColor=n.color; ctx.shadowBlur=on?30:16;
     ctx.fillStyle=n.color; ctx.beginPath(); ctx.arc(n.x,n.y,r,0,6.2832); ctx.fill();
     ctx.shadowBlur=0;
-    ctx.fillStyle='rgba(6,9,22,.72)'; ctx.beginPath(); ctx.arc(n.x,n.y,r-3.5,0,6.2832); ctx.fill();
+    var rim=Math.max(2,r*0.16);
+    ctx.fillStyle='rgba(6,9,22,.72)'; ctx.beginPath(); ctx.arc(n.x,n.y,r-rim,0,6.2832); ctx.fill();
     ctx.fillStyle=n.color; ctx.beginPath(); ctx.arc(n.x,n.y,r*0.38,0,6.2832); ctx.fill();
     if(n.notes&&n.notes.trim()){
-      ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(n.x+r*0.72,n.y-r*0.72,3,0,6.2832); ctx.fill();
+      ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(n.x+r*0.72,n.y-r*0.72,Math.max(2,r*0.12),0,6.2832); ctx.fill();
     }
-    if(on||n===linkFrom){
-      ctx.strokeStyle=n===linkFrom?'rgba(110,231,255,.95)':'#fff'; ctx.lineWidth=2;
+    var cyan=n===linkFrom||(br&&(n===br.node||n===br.target));
+    if(on||cyan){
+      ctx.strokeStyle=cyan?'rgba(110,231,255,.95)':'#fff'; ctx.lineWidth=2;
       ctx.beginPath(); ctx.arc(n.x,n.y,r+5,0,6.2832); ctx.stroke();
     }
-    if(view.k>=0.5||on){
+    if(view.k>=0.5||on||n.level===0){
       var label=n.title||'Sans titre';
       if(label.length>26) label=label.slice(0,25)+'…';
       ctx.fillStyle=on?'#fff':'#d7dffa';
@@ -351,9 +388,20 @@ function select(n,center){
   setHash(n?n.id:'');
   if(!n) return;
   $('fTitle').value=n.title; $('fNotes').value=n.notes;
-  renderSwatches(); renderLinks();
+  renderSwatches(); renderSizes(); renderLinks();
   reveal(n,center);
 }
+function renderSizes(){
+  var box=$('sizes'); box.textContent='';
+  SIZE_NAMES.forEach(function(name,lv){
+    var b=document.createElement('button');
+    b.textContent=name; b.title='Taille de l\'idée';
+    if(sel&&sel.level===lv) b.className='on';
+    b.onclick=function(){ if(!sel) return; sel.level=lv; renderSizes(); heat(0.5); save(); };
+    box.appendChild(b);
+  });
+}
+function updateEmpty(){$('empty').hidden=state.nodes.length>0;}
 function renderSwatches(){
   var box=$('swatches'); box.textContent='';
   COLORS.forEach(function(c){
@@ -388,10 +436,12 @@ function renderLinks(){
 
 /* ---------- actions ---------- */
 function addNode(x,y,parent){
-  var n={id:uid(),title:'',notes:'',color:parent?parent.color:COLORS[state.nodes.length%COLORS.length],x:x,y:y,vx:0,vy:0};
+  var roots=state.nodes.filter(function(o){return o.level===0;}).length;
+  var n={id:uid(),title:'',notes:'',color:parent?parent.color:COLORS[roots%COLORS.length],
+    level:parent?Math.min(parent.level+1,3):0,x:x,y:y};
   state.nodes.push(n);
   if(parent) state.links.push({a:parent.id,b:n.id});
-  recount(); heat(0.5); saveNow();
+  recount(); heat(0.5); saveNow(); updateEmpty();
   select(n);
   var f=$('fTitle'); f.focus();
   return n;
@@ -405,7 +455,7 @@ function toggleLink(a,b){
 function removeNode(n){
   state.nodes=state.nodes.filter(function(o){return o!==n;});
   state.links=state.links.filter(function(l){return l.a!==n.id&&l.b!==n.id;});
-  recount(); heat(0.3); saveNow();
+  recount(); heat(0.3); saveNow(); updateEmpty();
   if(sel===n) select(null);
 }
 function startLink(){
@@ -417,7 +467,8 @@ function startLink(){
 function endLink(){linkFrom=null;$('linkBanner').hidden=true;}
 
 /* ---------- pointeur ---------- */
-var pts={}, gesture=null, lastBlank={t:0,x:0,y:0};
+var pts={}, gesture=null, lastBlank={t:0,x:0,y:0}, pressTimer=null;
+canvas.addEventListener('contextmenu',function(e){e.preventDefault();});
 function count(){return Object.keys(pts).length;}
 function two(){var k=Object.keys(pts);return [pts[k[0]],pts[k[1]]];}
 function hit(x,y){
@@ -433,13 +484,21 @@ canvas.addEventListener('pointerdown',function(e){
   try{canvas.setPointerCapture(e.pointerId);}catch(err){}
   pts[e.pointerId]={x:e.clientX,y:e.clientY};
   if(count()===2){
-    var p=two(); drag=null;
+    var p=two(); drag=null; clearTimeout(pressTimer);
     gesture={type:'pinch',d:Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y)||1,mx:(p[0].x+p[1].x)/2,my:(p[0].y+p[1].y)/2};
     return;
   }
   if(count()>2) return;
   var n=hit(e.clientX,e.clientY);
-  gesture={type:n?'node':'pan',node:n,sx:e.clientX,sy:e.clientY,lx:e.clientX,ly:e.clientY,moved:false};
+  var g=gesture={type:n?'node':'pan',node:n,sx:e.clientX,sy:e.clientY,lx:e.clientX,ly:e.clientY,moved:false,
+    tol:e.pointerType==='mouse'?5:10};
+  clearTimeout(pressTimer);
+  if(n) pressTimer=setTimeout(function(){
+    /* clic long sans bouger : on passe en mode « faire pousser une branche » */
+    if(gesture!==g||g.type!=='node'||g.moved) return;
+    g.type='branch'; g.wx=n.x; g.wy=n.y; g.target=null;
+    try{ if(navigator.vibrate) navigator.vibrate(15); }catch(err){}
+  },420);
 });
 canvas.addEventListener('pointermove',function(e){
   if(!pts[e.pointerId]||!gesture) return;
@@ -452,12 +511,17 @@ canvas.addEventListener('pointermove',function(e){
     g.d=d; g.mx=mx; g.my=my; return;
   }
   var x=e.clientX, y=e.clientY;
+  if(g.type==='branch'){
+    var bw=toWorld(x,y), t=hit(x,y);
+    g.wx=bw.x; g.wy=bw.y; g.target=(t&&t!==g.node)?t:null; g.moved=true;
+    return;
+  }
   if(!g.moved){
-    if(Math.hypot(x-g.sx,y-g.sy)<5) return;
-    g.moved=true; g.lx=x; g.ly=y;
+    if(Math.hypot(x-g.sx,y-g.sy)<g.tol) return;
+    g.moved=true; g.lx=x; g.ly=y; clearTimeout(pressTimer);
   }
   if(g.type==='node'){
-    var w=toWorld(x,y); g.node.x=w.x; g.node.y=w.y; g.node.vx=g.node.vy=0;
+    var w=toWorld(x,y); g.node.x=w.x; g.node.y=w.y;
     drag=g.node; heat(0.12);
   }else{
     view.x+=x-g.lx; view.y+=y-g.ly;
@@ -469,8 +533,15 @@ function release(e){
   delete pts[e.pointerId];
   var g=gesture; if(!g) return;
   if(g.type==='pinch'){ if(count()<2) gesture=null; return; }
-  gesture=null; drag=null;
+  gesture=null; drag=null; clearTimeout(pressTimer);
   if(e.type==='pointercancel') return;
+  if(g.type==='branch'){
+    var src=g.node;
+    if(g.target){ if(!linked(src,g.target)) toggleLink(src,g.target); select(src); }
+    else if(Math.hypot(g.wx-src.x,g.wy-src.y)>radius(src)+12) addNode(g.wx,g.wy,src);
+    else select(src);
+    return;
+  }
   if(g.moved){ if(g.type==='node') save(); return; }
   if(g.type==='node'){
     if(linkFrom){ var from=linkFrom; endLink(); if(g.node!==from) toggleLink(from,g.node); select(from); }
@@ -517,7 +588,7 @@ document.addEventListener('click',function(e){ if(!e.target.closest('.menu')) $(
 $('mFit').onclick=function(){$('menu').hidden=true;fit();};
 $('mExport').onclick=function(){
   $('menu').hidden=true; saveNow();
-  var data=JSON.stringify({nodes:state.nodes.map(function(n){return {id:n.id,title:n.title,notes:n.notes,color:n.color,x:Math.round(n.x),y:Math.round(n.y)};}),links:state.links},null,2);
+  var data=JSON.stringify({nodes:state.nodes.map(plain),links:state.links},null,2);
   var a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([data],{type:'application/json'}));
   a.download='reseau-idees-'+new Date().toISOString().slice(0,10)+'.json';
@@ -538,8 +609,8 @@ $('file').addEventListener('change',function(){
 });
 $('mReset').onclick=function(){
   $('menu').hidden=true;
-  if(!confirm('Tout effacer et repartir des exemples ? Cette action est définitive.')) return;
-  install(seed()); settle(); saveNow(); fit();
+  if(!confirm('Tout effacer et repartir d\'un réseau vide ? Cette action est définitive.')) return;
+  install(blank()); saveNow(); fit();
 };
 $('search').addEventListener('input',function(){query=this.value.trim().toLowerCase();});
 $('search').addEventListener('keydown',function(e){
@@ -557,16 +628,14 @@ document.addEventListener('visibilitychange',function(){ if(document.hidden) sav
 /* ---------- démarrage ---------- */
 function install(s){
   state=s; sel=null; linkFrom=null;
-  state.nodes.forEach(function(n){n.vx=0;n.vy=0;});
-  recount(); select(null); endLink();
+  recount(); select(null); endLink(); updateEmpty();
 }
-function settle(){alpha=1;for(var i=0;i<500;i++) step();alpha=0;}
 
 resize();
 var startId=location.hash?decodeURIComponent(location.hash.slice(1)):'';
 var stored=load();
-install(stored||seed());
-if(!stored){settle();saveNow();}
+install(stored||blank());
+if(!stored) saveNow();
 var start=startId?byId(startId):null;
 if(start) select(start);
 fit();
