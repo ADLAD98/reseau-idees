@@ -208,6 +208,9 @@ body.fx .pack.ready .pack-shine{animation:shine 3.4s ease-in-out infinite}
 .wait{display:flex;flex-direction:column;gap:10px;width:100%;max-width:380px}
 .wait-time{display:flex;align-items:baseline;gap:12px;color:var(--mut)}
 .wait-time b{font:700 40px/1 var(--mono);letter-spacing:.06em;color:var(--txt)}
+.reserve{margin-top:12px;color:var(--mut);font-size:14px}
+.reserve b{color:var(--acc);font-weight:600}
+.reserve #count{font-family:var(--mono);letter-spacing:.04em}
 .bar{height:6px;background:rgba(120,200,255,.1);overflow:hidden}
 .bar i{display:block;height:100%;background:var(--acc);box-shadow:0 0 10px var(--acc);transition:width .9s linear}
 .meter{width:100%;max-width:560px;margin-top:14px;padding-top:18px;border-top:1px solid var(--line)}

@@ -153,6 +153,10 @@ function showAuth(message) {
       location.hash = '#/packs';
       shell();
       route();
+      if (mode === 'register') {
+        const packs = 1 + (S.free.spare || 0);
+        toast('Bienvenue ' + S.player.name + ' ! ' + (packs > 1 ? packs + ' packs t\'attendent.' : 'Ton premier pack t\'attend.'));
+      }
     } catch (err) {
       error.textContent = err instanceof ApiError ? err.message : 'Un problème est survenu. Réessaie.';
       if (!(err instanceof ApiError)) console.error(err);
@@ -209,7 +213,11 @@ document.addEventListener('error', (e) => {
 }, true);
 
 /* ---------- écran Packs ---------- */
-const packReady = () => S.free.readyAt <= now();
+/* un pack peut s'ouvrir si le délai du pack gratuit est écoulé, ou s'il reste des packs en réserve */
+const timeLeft = () => S.free.readyAt - now();
+const packReady = () => timeLeft() <= 0 || S.free.spare > 0;
+/* résumé de la situation : quand il change, on redessine le bouton ; sinon seul le compte à rebours bouge */
+const packSig = () => (timeLeft() <= 0 ? 'pret' : 'attente') + '/' + (S.free.spare || 0);
 function progressHTML() {
   const total = S.cat.cards.length, have = S.owned.size;
   const tiers = [...S.cat.tiers].reverse().map((t) => {
@@ -220,10 +228,14 @@ function progressHTML() {
     + '<div class="bar"><i style="width:' + pct(have, total) + '%"></i></div><div class="tiers">' + tiers + '</div></div>';
 }
 function packActionHTML() {
-  if (packReady()) return '<button class="btn solid big" type="button" id="openPack">Ouvrir le pack</button>';
-  const left = S.free.readyAt - now();
-  return '<div class="wait"><div class="wait-time"><b id="count">' + clock(left) + '</b><span>avant le prochain pack</span></div>'
-    + '<div class="bar"><i id="countBar" style="width:' + Math.min(100, 100 - (100 * left) / S.free.cooldownMs) + '%"></i></div></div>';
+  const left = timeLeft(), spare = S.free.spare || 0;
+  if (left > 0 && !spare) {
+    return '<div class="wait"><div class="wait-time"><b id="count">' + clock(left) + '</b><span>avant le prochain pack</span></div>'
+      + '<div class="bar"><i id="countBar" style="width:' + Math.min(100, 100 - (100 * left) / S.free.cooldownMs) + '%"></i></div></div>';
+  }
+  const reserve = spare ? '<p class="reserve"><b>' + spare + '</b> pack' + (spare > 1 ? 's' : '') + ' en réserve'
+    + (left > 0 ? ' · prochain pack gratuit dans <b id="count">' + clock(left) + '</b>' : '') + '</p>' : '';
+  return '<button class="btn solid big" type="button" id="openPack">' + (left > 0 ? 'Ouvrir un pack en réserve' : 'Ouvrir le pack') + '</button>' + reserve;
 }
 function viewPacks(main) {
   const recent = [...S.owned.entries()].sort((a, b) => b[1].at - a[1].at).slice(0, 6).map(([id]) => S.cat.cardById.get(id)).filter(Boolean);
@@ -231,7 +243,7 @@ function viewPacks(main) {
     + '<div class="home-side"><div class="eyebrow mono">Pack gratuit · toutes les ' + Math.round(S.free.cooldownMs / 60000) + ' minutes</div>'
     + '<h1 class="h1">' + S.free.size + ' cartes à découvrir</h1>'
     + '<p class="lead">Joueurs et coachs pros de la saison ' + S.cat.season + '. La dernière carte du pack est une carte bonus : rang Titulaire au minimum.</p>'
-    + '<div id="packAction">' + packActionHTML() + '</div>' + progressHTML() + '</div></section>'
+    + '<div id="packAction" data-sig="' + packSig() + '">' + packActionHTML() + '</div>' + progressHTML() + '</div></section>'
     + '<section><h2 class="h2">Dernières cartes obtenues</h2>'
     + (recent.length ? '<div class="row-cards">' + recent.map((c) => tile(c)).join('') + '</div>' : '<p class="empty">Ta collection est vide. Ouvre ton premier pack !</p>')
     + '</section>';
@@ -240,19 +252,16 @@ function viewPacks(main) {
 setInterval(() => {
   const box = document.getElementById('packAction');
   if (!box || !S.free || S.opening) return;
-  const count = document.getElementById('count');
-  if (packReady()) {
-    if (count) {
-      box.innerHTML = packActionHTML();
-      const pack = $('#packBox .pack');
-      if (pack) pack.className = 'pack ready';
-    }
+  if (box.dataset.sig !== packSig()) {
+    box.dataset.sig = packSig();
+    box.innerHTML = packActionHTML();
+    const pack = $('#packBox .pack');
+    if (pack) pack.className = 'pack ' + (packReady() ? 'ready' : 'waiting');
     return;
   }
-  const left = S.free.readyAt - now();
-  if (!count) { box.innerHTML = packActionHTML(); return; }
-  count.textContent = clock(left);
-  document.getElementById('countBar').style.width = Math.min(100, 100 - (100 * left) / S.free.cooldownMs) + '%';
+  const left = timeLeft(), count = document.getElementById('count'), bar = document.getElementById('countBar');
+  if (count) count.textContent = clock(left);
+  if (bar) bar.style.width = Math.min(100, 100 - (100 * left) / S.free.cooldownMs) + '%';
 }, 1000);
 document.addEventListener('click', async (e) => {
   if (!e.target.closest('#openPack') || S.opening) return;
