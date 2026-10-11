@@ -6,10 +6,10 @@
 <meta name="theme-color" content="#05070b">
 <meta name="color-scheme" content="dark">
 <title>Bcorps Labs</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2305070b'/%3E%3Cpath d='M16 3 27 9.5v13L16 29 5 22.5v-13z' fill='none' stroke='%2300e5ff' stroke-width='2'/%3E%3Cpath d='M16 11l4.5 2.6v5.2L16 21.4l-4.5-2.6v-5.2z' fill='%2300e5ff'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Crect width='120' height='120' fill='%2305070b'/%3E%3Ccircle cx='60' cy='60' r='36' fill='none' stroke='%2300e5ff' stroke-width='20'/%3E%3Ccircle cx='60' cy='60' r='9' fill='%23e8f1f8'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Share+Tech+Mono&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Exo+2:wght@700&family=Share+Tech+Mono&display=swap">
 <style>
 :root{
   --bg:#05070b; --panel:#080c12; --raise:#0f1620; --pop:#0a0f17;
@@ -200,14 +200,16 @@ body.fx #panel{animation:panel-in .16s ease-out}
 .h-main{flex:1;width:min(1280px,100%);margin:0 auto;padding:clamp(28px,6vh,64px) 32px 28px;
   display:grid;grid-template-columns:minmax(250px,310px) minmax(0,1fr) 352px;gap:clamp(24px,3vw,44px);align-items:start;align-content:start}
 .tag{display:inline-flex;align-items:center;gap:9px;padding:5px 9px;border:1px solid rgba(255,42,109,.45);color:var(--alert)}
-#hubTitle{position:relative;margin:26px 0 0;font:700 clamp(42px,4.5vw,60px)/.92 var(--ui);letter-spacing:.05em;text-transform:uppercase}
-#hubTitle span{display:block;color:var(--acc)}
-/* glitch : deux copies décalées du titre qui n'apparaissent que par à-coups */
-body.fx #hubTitle::before,body.fx #hubTitle::after{content:attr(data-text);position:absolute;inset:0;white-space:pre-line;pointer-events:none;opacity:0}
-body.fx #hubTitle::before{color:var(--acc);animation:glitch-a 5.2s steps(1) infinite}
-body.fx #hubTitle::after{color:var(--alert);animation:glitch-b 5.2s steps(1) infinite}
-@keyframes glitch-a{0%,91%,100%{opacity:0}92%{opacity:.85;transform:translate(-4px,-1px);clip-path:inset(8% 0 62% 0)}94%{opacity:.85;transform:translate(3px,1px);clip-path:inset(58% 0 12% 0)}96%{opacity:.7;transform:translate(-2px,0);clip-path:inset(32% 0 40% 0)}}
-@keyframes glitch-b{0%,91%,100%{opacity:0}92%{opacity:.8;transform:translate(4px,1px);clip-path:inset(52% 0 20% 0)}94%{opacity:.8;transform:translate(-3px,-1px);clip-path:inset(12% 0 66% 0)}96%{opacity:.6;transform:translate(2px,0);clip-path:inset(70% 0 6% 0)}}
+/* logo : le nom avec un anneau à la place du « o », et la pastille LABS */
+.logo{position:relative;display:inline-block;font-family:"Exo 2",var(--ui);font-weight:700;letter-spacing:-.015em;line-height:1;white-space:nowrap;color:#e8f1f8}
+.logo .o{display:inline-block;vertical-align:baseline;position:relative;width:.56em;height:.56em;margin:0 .03em -.012em;
+  border:.135em solid var(--acc);border-radius:50%;box-shadow:0 0 .4em rgba(0,229,255,.3)}
+.logo .o::after{content:"";position:absolute;left:50%;top:50%;width:.12em;height:.12em;margin:-.06em;border-radius:50%;background:currentColor}
+.logo sup{position:absolute;left:100%;top:-.1em;margin-left:.3em;padding:.34em .62em .3em;border:1px solid var(--acc);border-radius:99px;
+  font:500 .2em/1 var(--ui);letter-spacing:.3em;color:var(--acc)}
+body.fx .logo .o{animation:ring 3.2s ease-in-out infinite}
+@keyframes ring{50%{box-shadow:0 0 .75em rgba(0,229,255,.55)}}
+#hubTitle{margin:26px 0 0;font-size:clamp(48px,4.7vw,62px)}
 .h-sub{margin-top:20px;color:var(--mut);line-height:1.9}
 .h-sub s{text-decoration:none;background:var(--txt);color:transparent;user-select:none}
 .h-read{margin:34px 0 0;border-top:1px solid var(--line2)}
@@ -405,8 +407,8 @@ a.btn{color:var(--txt);text-decoration:none}
 .term .line.ok{letter-spacing:.2em}
 .gate{display:flex;flex-direction:column;align-items:center;gap:22px;opacity:0;transform:scale(.97);
   transition:opacity .4s ease,transform .6s ease;text-align:center}
-.gate b{font:700 clamp(34px,8.5vw,92px)/1 var(--ui);letter-spacing:.1em;color:var(--txt);white-space:nowrap}
-.gate span{padding:7px 14px;border:1px solid var(--ok);color:var(--ok);font-size:11px;letter-spacing:.3em}
+.gate .logo{font-size:clamp(44px,10vw,104px);margin-right:1.1em}
+.gate>span{padding:7px 14px;border:1px solid var(--ok);color:var(--ok);font-size:11px;letter-spacing:.3em}
 #intro.granted .term{opacity:0;transform:translateY(-8px)}
 #intro.granted .gate{opacity:1;transform:none;transition-delay:.3s}
 .skip{align-self:end;margin-bottom:calc(22px + env(safe-area-inset-bottom));color:var(--faint);font-size:10.5px;letter-spacing:.14em}
@@ -464,7 +466,7 @@ a.btn{color:var(--txt);text-decoration:none}
     <div id="introLines"></div>
   </div>
   <div class="gate">
-    <b id="gateTitle">BCORPS LABS</b>
+    <div class="logo" aria-label="Bcorps Labs">Bc<span class="o"></span>rps<sup>LABS</sup></div>
     <span>ACCÈS AUTORISÉ</span>
   </div>
   <div class="skip">CLIQUE OU APPUIE SUR UNE TOUCHE POUR PASSER</div>
@@ -472,7 +474,7 @@ a.btn{color:var(--txt);text-decoration:none}
 
 <div id="hub">
   <header class="h-top mono">
-    <span class="mk"><svg viewBox="0 0 32 32"><path d="M16 3 27 9.5v13L16 29 5 22.5v-13z" fill="none" stroke="#00e5ff" stroke-width="2"/><path d="M16 11l4.5 2.6v5.2L16 21.4l-4.5-2.6v-5.2z" fill="#00e5ff"/></svg>Bcorps Labs<span class="hide-s"><b>//</b> Intranet</span></span>
+    <span class="mk"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="38" fill="none" stroke="#00e5ff" stroke-width="20"/><circle cx="60" cy="60" r="9" fill="#e8f1f8"/></svg>Bcorps Labs<span class="hide-s"><b>//</b> Intranet</span></span>
     <span class="hide-s">Nœud BL-01</span>
     <span class="spacer"></span>
     <span class="hide-s" id="hubDate"></span>
@@ -482,7 +484,7 @@ a.btn{color:var(--txt);text-decoration:none}
   <main class="h-main">
     <section>
       <div class="tag mono">Confidentiel · ne pas diffuser</div>
-      <h1 id="hubTitle" data-text="Bcorps&#10;Labs">Bcorps<span>Labs</span></h1>
+      <h1 id="hubTitle" class="logo" aria-label="Bcorps Labs">Bc<span class="o"></span>rps<sup>LABS</sup></h1>
       <div class="h-sub mono">Division recherche <s>XXXXXXXX</s><br>Dossier BL-7731 · Accréditation niveau 5</div>
       <dl class="h-read mono">
         <div><dt>Opérateur</dt><dd>Authentifié</dd></div>
@@ -544,7 +546,7 @@ a.btn{color:var(--txt);text-decoration:none}
 
 <section id="agenda" hidden>
   <header class="a-bar">
-    <button id="aHome" aria-label="Console Bcorps Labs" title="Console Bcorps Labs"><svg viewBox="0 0 32 32"><path d="M16 3 27 9.5v13L16 29 5 22.5v-13z" fill="none" stroke="#00e5ff" stroke-width="2"/><path d="M16 11l4.5 2.6v5.2L16 21.4l-4.5-2.6v-5.2z" fill="#00e5ff"/></svg></button>
+    <button id="aHome" aria-label="Console Bcorps Labs" title="Console Bcorps Labs"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="38" fill="none" stroke="#00e5ff" stroke-width="20"/><circle cx="60" cy="60" r="9" fill="#e8f1f8"/></svg></button>
     <nav class="crumbs"><span class="c1">BL//NET</span><i>›</i><span class="a-name">Planificateur</span></nav>
     <span class="spacer"></span>
     <span id="aToday" class="mono"></span>
@@ -608,7 +610,7 @@ a.btn{color:var(--txt);text-decoration:none}
 <canvas id="c"></canvas>
 
 <header id="bar">
-  <button id="btnHome" aria-label="Console Bcorps Labs" title="Console Bcorps Labs"><svg viewBox="0 0 32 32"><path d="M16 3 27 9.5v13L16 29 5 22.5v-13z" fill="none" stroke="#00e5ff" stroke-width="2"/><path d="M16 11l4.5 2.6v5.2L16 21.4l-4.5-2.6v-5.2z" fill="#00e5ff"/></svg></button>
+  <button id="btnHome" aria-label="Console Bcorps Labs" title="Console Bcorps Labs"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="38" fill="none" stroke="#00e5ff" stroke-width="20"/><circle cx="60" cy="60" r="9" fill="#e8f1f8"/></svg></button>
   <nav class="crumbs">
     <span class="c1">BL//NET</span><i>›</i><span class="c2">Réseau neuronal</span><i>›</i>
     <div class="boards">
@@ -1760,16 +1762,6 @@ function renderHubLinks(){
 }
 
 /* ---------- console d'accueil ---------- */
-/* texte qui se « déchiffre » : des glyphes aléatoires laissent place aux vraies lettres */
-function scramble(el,text,ms,done){
-  var G='ABCDEFGHJKLMNPQRSTUVWXYZ0123456789#%&/<>[]{}=+*', t0=Date.now();
-  (function tick(){
-    var p=Math.min((Date.now()-t0)/ms,1), n=Math.floor(p*text.length), s=text.slice(0,n), i;
-    for(i=n;i<text.length;i++) s+=text[i]===' '?' ':G[Math.floor(Math.random()*G.length)];
-    el.textContent=s;
-    if(p<1) setTimeout(tick,45); else if(done) done();
-  })();
-}
 function clock(){return new Date().toLocaleTimeString('fr-FR');}
 function row(k,v){
   var s=document.createElement('span'), a=document.createElement('i'), b=document.createElement('b');
@@ -1896,7 +1888,6 @@ requestAnimationFrame(draw);
     }
     cur.remove(); await wait(260); if(done) return;
     el.classList.add('granted');
-    scramble($('gateTitle'),'BCORPS LABS',900);
     await wait(1700);
     finish();
   })();
