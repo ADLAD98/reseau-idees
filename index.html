@@ -7,6 +7,12 @@
 <meta name="color-scheme" content="dark">
 <title>Bcorps Labs</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Crect width='120' height='120' fill='%2305070b'/%3E%3Ccircle cx='60' cy='60' r='36' fill='none' stroke='%2300e5ff' stroke-width='20'/%3E%3Ccircle cx='60' cy='60' r='9' fill='%23e8f1f8'/%3E%3C/svg%3E">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Bcorps">
+<link rel="apple-touch-icon" href="img/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Exo+2:wght@700&family=Share+Tech+Mono&display=swap">
@@ -428,7 +434,7 @@ a.btn{color:var(--txt);text-decoration:none}
 #tPanel{display:flex;flex-direction:column;gap:18px;padding:12px 20px 0;overflow-y:auto;background:var(--panel);
   border-left:1px solid var(--line2);border-top:2px solid var(--acc)}
 #tPanel[hidden]{display:none}
-#tTitle{width:100%;padding:0 0 9px;resize:none;overflow:hidden;font:600 21px/1.3 var(--ui);background:none;border:0;
+#tTitle{flex:none;width:100%;min-height:38px;padding:0 0 9px;resize:none;overflow:hidden;font:600 21px/1.3 var(--ui);background:none;border:0;
   border-bottom:1px solid var(--line2);outline:none;transition:border-color .12s}
 #tTitle:focus{border-color:var(--acc)}
 .t-state{display:flex;flex-wrap:wrap;gap:8px}
@@ -674,6 +680,78 @@ body.fx #patch{animation:tool-in .22s ease-out}
   #pEdit input,#pEdit textarea{font-size:16px}
   #pEdit .actions{margin-left:-16px;margin-right:-16px;padding:12px 16px calc(12px + env(safe-area-inset-bottom))}
 }
+
+/* ---------- sous-tâches, tâches liées, bilan de la semaine, recherche, annulation ---------- */
+.actions{flex-wrap:wrap}
+.subs{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
+.subs li{display:flex;align-items:center;gap:10px;padding:5px 2px}
+.subs .chk{width:15px;height:15px;margin:0}
+.subs li.done .chk{background:var(--ok);border-color:var(--ok)}
+.subs li.done .chk::after{content:"";position:absolute;left:4px;top:0;width:4px;height:9px;border:solid var(--bg);border-width:0 2px 2px 0;transform:rotate(45deg)}
+.subs span{flex:1;min-width:0;overflow-wrap:anywhere;font-size:13.5px;line-height:1.4}
+.subs li.done span{color:var(--faint);text-decoration:line-through}
+.subs .ib{width:24px;height:24px;color:var(--faint)}
+.subs .ib svg{width:12px;height:12px}
+.idea-link{display:flex;align-items:center;gap:10px;width:100%;height:38px;padding:0 11px;border:1px solid var(--line2);background:none;text-align:left;transition:border-color .12s,color .12s}
+.idea-link:hover{border-color:var(--acc);color:var(--acc)}
+.idea-link i{flex:none;width:8px;height:8px;transform:rotate(45deg)}
+.idea-link span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.idea-link small{flex:none;color:var(--faint);font:10.5px var(--mono);letter-spacing:.06em;text-transform:uppercase}
+.week:has(+.week-review){min-height:0}
+.week-review{margin-top:18px;max-width:900px}
+.wk-bars{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;height:96px;align-items:end;padding-top:4px}
+.wk-day{display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:5px;height:100%;cursor:pointer}
+.wk-day i{display:block;width:100%;min-height:2px;background:rgba(57,255,159,.35);border-top:2px solid var(--ok);transition:background .15s}
+.wk-day:hover i{background:rgba(57,255,159,.55)}
+.wk-day b{font:11px/1 var(--mono);color:var(--txt);font-weight:400;min-height:11px}
+.wk-day span{color:var(--faint);font:10.5px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase}
+.wk-day.today span{color:var(--acc)}
+/* le bandeau passe au-dessus du contenu, pour que les résultats de recherche ne soient pas recouverts */
+.h-top{position:relative;z-index:5}
+.h-search{position:relative;display:flex;align-items:center;width:300px;height:32px;margin-left:8px;border:1px solid var(--line2);transition:border-color .12s,box-shadow .12s}
+.h-search:focus-within{border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-soft)}
+.h-search>svg{position:absolute;left:10px;width:14px;height:14px;color:var(--faint);pointer-events:none}
+#hubSearch{width:100%;height:100%;padding:0 10px 0 31px;background:none;border:0;outline:none;color:var(--txt);font:13px var(--mono);letter-spacing:.04em;text-transform:none}
+#hubSearch::-webkit-search-cancel-button{display:none}
+#hubResults{position:absolute;z-index:3;left:-1px;top:calc(100% + 8px);width:min(420px,calc(100vw - 32px));max-height:70vh;overflow:auto;padding:10px 6px 6px}
+#hubResults .label{padding:6px 8px 6px}
+#hubResults .item{text-transform:none;letter-spacing:.02em;font-size:13.5px;height:34px}
+#hubResults .item span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#hubResults .none{padding:8px;color:var(--faint);font:12px var(--mono);text-transform:none;letter-spacing:.04em}
+.toast.act{display:flex;align-items:center;gap:14px;pointer-events:auto;padding-right:8px}
+.toast button{height:26px;padding:0 10px;border:1px solid var(--acc-line);background:none;color:var(--acc);font:600 11px/1 var(--ui);letter-spacing:.1em;text-transform:uppercase}
+.toast button:hover{background:var(--acc-soft)}
+@media (max-width:760px){
+  .h-search{flex:1;width:auto;min-width:0;margin-left:0}
+  #hubSearch{font-size:16px}
+  .h-top .live{font-size:0;gap:0}
+  .h-top .spacer,#hubClock{display:none}
+  .wk-bars{height:80px;gap:5px}
+}
+
+/* ---------- coffre en ligne ---------- */
+#vault{position:fixed;inset:0;z-index:98;display:grid;place-items:center;padding:16px;background:rgba(3,4,6,.8)}
+.v-box{display:flex;flex-direction:column;gap:14px;width:min(500px,100%);max-height:100%;overflow:auto;padding:14px 20px 20px}
+.v-box h2{margin:0;font:700 21px/1.2 var(--ui);letter-spacing:.02em}
+.v-box p,.v-box ol{margin:0;color:var(--mut);line-height:1.6}
+.v-box ol{padding-left:20px}
+.v-box b{color:var(--txt);font-weight:600}
+.v-box input{width:100%;padding:9px 11px;background:var(--bg);border:1px solid var(--line2);color:var(--txt);font:14px/1.5 var(--ui);outline:none;transition:border-color .12s}
+.v-box input:focus{border-color:var(--acc)}
+.v-warn{padding:9px 11px;border-left:2px solid var(--warn);background:rgba(255,214,10,.06);color:#d9cf9a!important;font-size:13px}
+#vStatus{min-height:18px;color:var(--mut);font:11.5px/1.5 var(--mono);letter-spacing:.04em}
+#vStatus.err{color:var(--alert)}
+.v-acts{display:flex;flex-wrap:wrap;gap:8px}
+.h-read dd{max-width:62%;overflow-wrap:anywhere}
+.code-in{width:min(280px,58vw);padding:0 2px;background:none;border:0;border-bottom:1px solid var(--acc-line);outline:none;color:var(--acc);font:inherit;letter-spacing:.14em}
+.code-skip{display:block;margin-top:16px;padding:8px 12px;border:1px solid var(--line2);background:none;color:var(--mut);font:11px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase}
+.code-skip:hover{border-color:var(--acc-line);color:var(--acc)}
+.term .bad{color:var(--alert)}
+#intro.locked{cursor:default}
+#intro.locked .skip{visibility:hidden}
+@media (max-width:760px){
+  .v-box input,.code-in{font-size:16px}
+}
 </style>
 </head>
 <body>
@@ -692,6 +770,11 @@ body.fx #patch{animation:tool-in .22s ease-out}
 <div id="hub">
   <header class="h-top mono">
     <span class="mk"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="38" fill="none" stroke="#00e5ff" stroke-width="20"/><circle cx="60" cy="60" r="9" fill="#e8f1f8"/></svg>Bcorps Labs</span>
+    <div class="h-search">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="hubSearch" type="search" placeholder="Rechercher partout…" autocomplete="off" aria-label="Rechercher dans les idées, les tâches et les notes">
+      <div id="hubResults" class="pop" hidden></div>
+    </div>
     <span class="spacer"></span>
     <span id="hubClock"></span>
     <span class="live">Canal chiffré</span>
@@ -703,10 +786,12 @@ body.fx #patch{animation:tool-in .22s ease-out}
       <dl class="h-read mono">
         <div><dt>Données</dt><dd id="hubData"></dd></div>
         <div><dt>Dernière sauvegarde</dt><dd id="hubBackup"></dd></div>
+        <div><dt>Coffre en ligne</dt><dd id="hubVault"></dd></div>
       </dl>
       <div class="h-acts">
         <button id="hubSave" class="btn solid" title="Télécharge un fichier avec tous tes réseaux et toutes tes tâches. Utile : ces données vivent dans ce navigateur, qui peut les effacer.">Sauvegarder tout</button>
         <button id="hubRestore" class="btn" title="Recharge un fichier de sauvegarde">Restaurer</button>
+        <button id="hubVaultBtn" class="btn line" hidden></button>
       </div>
     </section>
     <section class="spaces">
@@ -806,6 +891,24 @@ body.fx #patch{animation:tool-in .22s ease-out}
           </div>
         </div>
       </div>
+      <div class="field">
+        <div class="label">// Répétition</div>
+        <div class="seg" id="tRepeat">
+          <button type="button" data-r="">Jamais</button>
+          <button type="button" data-r="day">Jour</button>
+          <button type="button" data-r="week">Semaine</button>
+          <button type="button" data-r="month">Mois</button>
+        </div>
+      </div>
+      <div class="field">
+        <div class="label"><span>// Sous-tâches</span><b id="tSubCount"></b></div>
+        <ul id="tSubs" class="subs"></ul>
+        <form id="tSubAdd" class="quick-add"><input placeholder="+ Sous-tâche" maxlength="200" autocomplete="off" aria-label="Nouvelle sous-tâche"></form>
+      </div>
+      <div class="field" id="tIdeaBox" hidden>
+        <div class="label">// Idée liée</div>
+        <button type="button" id="tIdea" class="idea-link"></button>
+      </div>
       <div class="field notes">
         <div class="label">// Détails</div>
         <textarea id="tNotes" placeholder="Écris ici tout ce qu'il faut : étapes, liens, idées, rappels…"></textarea>
@@ -866,6 +969,29 @@ body.fx #patch{animation:tool-in .22s ease-out}
     </aside>
   </div>
 </section>
+
+<div id="vault" hidden>
+  <div class="v-box pop">
+    <div class="p-top"><span class="mono">Coffre en ligne</span><button id="vClose" class="ib" aria-label="Fermer"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <h2 id="vTitle"></h2>
+    <p id="vText"></p>
+    <ol id="vSteps" hidden>
+      <li>Sur GitHub : Settings → Developer settings → Fine-grained tokens → Generate new token.</li>
+      <li>Repository access : <b>Only select repositories</b> → reseau-idees.</li>
+      <li>Permissions → Contents : <b>Read and write</b>.</li>
+      <li>Copie la clé générée et colle-la ci-dessous.</li>
+    </ol>
+    <div class="field" id="vTokenBox" hidden><div class="label">// Clé GitHub</div><input id="vToken" type="password" placeholder="github_pat_…" autocomplete="off" spellcheck="false"></div>
+    <div class="field" id="vCodeBox"><div class="label">// Code secret</div><input id="vCode" type="password" autocomplete="off"></div>
+    <div class="field" id="vCode2Box" hidden><div class="label">// Code secret, une seconde fois</div><input id="vCode2" type="password" autocomplete="off"></div>
+    <p id="vWarn" class="v-warn" hidden>Ce code ne peut pas être retrouvé. Si tu l'oublies, la copie en ligne devient illisible ; tes données restent sur les appareils déjà déverrouillés.</p>
+    <div id="vStatus"></div>
+    <div class="v-acts">
+      <button id="vOk" class="btn solid"></button>
+      <button id="vForget" class="btn" hidden>Oublier cet appareil</button>
+    </div>
+  </div>
+</div>
 
 <canvas id="c"></canvas>
 
@@ -955,9 +1081,14 @@ body.fx #patch{animation:tool-in .22s ease-out}
     <div class="label"><span>// Liaisons</span><b id="linkCount"></b></div>
     <ul id="links"></ul>
   </div>
+  <div class="field" id="ideaTasksBox" hidden>
+    <div class="label"><span>// Tâches liées</span><b id="ideaTaskCount"></b></div>
+    <ul id="ideaTasks" class="subs"></ul>
+  </div>
   <div class="actions">
     <button id="pChild" class="btn line"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Sous-idée</button>
     <button id="pLink" class="btn"><svg viewBox="0 0 24 24"><path d="M9 15l6-6M10 6l1-1a4 4 0 0 1 6 6l-1 1M14 18l-1 1a4 4 0 0 1-6-6l1-1"/></svg>Relier</button>
+    <button id="pTask" class="btn" title="Créer une tâche pour aujourd'hui à partir de cette idée"><svg viewBox="0 0 24 24"><path d="M5 12l4 4 10-10"/></svg>Tâche</button>
     <button id="pDel" class="ib danger push" aria-label="Supprimer l'idée" title="Supprimer l'idée"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>
   </div>
 </aside>
@@ -1084,6 +1215,7 @@ function saveNow(){
   try{
     localStorage.setItem(KEY2,JSON.stringify({current:state.id,boards:store.boards.map(boardOut)}));
   }catch(e){}
+  vaultTouch();
 }
 function save(){ if(!saveTimer) saveTimer=setTimeout(saveNow,400); }
 
@@ -1370,7 +1502,7 @@ function select(n,center){
   setHash(n?n.id:'');
   if(!n) return;
   $('fTitle').value=n.title; $('fNotes').value=n.notes;
-  renderSwatches(); renderSizes(); renderLinks();
+  renderSwatches(); renderSizes(); renderLinks(); renderIdeaTasks();
   reveal(n,center);
 }
 function renderMeta(){
@@ -1444,11 +1576,16 @@ function toggleLink(a,b){
   toast(linked(a,b)?'Liaison créée':'Liaison supprimée');
 }
 function removeNode(n){
+  var board=state, gone=state.links.filter(function(l){return l.a===n.id||l.b===n.id;});
   state.nodes=state.nodes.filter(function(o){return o!==n;});
   state.links=state.links.filter(function(l){return l.a!==n.id&&l.b!==n.id;});
   recount(); heat(0.3); saveNow(); updateEmpty();
   if(sel===n) select(null);
-  toast('Idée supprimée');
+  toast('Idée supprimée',function(){
+    board.nodes.push(n); board.links=board.links.concat(gone);
+    if(state===board){ recount(); heat(0.3); updateEmpty(); }
+    saveNow();
+  });
 }
 function startLink(){
   if(!sel) return;
@@ -1458,13 +1595,26 @@ function startLink(){
 }
 function endLink(){linkFrom=null;$('linkBanner').hidden=true;touch();}
 function closePopups(){$('menu').hidden=true;$('help').hidden=true;$('boardMenu').hidden=true;}
-/* petite confirmation en bas de l'écran, qui s'efface toute seule */
-function toast(msg){
+/* petite confirmation en bas de l'écran, qui s'efface toute seule.
+   Avec « undo », elle porte un bouton Annuler et reste plus longtemps ; Ctrl+Z fait la même chose. */
+var undoFn=null;
+function toast(msg,undo){
   var t=document.createElement('div'); t.className='toast'; t.textContent=msg;
+  if(undo){
+    var b=document.createElement('button'); b.type='button'; b.textContent='Annuler';
+    undoFn=undo; t.classList.add('act');
+    b.onclick=function(){ if(undoFn===undo) undoFn=null; t.remove(); undo(); toast('Action annulée'); };
+    t.appendChild(b);
+  }
   $('toasts').appendChild(t);
-  setTimeout(function(){t.classList.add('out');},2200);
-  setTimeout(function(){t.remove();},2600);
+  setTimeout(function(){t.classList.add('out');},undo?6500:2200);
+  setTimeout(function(){t.remove(); if(undo&&undoFn===undo) undoFn=null;},undo?6900:2600);
 }
+document.addEventListener('keydown',function(e){
+  if(e.key!=='z'||!(e.ctrlKey||e.metaKey)||!undoFn||/^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
+  e.preventDefault();
+  var f=undoFn; undoFn=null; f(); toast('Action annulée');
+});
 
 /* ---------- réseaux ---------- */
 function switchBoard(b){
@@ -1477,6 +1627,7 @@ function deleteBoard(b){
   store.boards=store.boards.filter(function(o){return o!==b;});
   if(!store.boards.length) store.boards.push(newBoard('Mon réseau'));
   if(b===state) switchBoard(store.boards[0]); else { saveNow(); renderBoards(); }
+  toast('Réseau « '+b.name+' » supprimé',function(){ store.boards.push(b); saveNow(); renderBoards(); });
 }
 function miniBtn(icon,label,cls){
   var b=document.createElement('button'); b.className='ib mini'+(cls?' '+cls:'');
@@ -1641,6 +1792,28 @@ $('pChild').onclick=function(){
   if(!sel) return;
   var a=Math.random()*6.2832, d=radius(sel)+90; addNode(sel.x+Math.cos(a)*d,sel.y+Math.sin(a)*d,sel);
 };
+/* tâches du Planificateur créées à partir de l'idée ouverte */
+function renderIdeaTasks(){
+  var ul=$('ideaTasks'), list=sel?tasks.filter(function(t){return t.idea&&t.idea.node===sel.id;}):[];
+  ul.textContent='';
+  $('ideaTasksBox').hidden=!list.length;
+  $('ideaTaskCount').textContent=list.length?two0(list.length):'';
+  list.forEach(function(t){
+    var li=el('li',t.done?'done':''), chk=el('button','chk'), tx=el('span');
+    chk.type='button'; chk.setAttribute('aria-label',t.done?'Rouvrir la tâche':'Terminer la tâche');
+    chk.onclick=function(){setDone(t,!t.done); saveTasks(); renderIdeaTasks();};
+    tx.textContent=(t.title||'Sans titre')+(t.date?' · '+shortDate(t.date):''); tx.style.cursor='pointer'; tx.title='Ouvrir dans le Planificateur';
+    tx.onclick=function(){ selDay=t.date||todayIso(); aView='day'; openAgenda(); openTask(t); };
+    li.appendChild(chk); li.appendChild(tx); ul.appendChild(li);
+  });
+}
+$('pTask').onclick=function(){
+  if(!sel) return;
+  var t=addTask(sel.title||'Sans titre',todayIso());
+  t.idea={board:state.id,node:sel.id};
+  saveTasks(); renderIdeaTasks();
+  toast('Tâche créée pour aujourd\'hui');
+};
 $('pLink').onclick=startLink;
 $('linkCancel').onclick=endLink;
 $('pDel').onclick=function(){
@@ -1754,7 +1927,9 @@ $('hubRestore').onclick=function(){$('file').click();};
 $('mReset').onclick=function(){
   $('menu').hidden=true;
   if(!confirm('Vider le réseau « '+state.name+' » ? Toutes ses idées seront effacées, définitivement.')) return;
+  var board=state, oldNodes=state.nodes, oldLinks=state.links;
   state.nodes=[]; state.links=[]; switchBoard(state);
+  toast('Réseau vidé',function(){ board.nodes=oldNodes; board.links=oldLinks; if(state===board) switchBoard(board); else saveNow(); });
 };
 
 /* recherche : champ fixe sur grand écran, rangée dépliable sur téléphone */
@@ -1804,11 +1979,19 @@ function monthEndIso(){var d=new Date(); return iso(new Date(d.getFullYear(),d.g
 function shortDate(s){var d=fromIso(s); return DOW[d.getDay()]+' '+two0(d.getDate())+'/'+two0(d.getMonth()+1);}
 function dayMonth(s){var d=fromIso(s); return d.getDate()+(d.getDate()===1?'er':'')+' '+MONTHS[d.getMonth()];}
 function longDate(s){return DOW_LONG[fromIso(s).getDay()]+' '+dayMonth(s);}
+var REPEATS={day:'chaque jour',week:'chaque semaine',month:'chaque mois'};
+function normSubs(a){
+  return (Array.isArray(a)?a:[]).filter(function(s){return s&&typeof s.text==='string'&&s.text.trim();}).slice(0,40).map(function(s,j){
+    return {id:String(s.id||'s'+j),text:s.text.slice(0,200),done:!!s.done};
+  });
+}
 function normTasks(a){
   return a.filter(function(t){return t&&typeof t.title==='string';}).map(function(t,i){
     return {id:String(t.id||uid()+i),title:t.title.slice(0,200),date:ISO_RE.test(t.date)?t.date:null,
       done:!!t.done,hi:!!t.hi,notes:String(t.notes||''),created:+t.created||0,doneAt:+t.doneAt||0,
-      was:Array.isArray(t.was)?t.was.filter(function(d){return ISO_RE.test(d);}).slice(-90):[]};
+      was:Array.isArray(t.was)?t.was.filter(function(d){return ISO_RE.test(d);}).slice(-90):[],
+      subs:normSubs(t.subs),repeat:REPEATS[t.repeat]?t.repeat:'',next:String(t.next||''),
+      idea:t.idea&&t.idea.node?{board:String(t.idea.board||''),node:String(t.idea.node)}:null};
   });
 }
 /* ne garde que les jours valides qui ont vraiment du texte */
@@ -1833,6 +2016,7 @@ function saveTasks(){
     localStorage.setItem(KEY_T,JSON.stringify(tasks));
     localStorage.setItem(KEY_D,JSON.stringify(dayNotes));
   }catch(e){}
+  vaultTouch();
 }
 function commitTasks(){saveTasks();renderAgenda();}
 /* « reportée » : tâche non faite qui a déjà été repoussée d'au moins un jour (t.was garde les jours manqués) */
@@ -1865,7 +2049,7 @@ function sortTasks(list,td){
 function tasksOn(s){return tasks.filter(function(t){return t.date===s;});}
 function isDone(t){return t.done;}
 function addTask(title,date){
-  var t={id:uid(),title:title,date:date||null,done:false,hi:false,notes:'',created:Date.now(),doneAt:0,was:[]};
+  var t={id:uid(),title:title,date:date||null,done:false,hi:false,notes:'',created:Date.now(),doneAt:0,was:[],subs:[],repeat:'',next:'',idea:null};
   tasks.push(t);
   return t;
 }
@@ -1881,6 +2065,8 @@ function taskRow(t,td,showDate){
   if(late(t,td)){ s=el('span','late'); s.textContent='Reportée · prévue '+shortDate(t.was[0]); tm.appendChild(s); }
   else if(showDate&&t.date){ s=el('span'); s.textContent=shortDate(t.date); tm.appendChild(s); }
   if(t.hi){ s=el('span','hi'); s.textContent='Prioritaire'; tm.appendChild(s); }
+  if(t.subs.length){ s=el('span','note'); s.textContent=t.subs.filter(isDone).length+'/'+t.subs.length+' étapes'; tm.appendChild(s); }
+  if(t.repeat){ s=el('span','note'); s.textContent='↻ '+REPEATS[t.repeat]; tm.appendChild(s); }
   if(t.notes.trim()){ s=el('span','note'); s.textContent='+ détails'; tm.appendChild(s); }
   body.appendChild(tt); body.appendChild(tm);
   li.appendChild(chk); li.appendChild(body);
@@ -1921,7 +2107,26 @@ function goDay(s){swapNext=true; selDay=s; aView='day'; syncCal(); renderAgenda(
 /* ----- les trois vues ----- */
 /* jour où une tâche a été cochée ; pour les anciennes tâches sans horodatage, on retient le jour prévu */
 function doneDay(t){return !t.done?null:t.doneAt?iso(new Date(t.doneAt)):t.date;}
-function setDone(t,v){t.done=v; t.doneAt=v?Date.now():0; if(v) justId=t.id;}
+/* date de la prochaine occurrence d'une tâche répétée : toujours après aujourd'hui */
+function nextDate(t){
+  var td=todayIso(), d=t.date||td, x, n;
+  do{
+    if(t.repeat==='day') d=addDays(d,1);
+    else if(t.repeat==='week') d=addDays(d,7);
+    else{ x=fromIso(d); n=new Date(x.getFullYear(),x.getMonth()+1,1); n.setDate(Math.min(x.getDate(),new Date(n.getFullYear(),n.getMonth()+1,0).getDate())); d=iso(n); }
+  }while(d<=td);
+  return d;
+}
+function setDone(t,v){
+  t.done=v; t.doneAt=v?Date.now():0; if(v) justId=t.id;
+  /* tâche répétée : la cocher crée la suivante, une seule fois */
+  if(v&&t.repeat&&!t.next){
+    var n=addTask(t.title,nextDate(t));
+    n.hi=t.hi; n.notes=t.notes; n.repeat=t.repeat; n.idea=t.idea;
+    n.subs=t.subs.map(function(s){return {id:uid(),text:s.text,done:false};});
+    t.next=n.id;
+  }
+}
 /* idées créées un jour donné dans le Réseau neuronal, tous réseaux confondus */
 function ideasOn(s){
   var out=[];
@@ -2024,6 +2229,53 @@ function viewDay(main,td){
   c2.appendChild(label('Notes du jour')); c2.appendChild(notes);
   wrap.appendChild(c1); wrap.appendChild(c2); main.appendChild(wrap);
 }
+/* bilan d'une semaine : mêmes chiffres que le débrief du jour, sur sept jours */
+function weekReview(td,start){
+  var box=el('div','debrief week-review'), stats=el('div','db-stats'), bars=el('div','wk-bars'), end=addDays(start,6), days=[], i, max=1;
+  var inWeek=function(d){return !!d&&d>=start&&d<=end;};
+  var done=tasks.filter(function(t){return inWeek(doneDay(t));}).sort(function(a,b){return (a.doneAt||0)-(b.doneAt||0);});
+  var missed=tasks.filter(function(t){return t.was.some(inWeek);}).length;
+  var made=tasks.filter(function(t){return t.created&&inWeek(iso(new Date(t.created)));}).length;
+  var ideas=0, p=function(n){return n>1?'s':'';};
+  var stat=function(n,text){
+    if(!n) return;
+    var s=el('span','on'), b=el('b'); b.textContent=two0(n); s.appendChild(b); s.appendChild(document.createTextNode(text)); stats.appendChild(s);
+  };
+  for(i=0;i<7;i++){
+    (function(d){
+      var n=done.filter(function(t){return doneDay(t)===d;}).length;
+      ideas+=ideasOn(d).length; days.push({d:d,n:n}); if(n>max) max=n;
+    })(addDays(start,i));
+  }
+  box.appendChild(label(end<td?'Bilan de la semaine':'Bilan de la semaine en cours'));
+  stat(done.length,'tâche'+p(done.length)+' faite'+p(done.length));
+  stat(missed,'tâche'+p(missed)+' reportée'+p(missed));
+  stat(made,'tâche'+p(made)+' créée'+p(made));
+  stat(ideas,'idée'+p(ideas)+' ajoutée'+p(ideas));
+  box.appendChild(stats);
+  /* une barre par jour : nombre de tâches faites */
+  days.forEach(function(o){
+    var col=el('div','wk-day'+(o.d===td?' today':'')), bar=el('i'), n=el('b'), lab=el('span');
+    bar.style.height=Math.round(o.n/max*100)+'%'; n.textContent=o.n||''; lab.textContent=DOW[fromIso(o.d).getDay()];
+    col.title=plural(o.n,'tâche')+' faite'+p(o.n)+' le '+longDate(o.d);
+    col.onclick=function(){goDay(o.d);};
+    col.appendChild(n); col.appendChild(bar); col.appendChild(lab); bars.appendChild(col);
+  });
+  box.appendChild(bars);
+  if(done.length){
+    var h=el('div','db-sub'), ul=el('ul','db-list');
+    h.textContent='Fait cette semaine'; box.appendChild(h); box.appendChild(ul);
+    done.forEach(function(t){
+      var li=el('li','go'), hh=el('span','h'), tx=el('span','t');
+      hh.textContent=DOW[fromIso(doneDay(t)).getDay()]; tx.textContent=t.title||'Sans titre';
+      li.onclick=function(){openTask(t);};
+      li.appendChild(hh); li.appendChild(tx); ul.appendChild(li);
+    });
+  }else{
+    var none=el('p','none'); none.textContent='Aucune tâche cochée cette semaine.'; box.appendChild(none);
+  }
+  return box;
+}
 function viewWeek(main,td){
   var w=el('div','week'), start=weekStart(selDay), i;
   for(i=0;i<7;i++){
@@ -2041,6 +2293,8 @@ function viewWeek(main,td){
     })(addDays(start,i));
   }
   main.appendChild(w);
+  /* pas de bilan pour une semaine à venir */
+  if(start<=td) main.appendChild(weekReview(td,start));
 }
 function viewMonth(main,td){
   var box=el('div','month'), dow=el('div','m-dow mono'), grid=el('div','m-grid');
@@ -2154,8 +2408,37 @@ function shift(dir){
 
 /* ----- fiche d'une tâche ----- */
 function grow(){var a=$('tTitle'); a.style.height='auto'; a.style.height=a.scrollHeight+'px';}
+function findIdea(ref){
+  var out=null;
+  if(ref) store.boards.forEach(function(b){ b.nodes.forEach(function(n){ if(n.id===ref.node) out={board:b,node:n}; }); });
+  return out;
+}
+function renderSubs(){
+  var t=selTask, ul=$('tSubs');
+  ul.textContent='';
+  $('tSubCount').textContent=t.subs.length?t.subs.filter(isDone).length+'/'+t.subs.length:'';
+  t.subs.forEach(function(s){
+    var li=el('li',s.done?'done':''), chk=el('button','chk'), tx=el('span'), rm=el('button','ib');
+    chk.type=rm.type='button';
+    chk.setAttribute('aria-label',s.done?'Rouvrir l\'étape':'Terminer l\'étape');
+    chk.onclick=function(){s.done=!s.done; renderSubs(); commitTasks();};
+    tx.textContent=s.text;
+    rm.innerHTML=X_ICON; rm.title='Retirer cette sous-tâche'; rm.setAttribute('aria-label',rm.title);
+    rm.onclick=function(){t.subs=t.subs.filter(function(o){return o!==s;}); renderSubs(); commitTasks();};
+    li.appendChild(chk); li.appendChild(tx); li.appendChild(rm); ul.appendChild(li);
+  });
+}
 function fillPanel(){
   var t=selTask; if(!t) return;
+  var idea=findIdea(t.idea);
+  [].forEach.call($('tRepeat').children,function(b){b.classList.toggle('on',b.getAttribute('data-r')===t.repeat);});
+  renderSubs();
+  $('tIdeaBox').hidden=!idea;
+  if(idea){
+    var dot=el('i'), tx=el('span'), bd=el('small');
+    dot.style.background=idea.node.color; tx.textContent=idea.node.title||'Sans titre'; bd.textContent=idea.board.name;
+    $('tIdea').textContent=''; $('tIdea').appendChild(dot); $('tIdea').appendChild(tx); $('tIdea').appendChild(bd);
+  }
   $('tTitle').value=t.title; $('tNotes').value=t.notes; $('tDate').value=t.date||'';
   $('tDone').classList.toggle('on',t.done); $('tDone').textContent=t.done?'Terminée':'Marquer terminée';
   $('tHi').classList.toggle('on',t.hi); $('tHi').textContent=t.hi?'Prioritaire':'Mettre en priorité';
@@ -2198,7 +2481,25 @@ $('tDel').onclick=function(){
   if((t.title.trim()||t.notes.trim())&&!confirm('Supprimer la tâche « '+(t.title||'Sans titre')+' » ?')) return;
   tasks=tasks.filter(function(o){return o!==t;});
   selTask=null; $('tPanel').hidden=true; $('aBody').classList.remove('with-panel'); commitTasks();
-  toast('Tâche supprimée');
+  toast('Tâche supprimée',function(){ tasks.push(t); commitTasks(); });
+};
+$('tRepeat').addEventListener('click',function(e){
+  var b=e.target.closest('button'); if(!b||!selTask) return;
+  selTask.repeat=b.getAttribute('data-r'); selTask.next='';
+  fillPanel(); commitTasks();
+});
+$('tSubAdd').addEventListener('submit',function(e){
+  e.preventDefault();
+  var inp=this.querySelector('input'), v=inp.value.trim();
+  if(!v||!selTask) return;
+  selTask.subs.push({id:uid(),text:v,done:false}); inp.value='';
+  renderSubs(); commitTasks();
+});
+/* ouvre dans le Réseau neuronal l'idée d'où vient la tâche */
+$('tIdea').onclick=function(){
+  var idea=selTask&&findIdea(selTask.idea); if(!idea) return;
+  openTool(); if(state!==idea.board) switchBoard(idea.board);
+  select(idea.node,true);
 };
 $('tClose').onclick=closeTask;
 
@@ -2215,8 +2516,9 @@ $('aPurge').onclick=function(){
   if(!n){ alert('Aucune tâche terminée à supprimer.'); return; }
   if(!confirm('Supprimer définitivement '+plural(n,'tâche')+' terminée'+(n>1?'s':'')+' ? Elles disparaîtront aussi des débriefs des jours passés.')) return;
   if(selTask&&selTask.done){ selTask=null; $('tPanel').hidden=true; $('aBody').classList.remove('with-panel'); }
+  var purged=tasks.filter(isDone);
   tasks=tasks.filter(function(t){return !t.done;}); commitTasks();
-  toast(plural(n,'tâche')+' supprimée'+(n>1?'s':''));
+  toast(plural(n,'tâche')+' supprimée'+(n>1?'s':''),function(){ tasks=tasks.concat(purged); commitTasks(); });
 };
 document.addEventListener('keydown',function(e){
   if(!agendaOpen||hubOpen) return;
@@ -2546,6 +2848,271 @@ document.addEventListener('keydown',function(e){
   if(e.key==='Escape'&&pnOpen&&!hubOpen&&pnMode) closeEditor();
 });
 
+/* ---------- recherche globale : idées, tâches et notes des jours ---------- */
+function hubSearch(q){
+  var box=$('hubResults'), groups=[], ideas=[], found=[], notes=[];
+  box.textContent='';
+  q=q.trim().toLowerCase();
+  if(q.length<2){ box.hidden=true; return; }
+  var has=function(s){return String(s||'').toLowerCase().indexOf(q)>=0;};
+  store.boards.forEach(function(b){ b.nodes.forEach(function(n){ if(has(n.title)||has(n.notes)) ideas.push({b:b,n:n}); }); });
+  tasks.forEach(function(t){ if(has(t.title)||has(t.notes)||t.subs.some(function(s){return has(s.text);})) found.push(t); });
+  Object.keys(dayNotes).sort().reverse().forEach(function(d){ if(has(dayNotes[d])) notes.push(d); });
+  var group=function(title,list,make){
+    if(!list.length) return;
+    var h=el('div','label'); h.textContent='// '+title+' · '+two0(list.length); box.appendChild(h);
+    list.slice(0,6).forEach(function(o){
+      var r=make(o), b=el('button','item'), tx=el('span'), sm=el('small');
+      b.type='button'; tx.textContent=r[0]; sm.textContent=r[1];
+      b.onclick=function(){ box.hidden=true; $('hubSearch').value=''; r[2](); };
+      b.appendChild(tx); b.appendChild(sm); box.appendChild(b);
+    });
+    groups.push(title);
+  };
+  group('Idées',ideas,function(o){return [o.n.title||'Sans titre',o.b.name,function(){ openTool(); if(state!==o.b) switchBoard(o.b); select(o.n,true); }];});
+  group('Tâches',found,function(t){return [t.title||'Sans titre',t.date?shortDate(t.date):'à planifier',function(){ selDay=t.date||todayIso(); aView='day'; openAgenda(); openTask(t); }];});
+  group('Notes du jour',notes,function(d){return [dayNotes[d].replace(/\s+/g,' ').slice(0,60),shortDate(d),function(){ selDay=d; aView='day'; openAgenda(); }];});
+  if(!groups.length){ var none=el('div','none'); none.textContent='Aucun résultat pour « '+q+' ».'; box.appendChild(none); }
+  box.hidden=false;
+}
+$('hubSearch').addEventListener('input',function(){hubSearch(this.value);});
+$('hubSearch').addEventListener('keydown',function(e){
+  if(e.key==='Escape'){ this.value=''; $('hubResults').hidden=true; this.blur(); }
+  if(e.key==='Enter'){ var first=$('hubResults').querySelector('.item'); if(first) first.click(); }
+});
+document.addEventListener('click',function(e){ if(!e.target.closest('.h-search')) $('hubResults').hidden=true; });
+
+/* ---------- coffre en ligne : sauvegarde chiffrée et synchronisation entre appareils ---------- */
+/* Deux fichiers sur la branche « coffre » du dépôt (hors du site publié, donc sans reconstruction du site) :
+   - acces.json   : la clé GitHub, chiffrée par le code secret ; lisible par tous, inutilisable sans le code ;
+   - donnees.json : réseaux, tâches et notes, chiffrés par le même code.
+   Sur un nouvel appareil, le code secret seul suffit donc à tout retrouver. */
+var VAULT_BRANCH='coffre', KEY_VK='bcorps-coffre-cle', KEY_VS='bcorps-coffre-etat';
+var vault={key:null,exists:null,access:null,probe:null,rev:0,sig:'',last:0,busy:false,again:false,applying:false,error:'',timer:null};
+var vMode='';
+function b64e(buf){var b=new Uint8Array(buf), s='', i; for(i=0;i<b.length;i++) s+=String.fromCharCode(b[i]); return btoa(s);}
+function b64d(s){var bin=atob(s), b=new Uint8Array(bin.length), i; for(i=0;i<bin.length;i++) b[i]=bin.charCodeAt(i); return b;}
+function hashText(s){var h=5381, i; for(i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))|0; return String(h)+':'+s.length;}
+function deriveKey(code,salt){
+  return crypto.subtle.importKey('raw',new TextEncoder().encode(code),'PBKDF2',false,['deriveKey']).then(function(k){
+    return crypto.subtle.deriveKey({name:'PBKDF2',salt:b64d(salt),iterations:310000,hash:'SHA-256'},k,{name:'AES-GCM',length:256},true,['encrypt','decrypt']);
+  });
+}
+function seal(key,text){
+  var iv=crypto.getRandomValues(new Uint8Array(12));
+  return crypto.subtle.encrypt({name:'AES-GCM',iv:iv},key,new TextEncoder().encode(text)).then(function(buf){return {iv:b64e(iv),data:b64e(buf)};});
+}
+function unseal(key,o){
+  return crypto.subtle.decrypt({name:'AES-GCM',iv:b64d(o.iv)},key,b64d(o.data)).then(function(buf){return new TextDecoder().decode(buf);});
+}
+/* lecture d'un fichier du coffre ; sans clé GitHub, la lecture reste possible car le dépôt est public */
+function ghFile(path,key){
+  return fetch('https://api.github.com/repos/'+REPO+'/contents/'+path+'?ref='+VAULT_BRANCH,
+    {headers:key?ghHeaders(key):{Accept:'application/vnd.github+json'},cache:'no-store'}).then(function(r){
+    if(r.status===404) return null;
+    if(!r.ok) throw new Error(r.status===401?'Clé refusée par GitHub.':r.status===403?'GitHub limite les requêtes, réessaie dans une minute.':'GitHub a répondu '+r.status+'.');
+    return r.json();
+  }).then(function(j){
+    return j?{sha:j.sha,text:decodeURIComponent(escape(atob(String(j.content||'').replace(/\s/g,''))))}:null;
+  });
+}
+function ghPut(path,text,sha,message){
+  return fetch('https://api.github.com/repos/'+REPO+'/contents/'+path,{method:'PUT',headers:ghHeaders(ghKey()),
+    body:JSON.stringify({message:message,branch:VAULT_BRANCH,content:b64(text),sha:sha||undefined})}).then(function(r){
+    if(r.status===409||r.status===422){ var c=new Error('Le coffre a changé entre-temps.'); c.conflict=true; throw c; }
+    if(!r.ok) throw new Error(r.status===401||r.status===403||r.status===404?'La clé n\'a pas le droit d\'écrire dans le dépôt.':'GitHub a répondu '+r.status+'.');
+    return r.json();
+  });
+}
+function vaultSnapshot(){return JSON.stringify({v:1,boards:store.boards.map(boardOut),tasks:tasks,dayNotes:dayNotes});}
+function vaultEmpty(){
+  return store.boards.every(function(b){return !b.nodes.length;})&&!tasks.length&&!Object.keys(dayNotes).length;
+}
+function vaultPersist(){try{localStorage.setItem(KEY_VS,JSON.stringify({rev:vault.rev,sig:vault.sig,last:vault.last}));}catch(e){}}
+/* applique le contenu du coffre à cet appareil ; en fusion, ce qui existe ici est gardé et le reste s'ajoute */
+function vaultApply(o,merge){
+  var boards=readBoards(o.boards), ts=normTasks(Array.isArray(o.tasks)?o.tasks:[]), days=normDays(o.dayNotes), have={}, cur;
+  if(merge){
+    store.boards.forEach(function(b){have[b.id]=true;});
+    boards.forEach(function(b){ if(!have[b.id]) store.boards.push(b); });
+    have={}; tasks.forEach(function(t){have[t.id]=true;});
+    ts.forEach(function(t){ if(!have[t.id]) tasks.push(t); });
+    Object.keys(days).forEach(function(k){ if(!dayNotes[k]) dayNotes[k]=days[k]; });
+  }else{
+    if(boards.length) store.boards=boards;
+    tasks=ts; dayNotes=days;
+  }
+  cur=store.boards.filter(function(b){return b.id===state.id;})[0]||store.boards[0];
+  vault.applying=true;
+  selTask=null; $('tPanel').hidden=true; $('aBody').classList.remove('with-panel');
+  switchBoard(cur); saveTasks();
+  vault.applying=false;
+  if(agendaOpen) renderAgenda();
+  if(hubOpen) showHub();
+}
+/* synchronise : récupère le coffre s'il a changé ailleurs, puis envoie ce qui a changé ici */
+function vaultSync(){
+  if(!vault.key||!ghKey()) return Promise.resolve();
+  if(vault.busy){ vault.again=true; return Promise.resolve(); }
+  vault.busy=true; vault.again=false; clearTimeout(vault.timer); vaultUi();
+  var snap=vaultSnapshot(), changed=hashText(snap)!==vault.sig, sha=null;
+  return ghFile('donnees.json',ghKey()).then(function(f){
+    var remote=f?JSON.parse(f.text):null;
+    sha=f?f.sha:null;
+    if(!remote||remote.rev===vault.rev) return !remote||changed;
+    return unseal(vault.key,remote).then(function(text){
+      var merge=changed&&!vaultEmpty();
+      vaultApply(JSON.parse(text),merge);
+      vault.rev=remote.rev; snap=vaultSnapshot();
+      if(!merge) vault.sig=hashText(snap);
+      return merge;
+    },function(){ throw new Error('Le coffre ne s\'ouvre pas avec le code de cet appareil.'); });
+  }).then(function(push){
+    if(!push) return;
+    var rev=Date.now();
+    return seal(vault.key,snap).then(function(s){
+      return ghPut('donnees.json',JSON.stringify({v:1,rev:rev,iv:s.iv,data:s.data}),sha,'Coffre : synchronisation');
+    }).then(function(){ vault.rev=rev; vault.sig=hashText(snap); });
+  }).then(function(){ vault.last=Date.now(); vault.error=''; },function(e){
+    vault.error=ghError(e);
+    if(e&&e.conflict) vault.again=true;
+  }).then(function(){
+    vault.busy=false; vaultPersist(); vaultUi();
+    if(vault.again) vaultTouch();
+  });
+}
+/* appelé après chaque enregistrement local : envoie vers le coffre après quelques secondes de calme */
+function vaultTouch(){
+  if(vault.applying||!vault.key) return;
+  clearTimeout(vault.timer); vault.timer=setTimeout(vaultSync,4000);
+}
+function vaultRemember(key){
+  vault.key=key;
+  return crypto.subtle.exportKey('raw',key).then(function(raw){
+    try{localStorage.setItem(KEY_VK,JSON.stringify({raw:b64e(raw)}));}catch(e){}
+  });
+}
+/* ouvre le coffre avec le code secret : retrouve la clé GitHub, puis les données */
+function vaultUnlock(code){
+  return (vault.access?Promise.resolve(vault.access):ghFile('acces.json',ghKey())).then(function(f){
+    if(!f) throw new Error('Aucun coffre n\'existe encore.');
+    var a=JSON.parse(f.text);
+    return deriveKey(code,a.salt).then(function(key){
+      return unseal(key,a).then(function(token){return {key:key,token:token};},function(){ throw new Error('Code refusé.'); });
+    });
+  }).then(function(r){
+    try{localStorage.setItem(KEY_GH,r.token);}catch(e){}
+    return vaultRemember(r.key);
+  }).then(function(){ vault.exists=true; vault.rev=0; vault.sig=''; vaultUi(); return vaultSync(); });
+}
+/* crée le coffre : chiffre la clé GitHub avec le code choisi, puis envoie les données */
+function vaultSetup(code){
+  var salt=b64e(crypto.getRandomValues(new Uint8Array(16))), key;
+  return ghFile('acces.json',ghKey()).then(function(f){
+    if(f) throw new Error('Un coffre existe déjà : déverrouille-le avec ton code.');
+    return deriveKey(code,salt);
+  }).then(function(k){ key=k; return seal(key,ghKey()); }).then(function(s){
+    return ghPut('acces.json',JSON.stringify({v:1,salt:salt,iv:s.iv,data:s.data}),null,'Coffre : creation');
+  }).then(function(){ return vaultRemember(key); }).then(function(){
+    vault.exists=true; vault.rev=0; vault.sig=''; vaultUi(); return vaultSync();
+  });
+}
+function ago(t){var m=Math.round((Date.now()-t)/6e4); return m<1?'à l\'instant':m<60?'il y a '+m+' min':'il y a '+Math.round(m/60)+' h';}
+function vaultUi(){
+  var d=$('hubVault'), b=$('hubVaultBtn'), text='Désactivé', color='var(--mut)', lab='Activer le coffre';
+  if(!window.crypto||!crypto.subtle||!window.fetch){ text='Indisponible dans ce navigateur'; lab=''; }
+  else if(vault.key){
+    lab='Coffre';
+    if(vault.busy) text='Synchronisation…';
+    else if(vault.error){ text=vault.error; color='var(--alert)'; }
+    else{ text=vault.last?'À jour · '+ago(vault.last):'Activé'; color='var(--ok)'; }
+  }else if(vault.exists){ text='Verrouillé'; color='var(--warn)'; lab='Déverrouiller'; }
+  d.textContent=text; d.style.color=color;
+  b.textContent=lab; b.hidden=!lab;
+  if(vMode==='manage') $('vText').textContent=vaultSummary();
+}
+function vaultSummary(){
+  return vault.busy?'Synchronisation en cours…':vault.error?'Dernier essai : '+vault.error:
+    'Tes réseaux, tes tâches et tes notes sont enregistrés en ligne, chiffrés par ton code. Dernière synchronisation : '+(vault.last?ago(vault.last):'jamais')+'.';
+}
+function vaultStart(){
+  var st=null, k=null;
+  try{ st=JSON.parse(localStorage.getItem(KEY_VS)||'null'); k=JSON.parse(localStorage.getItem(KEY_VK)||'null'); }catch(e){}
+  if(st){ vault.rev=+st.rev||0; vault.sig=String(st.sig||''); vault.last=+st.last||0; }
+  vault.probe=Promise.resolve();
+  if(window.crypto&&crypto.subtle&&window.fetch){
+    if(k&&k.raw){
+      /* appareil déjà déverrouillé : la clé de chiffrement est gardée ici */
+      vault.exists=true;
+      vault.probe=crypto.subtle.importKey('raw',b64d(k.raw),{name:'AES-GCM'},true,['encrypt','decrypt']).then(function(key){
+        vault.key=key; vaultUi(); vaultSync();
+      }).catch(function(){});
+    }else{
+      /* sinon on regarde simplement si un coffre existe, pour demander le code à la connexion */
+      vault.probe=ghFile('acces.json',ghKey()).then(function(f){ vault.exists=!!f; vault.access=f; },function(){ vault.exists=null; }).then(vaultUi);
+    }
+  }
+  vaultUi();
+}
+/* fenêtre du coffre : création, déverrouillage ou gestion selon l'état */
+function vStatus(msg,cls){var s=$('vStatus'); s.textContent=msg||''; s.className=cls||'';}
+function openVault(){
+  vMode=vault.key?'manage':vault.exists?'unlock':'setup';
+  var setup=vMode==='setup', manage=vMode==='manage';
+  $('vault').hidden=false; vStatus('');
+  $('vCode').value=''; $('vCode2').value=''; $('vToken').value='';
+  $('vTitle').textContent=setup?'Activer le coffre en ligne':manage?'Coffre activé':'Déverrouiller le coffre';
+  $('vText').textContent=setup?'Tes données seront enregistrées en ligne, chiffrées par un code que toi seul connais. Tu les retrouveras sur tous tes appareils en tapant ce code.':
+    manage?vaultSummary():'Tape ton code secret pour retrouver tes données sur cet appareil.';
+  $('vSteps').hidden=!setup||!!ghKey();
+  $('vTokenBox').hidden=!setup||!!ghKey();
+  $('vCodeBox').hidden=manage; $('vCode2Box').hidden=!setup;
+  $('vWarn').hidden=!setup;
+  $('vOk').textContent=setup?'Activer':manage?'Synchroniser maintenant':'Déverrouiller';
+  $('vForget').hidden=!manage;
+  if(!manage) setTimeout(function(){ ($('vTokenBox').hidden?$('vCode'):$('vToken')).focus(); },30);
+}
+function closeVault(){vMode=''; $('vault').hidden=true;}
+function vaultSubmit(){
+  var code=$('vCode').value, token=$('vToken').value.trim(), step;
+  if(vMode==='manage'){ vaultSync(); return; }
+  if(vMode==='unlock'){
+    if(!code){ vStatus('Tape ton code secret.','err'); return; }
+    vStatus('Vérification…');
+    vaultUnlock(code).then(function(){ closeVault(); toast('Coffre déverrouillé · données récupérées'); },function(e){ vStatus(ghError(e),'err'); });
+    return;
+  }
+  if(!ghKey()&&!token){ vStatus('Colle d\'abord ta clé GitHub.','err'); return; }
+  if(code.length<12){ vStatus('Choisis un code d\'au moins 12 caractères : une phrase de quelques mots, par exemple.','err'); return; }
+  if(code!==$('vCode2').value){ vStatus('Les deux codes ne sont pas identiques.','err'); return; }
+  vStatus('Création du coffre…');
+  step=ghKey()?Promise.resolve():fetch('https://api.github.com/repos/'+REPO,{headers:ghHeaders(token),cache:'no-store'}).then(function(r){
+    if(!r.ok) throw new Error(r.status===401?'Clé refusée par GitHub.':'Cette clé ne donne pas accès au dépôt du site.');
+    try{localStorage.setItem(KEY_GH,token);}catch(e){}
+  });
+  step.then(function(){ return vaultSetup(code); }).then(function(){
+    closeVault(); toast(vault.error?'Coffre créé, mais l\'envoi a échoué : '+vault.error:'Coffre activé · données enregistrées en ligne');
+  },function(e){ vStatus(ghError(e),'err'); });
+}
+$('hubVaultBtn').onclick=openVault;
+$('vClose').onclick=closeVault;
+$('vOk').onclick=vaultSubmit;
+$('vault').addEventListener('keydown',function(e){
+  if(e.key==='Enter'&&e.target.tagName==='INPUT'){ e.preventDefault(); vaultSubmit(); }
+  if(e.key==='Escape') closeVault();
+});
+$('vForget').onclick=function(){
+  if(!confirm('Oublier le coffre sur cet appareil ? Les données restent ici et en ligne, mais il faudra retaper le code pour synchroniser à nouveau.')) return;
+  try{localStorage.removeItem(KEY_VK);localStorage.removeItem(KEY_VS);localStorage.removeItem(KEY_GH);}catch(e){}
+  vault.key=null; vault.rev=0; vault.sig=''; vault.last=0; vault.error=''; vault.access=null;
+  closeVault(); vaultUi(); toast('Appareil oublié');
+};
+/* en quittant la page : dernier envoi ; en y revenant : on vérifie si un autre appareil a écrit */
+document.addEventListener('visibilitychange',function(){
+  if(!vault.key) return;
+  if(document.hidden||Date.now()-vault.last>60000) vaultSync();
+});
+
 /* ---------- console d'accueil ---------- */
 function clock(){return new Date().toLocaleTimeString('fr-FR');}
 function row(k,v){
@@ -2611,6 +3178,9 @@ var start=startId?byId(startId):null;
 loadTasks();
 renderHubLinks();
 loadNotes();
+vaultStart();
+/* application installable : garde une copie du site pour l'ouvrir hors connexion */
+if('serviceWorker' in navigator&&location.protocol==='https:') navigator.serviceWorker.register('sw.js').catch(function(){});
 /* demande au navigateur de ne pas évincer ces données de lui-même (sans effet sur un effacement réglé par l'utilisateur) */
 try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist().catch(function(){}); }catch(e){}
 /* un lien direct vers une idée ou vers le planificateur saute la console d'accueil */
@@ -2624,7 +3194,7 @@ requestAnimationFrame(draw);
 
 /* ---------- séquence de connexion ---------- */
 (function(){
-  var el=$('intro'), box=$('introLines'), done=false;
+  var el=$('intro'), box=$('introLines'), done=false, locked=false;
   var SCRIPT=[
     {t:'BCORPS LABS // TERMINAL SÉCURISÉ',cls:'dim'},
     {t:'Connexion au serveur chiffré…',after:' OK'},
@@ -2634,14 +3204,40 @@ requestAnimationFrame(draw);
   ];
   var wait=function(ms){return new Promise(function(r){setTimeout(r,ms);});};
   function finish(){
-    if(done) return; done=true;
+    if(done||locked) return; done=true;
     el.classList.add('out');
     window.removeEventListener('keydown',onKey,true);
     setTimeout(function(){el.remove();},550);
   }
   function onKey(e){
+    if(locked) return;
     if(e.ctrlKey||e.metaKey||e.altKey||/^(F\d+|Shift|Control|Alt|Meta)$/.test(e.key)) return;
     e.stopPropagation(); finish();
+  }
+  /* vrai : un coffre existe en ligne et cet appareil n'a pas encore été déverrouillé */
+  function needRealCode(){
+    return Promise.race([vault.probe||Promise.resolve(),wait(3000)]).then(function(){ return !!vault.exists&&!vault.key; });
+  }
+  /* saisie réelle du code secret ; se termine par true (coffre ouvert) ou false (on continue sans) */
+  function realCode(row,cur){
+    return new Promise(function(resolve){
+      var inp=document.createElement('input'), note=document.createElement('div'), skip=document.createElement('button'), busy=false;
+      inp.type='password'; inp.className='code-in'; inp.autocomplete='off'; inp.setAttribute('aria-label','Code secret');
+      note.className='line dim'; note.textContent='  Tape ton code secret, puis Entrée.';
+      skip.type='button'; skip.className='code-skip'; skip.textContent='Continuer sans le coffre';
+      cur.remove(); row.appendChild(inp); box.appendChild(note); box.appendChild(skip);
+      setTimeout(function(){inp.focus();},60);
+      var end=function(ok){ inp.disabled=true; note.remove(); skip.remove(); row.appendChild(cur); resolve(ok); };
+      inp.addEventListener('keydown',function(e){
+        if(e.key!=='Enter'||busy||!inp.value) return;
+        busy=true; note.className='line dim'; note.textContent='  Vérification…';
+        vaultUnlock(inp.value).then(function(){ end(true); },function(err){
+          busy=false; note.className='line bad'; note.textContent='  '+ghError(err)+' Réessaie.';
+          inp.value=''; inp.focus();
+        });
+      });
+      skip.onclick=function(){ end(false); };
+    });
   }
   el.addEventListener('pointerdown',finish);
   window.addEventListener('keydown',onKey,true);
@@ -2653,7 +3249,12 @@ requestAnimationFrame(draw);
       row.className='line '+(s.cls||''); pre.className='p'; pre.textContent='> ';
       row.appendChild(pre); row.appendChild(tx); row.appendChild(cur); box.appendChild(row);
       for(j=0;j<s.t.length;j++){ tx.textContent+=s.t[j]; await wait(s.speed||8); if(done) return; }
-      if(s.code){
+      if(s.code&&await needRealCode()){
+        /* le code tapé ici est le vrai : il ouvre le coffre et récupère les données */
+        locked=true; el.classList.add('locked');
+        await realCode(row,cur);
+        locked=false; el.classList.remove('locked');
+      }else if(s.code){
         /* le code se tape touche par touche, puis se masque comme un mot de passe */
         var cd=document.createElement('span'), shown=''; cd.className='code'; row.insertBefore(cd,cur);
         await wait(180);
