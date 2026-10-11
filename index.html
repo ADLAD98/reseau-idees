@@ -632,6 +632,12 @@ body.fx #patch{animation:tool-in .22s ease-out}
 .pn-sec.chg li::before{content:"~"}
 .pn-sec.fix .k,.pn-sec.fix li::before{color:var(--alert)}
 .pn-sec.fix li::before{content:"!"}
+.pn-body h4{margin:20px 0 0;font:600 15.5px/1.35 var(--ui);letter-spacing:.02em;color:var(--txt)}
+.pn-body p{margin:8px 0 0;line-height:1.6;color:#c3d3e0;overflow-wrap:anywhere}
+.pn-body ul{list-style:none;margin:8px 0 0;padding:0}
+.pn-body li{position:relative;padding:3px 0 3px 20px;line-height:1.55;color:#c3d3e0;overflow-wrap:anywhere}
+.pn-body li::before{content:"";position:absolute;left:4px;top:.72em;width:5px;height:5px;background:var(--acc);transform:rotate(45deg)}
+#peBody{min-height:190px}
 .pn-none{padding:44px 0;color:var(--faint);font:12px/1.9 var(--mono);letter-spacing:.05em}
 /* éditeur d'un patch note et réglage de la clé de publication */
 #pEdit{display:flex;flex-direction:column;gap:14px;padding:12px 20px 0;overflow-y:auto;background:var(--panel);
@@ -836,6 +842,7 @@ body.fx #patch{animation:tool-in .22s ease-out}
           <div class="field"><div class="label">// Date</div><input id="peDate" type="date"></div>
         </div>
         <div class="field"><div class="label">// Titre</div><input id="peTitle" placeholder="Nom de la mise à jour" maxlength="120" autocomplete="off"></div>
+        <div class="field"><div class="label"><span>// Texte libre</span><b>## rubrique · - puce</b></div><textarea id="peBody" placeholder="## Nouveautés&#10;Une phrase d'introduction.&#10;- Premier point&#10;- Deuxième point"></textarea></div>
         <div class="field"><div class="label"><span>// Ajouts</span><b>une ligne par élément</b></div><textarea id="peAdded" placeholder="Nouveau plat : la raclette"></textarea></div>
         <div class="field"><div class="label">// Modifications</div><textarea id="peChanged" placeholder="Les serveurs marchent plus vite"></textarea></div>
         <div class="field"><div class="label">// Corrections</div><textarea id="peFixed" placeholder="Le menu ne sort plus de l'écran sur téléphone"></textarea></div>
@@ -2352,7 +2359,8 @@ function normNotes(a){
   };
   return (Array.isArray(a)?a:[]).filter(function(n){return n&&typeof n==='object';}).map(function(n,i){
     return {id:String(n.id||'p'+i),game:String(n.game||''),version:String(n.version||'').slice(0,20),date:ISO_RE.test(n.date)?n.date:todayIso(),
-      title:String(n.title||'').slice(0,120),added:arr(n.added),changed:arr(n.changed),fixed:arr(n.fixed)};
+      title:String(n.title||'').slice(0,120),body:String(n.body||'').slice(0,12000),
+      added:arr(n.added),changed:arr(n.changed),fixed:arr(n.fixed)};
   }).sort(function(a,b){return a.date<b.date?1:a.date>b.date?-1:0;});
 }
 function cacheNotes(){try{localStorage.setItem(KEY_PN,JSON.stringify({updated:pnUpdated,notes:patchNotes}));}catch(e){}}
@@ -2375,6 +2383,22 @@ function gameById(id){
   var found=null;
   CREATIONS.forEach(function(cat){cat.items.forEach(function(o){ if(o.placeId===id) found=o; });});
   return found;
+}
+/* texte libre d'un patch note : « ## » ouvre une rubrique, « - » une puce, le reste fait un paragraphe */
+function renderBody(parent,text){
+  var box=el('div','pn-body'), ul=null;
+  text.split('\n').forEach(function(raw){
+    var s=raw.trim(), node;
+    if(!s){ ul=null; return; }
+    if(/^#\s/.test(s)) return;
+    if(/^##+\s/.test(s)){ node=el('h4'); node.textContent=s.replace(/^##+\s*/,''); box.appendChild(node); ul=null; return; }
+    if(/^[-*•]\s/.test(s)){
+      if(!ul){ ul=el('ul'); box.appendChild(ul); }
+      node=el('li'); node.textContent=s.replace(/^[-*•]\s*/,''); ul.appendChild(node); return;
+    }
+    node=el('p'); node.textContent=s; box.appendChild(node); ul=null;
+  });
+  parent.appendChild(box);
 }
 function renderPatch(){
   var g=pnGame, head=$('pHead'), list=$('pList'), notes=notesOf(g), key=ghKey();
@@ -2405,6 +2429,7 @@ function renderPatch(){
     }
     art.appendChild(top);
     if(n.title){ var t=el('h3'); t.textContent=n.title; art.appendChild(t); }
+    if(n.body) renderBody(art,n.body);
     [['add','Ajouts',n.added],['chg','Modifications',n.changed],['fix','Corrections',n.fixed]].forEach(function(s){
       if(!s[2].length) return;
       var sec=el('div','pn-sec '+s[0]), k=el('div','k'), ul=el('ul');
@@ -2432,7 +2457,7 @@ function openEditor(mode,note){
     $('peToken').focus();
   }else{
     $('peMeta').textContent=note?'Modifier le patch note':'Nouveau patch note';
-    $('peVersion').value=note?note.version:''; $('peDate').value=note?note.date:todayIso(); $('peTitle').value=note?note.title:'';
+    $('peVersion').value=note?note.version:''; $('peDate').value=note?note.date:todayIso(); $('peTitle').value=note?note.title:''; $('peBody').value=note?note.body:'';
     $('peAdded').value=note?note.added.join('\n'):''; $('peChanged').value=note?note.changed.join('\n'):''; $('peFixed').value=note?note.fixed.join('\n'):'';
     $('pePublish').textContent='Publier';
     $('peDel').hidden=!note; $('peDel').title='Supprimer ce patch note';
@@ -2473,10 +2498,10 @@ function commitNotes(before,message,done){
 }
 function saveNote(){
   var before=patchNotes.slice(), v=$('peVersion').value.trim(), title=$('peTitle').value.trim();
-  var n={id:pnEdit?pnEdit.id:uid(),game:pnGame.placeId,version:v,date:$('peDate').value,title:title,
+  var n={id:pnEdit?pnEdit.id:uid(),game:pnGame.placeId,version:v,date:$('peDate').value,title:title,body:$('peBody').value.trim(),
     added:toLines($('peAdded').value),changed:toLines($('peChanged').value),fixed:toLines($('peFixed').value)};
   if(!v&&!title){ setStatus('Donne au moins une version ou un titre.','err'); return; }
-  if(!n.added.length&&!n.changed.length&&!n.fixed.length){ setStatus('Écris au moins une ligne dans Ajouts, Modifications ou Corrections.','err'); return; }
+  if(!n.body&&!n.added.length&&!n.changed.length&&!n.fixed.length){ setStatus('Écris un texte libre, ou au moins une ligne dans Ajouts, Modifications ou Corrections.','err'); return; }
   patchNotes=normNotes([n].concat(patchNotes.filter(function(o){return o.id!==n.id;})));
   commitNotes(before,(pnEdit?'Patch note modifie : ':'Patch note : ')+pnGame.name+' '+(v||title),'Patch note publié · visible par tous dans une minute');
 }

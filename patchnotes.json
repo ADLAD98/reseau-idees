@@ -1,4 +1,16 @@
 {
-  "updated": 0,
-  "notes": []
+   "notes" : [
+      {
+         "added" : [],
+         "body" : "## 👑 5 nouveaux prestiges (6 à 10)\nTon bistro devient un monument qu'on voit de toute la ville : tourelles sur le toit, grand blason lumineux, oriflammes et lumières dans le ciel.\n- ★6 Palais Royal : marbre blanc, bleu roi et dômes dorés (+300 %)\n- ★7 Casino Riviera : rouge et or, néons et projecteurs (+450 %)\n- ★8 Palais de Cristal : glace menthe, flèches de cristal et aurore (+650 %)\n- ★9 Temple d'Or : or massif, flammes et colonnes de lumière (+900 %)\n- ★10 Légende Céleste : nuit violette, orbes et anneau flottant (+1 250 %)\n\nLes prestiges 1 à 5 sont maintenant gratuits : il suffit d'être niveau 100.\nLes prestiges 6 à 10 demandent en plus une somme en caisse, de 100 M à 1,5 Md.\nAu-delà de 5 étoiles, le jeu affiche une étoile et le numéro (★6, ★7…).\n\n## 📱 Le téléphone du patron\nTout est rangé dedans : Skills, Sabotage, Prestige, Boutique, Avis, Propreté, Familier, Titres, Pass, Cadeau et Réglages. Touche 2 ou l'icône en bas de l'écran.\n- Les clients laissent des avis. Une bonne note augmente tes pourboires.\n- Mini-jeu Burger Jump, avec classement mondial.\n- Un point rouge et une petite vibration te préviennent quand une récompense t'attend.\n- Jouable à la manette : flèche de gauche pour le sortir.\n\n## 🧽 Propreté\nDes taches apparaissent dans ton bistro. Clique dessus trois fois pour les frotter : un bistro propre reçoit de meilleurs avis.\n\n## 🐾 Familiers\n- Caresse ton familier, nourris-le et donne-lui un nom.\n- Un familier heureux et bien nourri donne son bonus complet.\n- Nouvelle animalerie en ville, près de la bijouterie.\n\n## 🏠 Toits et décors\n- Nouvelles améliorations de fin de partie : Grand miroir, Frise murale, Toit et verrière, Grand lustre, Toit de l'appartement.\n- Le toit de l'appartement double la hauteur sous plafond.\n- Chaque décor change de style avec ton prestige.\n\n## ⛲ La place\n- Nouvelle fontaine en marbre, avec de la vraie eau, des cascades et un éclairage de nuit.\n- Les toits des kiosques sont solides : on peut monter dessus.\n\n## ✨ Cosmétiques\nLes traînées de la garde-robe sont refaites : un sillage d'orbes lumineux et d'étoiles derrière toi.\n\n## 🎟️ Pass et missions\n- Missions de la semaine, en plus des missions du jour.\n- Les récompenses se récupèrent d'un clic.\n- Nouvelles missions : nettoyer, caresser et nourrir son familier, jouer à Burger Jump.\n\n## 🎓 Pour bien démarrer\nLe tutoriel passe à 5 étapes : il présente maintenant le téléphone et le nettoyage.\n\n## 🛠️ Améliorations\n- Serveurs, Publicité et Coffre montent jusqu'au niveau 20.\n- Mode AFK dans les Réglages.\n- On peut ramasser et revendre des trophées sans appartement.\n- À partir d'un milliard, l'argent s'affiche en B et en K.\n- Interface du haut réorganisée, offres en rotation toutes les 30 minutes.\n\n## 🐞 Corrections\n- Le total gagné (badge RentaMax) est bien sauvegardé.\n- Textures qui clignotaient sur l'escalier et les chaises.\n- Plafond de la cuisine, angles des façades et du mur arrière.\n- Statue à l'envers devant l'entrée, lustre qui flottait.\n- On ne traverse plus les passe-plats.",
+         "changed" : [],
+         "date" : "2026-10-11",
+         "fixed" : [],
+         "game" : "100518177726638",
+         "id" : "p20261011",
+         "title" : "Mise à jour 11-10",
+         "version" : ""
+      }
+   ],
+   "updated" : 1791726132000
 }
