@@ -1649,7 +1649,8 @@ function longDate(s){return DOW_LONG[fromIso(s).getDay()]+' '+dayMonth(s);}
 function normTasks(a){
   return a.filter(function(t){return t&&typeof t.title==='string';}).map(function(t,i){
     return {id:String(t.id||uid()+i),title:t.title.slice(0,200),date:ISO_RE.test(t.date)?t.date:null,
-      done:!!t.done,hi:!!t.hi,notes:String(t.notes||''),created:+t.created||0,doneAt:+t.doneAt||0};
+      done:!!t.done,hi:!!t.hi,notes:String(t.notes||''),created:+t.created||0,doneAt:+t.doneAt||0,
+      was:Array.isArray(t.was)?t.was.filter(function(d){return ISO_RE.test(d);}).slice(-90):[]};
   });
 }
 /* ne garde que les jours valides qui ont vraiment du texte */
@@ -1676,7 +1677,18 @@ function saveTasks(){
   }catch(e){}
 }
 function commitTasks(){saveTasks();renderAgenda();}
-function late(t,td){return !t.done&&!!t.date&&t.date<td;}
+/* « reportée » : tâche non faite qui a déjà été repoussée d'au moins un jour (t.was garde les jours manqués) */
+function late(t,td){return !t.done&&t.was.length>0;}
+/* report automatique : toute tâche non faite dont le jour est passé revient sur aujourd'hui */
+function rollTasks(td){
+  var changed=false;
+  tasks.forEach(function(t){
+    if(t.done||!t.date||t.date>=td) return;
+    for(var d=t.date;d<td&&t.was.length<90;d=addDays(d,1)) if(t.was.indexOf(d)<0) t.was.push(d);
+    t.date=td; changed=true;
+  });
+  return changed;
+}
 /* horizon d'une tâche, pour les compteurs de la console : en retard et non faite, elle compte dans « aujourd'hui » */
 function bucket(t,td,we,me){
   if(!t.date) return 'later';
@@ -1695,7 +1707,7 @@ function sortTasks(list,td){
 function tasksOn(s){return tasks.filter(function(t){return t.date===s;});}
 function isDone(t){return t.done;}
 function addTask(title,date){
-  var t={id:uid(),title:title,date:date||null,done:false,hi:false,notes:'',created:Date.now(),doneAt:0};
+  var t={id:uid(),title:title,date:date||null,done:false,hi:false,notes:'',created:Date.now(),doneAt:0,was:[]};
   tasks.push(t);
   return t;
 }
@@ -1708,7 +1720,8 @@ function taskRow(t,td,showDate){
   chk.type='button'; chk.setAttribute('aria-label',t.done?'Rouvrir la tâche':'Terminer la tâche');
   chk.onclick=function(e){e.stopPropagation(); setDone(t,!t.done); commitTasks(); if(selTask===t) fillPanel();};
   tt.textContent=t.title||'Sans titre';
-  if(showDate&&t.date){ s=el('span',late(t,td)?'late':''); s.textContent=(late(t,td)?'Retard · ':'')+shortDate(t.date); tm.appendChild(s); }
+  if(late(t,td)){ s=el('span','late'); s.textContent='Reportée · prévue '+shortDate(t.was[0]); tm.appendChild(s); }
+  else if(showDate&&t.date){ s=el('span'); s.textContent=shortDate(t.date); tm.appendChild(s); }
   if(t.hi){ s=el('span','hi'); s.textContent='Prioritaire'; tm.appendChild(s); }
   if(t.notes.trim()){ s=el('span','note'); s.textContent='+ détails'; tm.appendChild(s); }
   body.appendChild(tt); body.appendChild(tm);
@@ -1764,7 +1777,7 @@ function ideasOn(s){
 function debrief(td){
   var box=el('div','debrief'), stats=el('div','db-stats'), past=selDay<td;
   var done=tasks.filter(function(t){return doneDay(t)===selDay;}).sort(function(a,b){return (a.doneAt||0)-(b.doneAt||0);});
-  var left=past?tasks.filter(function(t){return t.date===selDay&&!t.done;}):[];
+  var left=past?tasks.filter(function(t){return t.was.indexOf(selDay)>=0;}):[];
   var made=tasks.filter(function(t){return t.created&&iso(new Date(t.created))===selDay;}).length;
   var ideas=ideasOn(selDay);
   var stat=function(n,text){
@@ -1797,14 +1810,14 @@ function debrief(td){
     });
   }
   if(left.length){
-    var ul2=section('Resté à faire');
+    var ul2=section('Pas fait ce jour-là, reporté au lendemain');
     left.forEach(function(t){
-      var li=el('li','go'), tx=el('span','t'), b=el('button','btn');
+      var li=el('li','go'), tx=el('span','t'), x=el('span','x');
       tx.textContent=t.title||'Sans titre';
-      b.type='button'; b.textContent='Reporter à aujourd\'hui';
-      b.onclick=function(e){e.stopPropagation(); t.date=td; commitTasks(); if(selTask===t) fillPanel();};
-      li.onclick=function(){openTask(t);};
-      li.appendChild(tx); li.appendChild(b); ul2.appendChild(li);
+      x.textContent=t.done?'faite '+shortDate(doneDay(t)):'toujours à faire';
+      if(t.done) x.style.color='var(--ok)';
+      li.title='Ouvrir la tâche'; li.onclick=function(){openTask(t);};
+      li.appendChild(tx); li.appendChild(x); ul2.appendChild(li);
     });
   }
   if(ideas.length){
@@ -1825,7 +1838,6 @@ function viewDay(main,td){
   var wrap=el('div','day-view'), c1=el('div','d-col'), c2=el('div','d-col'), head=el('div','d-head'), h=el('h2'), sub=el('span','mono');
   var nav=el('div','d-nav'), prev=el('button','btn'), next=el('button','btn');
   var list=tasksOn(selDay), done=list.filter(isDone).length, ul=el('ul','tasks'), notes=el('textarea');
-  var lateList=selDay===td?tasks.filter(function(t){return late(t,td);}):[];
   h.textContent=longDate(selDay);
   sub.textContent=(selDay===td?'Aujourd\'hui':selDay===addDays(td,1)?'Demain':selDay===addDays(td,-1)?'Hier':String(fromIso(selDay).getFullYear()))
     +' · '+(list.length?two0(done)+'/'+two0(list.length)+' faites':'aucune tâche');
@@ -1836,11 +1848,6 @@ function viewDay(main,td){
   head.appendChild(h); head.appendChild(sub); head.appendChild(nav);
   c1.appendChild(head);
   c1.appendChild(quickAdd(selDay,true,'Ajouter une tâche pour ce jour, puis Entrée'));
-  if(lateList.length){
-    var lu=el('ul','tasks');
-    fillList(lu,lateList,td,'',true);
-    c1.appendChild(label('En retard',lateList.length,'alert')); c1.appendChild(lu);
-  }
   ul.setAttribute('data-date',selDay);
   fillList(ul,list,td,selDay<td?'Aucune tâche n\'était prévue ce jour-là.':'Rien de prévu. Écris une tâche juste au-dessus.',false);
   c1.appendChild(label(selDay<td?'Tâches prévues ce jour-là':'Tâches du jour',list.length)); c1.appendChild(ul);
@@ -1946,6 +1953,7 @@ function periodLabel(){
 }
 function renderAgenda(){
   var td=todayIso(), main=$('aMain'), top=main.scrollTop, back=tasks.filter(function(t){return !t.date;}), add=$('backlogAdd'), f;
+  if(rollTasks(td)) saveTasks();
   lastToday=td;
   main.textContent='';
   (aView==='week'?viewWeek:aView==='month'?viewMonth:viewDay)(main,td);
@@ -2080,6 +2088,7 @@ $('agenda').addEventListener('drop',function(e){
 /* compteurs et mini-calendrier du mois, pour la console d'accueil */
 function agendaHub(){
   var td=todayIso(), we=weekEndIso(), me=monthEndIso(), a=0, w=0, l=0, st=$('agendaStats'), pv=$('agendaPreview'), info=dayInfo();
+  if(rollTasks(td)) saveTasks();
   tasks.forEach(function(t){
     if(t.done) return;
     var b=bucket(t,td,we,me);
@@ -2087,7 +2096,7 @@ function agendaHub(){
     if(late(t,td)) l++;
   });
   st.textContent='';
-  st.appendChild(row('Aujourd\'hui',a)); st.appendChild(row('Semaine',w)); st.appendChild(row('En retard',l));
+  st.appendChild(row('Aujourd\'hui',a)); st.appendChild(row('Semaine',w)); st.appendChild(row('Reportées',l));
   var n=new Date(), y=n.getFullYear(), m=n.getMonth(), lead=(new Date(y,m,1).getDay()+6)%7, days=new Date(y,m+1,0).getDate(), i, s, o;
   pv.textContent='';
   for(i=0;i<lead;i++) pv.appendChild(el('i','x'));
