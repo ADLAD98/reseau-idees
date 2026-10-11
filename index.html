@@ -589,6 +589,80 @@ body.fx .task.just .chk{animation:pop .32s ease-out}
 body.fx .toast{animation:toast-in .22s ease-out}
 @keyframes toast-in{from{opacity:0;transform:translateY(8px)}}
 .toast.out{opacity:0;transform:translateY(6px)}
+
+/* ---------- patch notes des jeux ---------- */
+#patch{position:fixed;inset:0;z-index:40;display:flex;flex-direction:column;
+  background:
+    linear-gradient(rgba(120,200,255,.02) 1px,transparent 1px) 0 0/100% 44px,
+    linear-gradient(90deg,rgba(120,200,255,.02) 1px,transparent 1px) 0 0/44px 100%,
+    var(--bg)}
+#patch[hidden]{display:none}
+body.fx #patch{animation:tool-in .22s ease-out}
+#pHome{width:32px;height:32px;display:grid;place-items:center;padding:0;border:0;background:none}
+#pHome:hover{background:var(--raise)}
+#pHome svg{width:22px;height:22px;stroke:none}
+.p-body{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr)}
+.p-body.with-panel{grid-template-columns:minmax(0,1fr) 404px}
+.p-main{overflow:auto;padding:28px 24px 44px}
+.p-wrap{max-width:820px;margin:0 auto}
+.pn-head{display:flex;align-items:center;gap:16px;padding-bottom:22px;border-bottom:1px solid var(--line2)}
+.pn-head img{flex:none;width:64px;height:64px;border:1px solid var(--line2)}
+.pn-head h2{margin:0;font:700 26px/1.1 var(--ui);letter-spacing:.02em}
+.pn-head .mono{display:block;margin-top:7px;color:var(--mut)}
+.pn-head .btn{margin-left:auto}
+.pn{position:relative;padding:24px 0 24px 28px;border-bottom:1px solid var(--line)}
+.pn::before{content:"";position:absolute;left:3px;top:32px;width:9px;height:9px;background:var(--acc);transform:rotate(45deg)}
+.pn-top{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px}
+.pn-v{padding:4px 8px;border:1px solid var(--acc-line);color:var(--acc);font:12px/1 var(--mono);letter-spacing:.1em}
+.pn-d{color:var(--mut)}
+.pn-top .ib{margin-left:auto}
+.pn h3{margin:12px 0 0;font:600 19px/1.3 var(--ui)}
+.pn-sec{margin-top:16px}
+.pn-sec .k{font:10.5px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase}
+.pn-sec ul{list-style:none;margin:8px 0 0;padding:0}
+.pn-sec li{position:relative;padding:3px 0 3px 20px;line-height:1.55;color:#c3d3e0;overflow-wrap:anywhere}
+.pn-sec li::before{position:absolute;left:2px;font-family:var(--mono)}
+.pn-sec.add .k,.pn-sec.add li::before{color:var(--ok)}
+.pn-sec.add li::before{content:"+"}
+.pn-sec.chg .k,.pn-sec.chg li::before{color:var(--acc)}
+.pn-sec.chg li::before{content:"~"}
+.pn-sec.fix .k,.pn-sec.fix li::before{color:var(--alert)}
+.pn-sec.fix li::before{content:"!"}
+.pn-none{padding:44px 0;color:var(--faint);font:12px/1.9 var(--mono);letter-spacing:.05em}
+/* éditeur d'un patch note et réglage de la clé de publication */
+#pEdit{display:flex;flex-direction:column;gap:14px;padding:12px 20px 0;overflow-y:auto;background:var(--panel);
+  border-left:1px solid var(--line2);border-top:2px solid var(--acc)}
+#pEdit[hidden]{display:none}
+#peForm,#peKey{display:flex;flex-direction:column;gap:14px}
+#peForm[hidden],#peKey[hidden]{display:none}
+#pEdit input,#pEdit textarea{width:100%;padding:9px 11px;background:var(--bg);border:1px solid var(--line2);color:var(--txt);
+  font:14px/1.5 var(--ui);outline:none;color-scheme:dark;transition:border-color .12s}
+#pEdit input:focus,#pEdit textarea:focus{border-color:var(--acc)}
+#pEdit textarea{min-height:92px;resize:vertical}
+.pe-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+#peKey p{margin:0;color:var(--mut);line-height:1.6}
+#peKey ol{margin:0;padding-left:20px;color:var(--mut);line-height:1.7}
+#peKey b{color:var(--txt);font-weight:600}
+#pStatus{min-height:18px;color:var(--mut);font:11.5px/1.5 var(--mono);letter-spacing:.04em}
+#pStatus.err{color:var(--alert)}
+#pStatus.ok{color:var(--ok)}
+#pEdit .actions{margin-top:auto}
+@media (max-width:980px){
+  .p-body.with-panel{grid-template-columns:minmax(0,1fr)}
+  #pEdit{position:fixed;z-index:9;top:calc(var(--top) + env(safe-area-inset-top));right:0;bottom:0;width:min(404px,100%)}
+}
+@media (max-width:760px){
+  #patch .a-bar .c1,#patch .a-bar .crumbs>i{display:none}
+  #pNew span{display:none}
+  .p-main{padding:18px 14px 30px}
+  .pn-head{flex-wrap:wrap}
+  .pn-head h2{font-size:22px}
+  .pn-head .btn{margin-left:0;flex:1 1 100%}
+  .pn{padding-left:22px}
+  #pEdit{left:0;width:auto;padding:14px 16px 0}
+  #pEdit input,#pEdit textarea{font-size:16px}
+  #pEdit .actions{margin-left:-16px;margin-right:-16px;padding:12px 16px calc(12px + env(safe-area-inset-bottom))}
+}
 </style>
 </head>
 <body>
@@ -728,6 +802,54 @@ body.fx .toast{animation:toast-in .22s ease-out}
       <div class="actions">
         <span id="tInfo" class="mono"></span>
         <button id="tDel" class="ib danger push" aria-label="Supprimer la tâche" title="Supprimer la tâche"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<section id="patch" hidden>
+  <header class="a-bar">
+    <button id="pHome" aria-label="Console Bcorps Labs" title="Console Bcorps Labs"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="38" fill="none" stroke="#00e5ff" stroke-width="20"/><circle cx="60" cy="60" r="9" fill="#e8f1f8"/></svg></button>
+    <nav class="crumbs"><span class="c1">BL//NET</span><i>›</i><span class="c1">Jeux Roblox</span><i>›</i><span class="a-name" id="pGame"></span></nav>
+    <span class="spacer"></span>
+    <button id="pKey" class="ib" aria-label="Clé de publication" title="Clé de publication"><svg viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l3 3M14 9l2 2"/></svg></button>
+    <button id="pNew" class="btn solid" hidden><svg viewBox="0 0 24 24" style="stroke-width:2.2"><path d="M12 5v14M5 12h14"/></svg><span>Patch note</span></button>
+  </header>
+  <div class="p-body" id="pBody">
+    <main class="p-main"><div class="p-wrap">
+      <div class="pn-head" id="pHead"></div>
+      <div id="pList"></div>
+    </div></main>
+    <aside id="pEdit" hidden>
+      <div class="p-top">
+        <span id="peMeta" class="mono"></span>
+        <button id="peClose" class="ib" aria-label="Fermer"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      </div>
+      <div id="peForm">
+        <div class="pe-row">
+          <div class="field"><div class="label">// Version</div><input id="peVersion" placeholder="1.2.0" maxlength="20" autocomplete="off"></div>
+          <div class="field"><div class="label">// Date</div><input id="peDate" type="date"></div>
+        </div>
+        <div class="field"><div class="label">// Titre</div><input id="peTitle" placeholder="Nom de la mise à jour" maxlength="120" autocomplete="off"></div>
+        <div class="field"><div class="label"><span>// Ajouts</span><b>une ligne par élément</b></div><textarea id="peAdded" placeholder="Nouveau plat : la raclette"></textarea></div>
+        <div class="field"><div class="label">// Modifications</div><textarea id="peChanged" placeholder="Les serveurs marchent plus vite"></textarea></div>
+        <div class="field"><div class="label">// Corrections</div><textarea id="peFixed" placeholder="Le menu ne sort plus de l'écran sur téléphone"></textarea></div>
+      </div>
+      <div id="peKey" hidden>
+        <p>Pour publier depuis le site, il faut une <b>clé GitHub</b> qui a le droit d'écrire dans le dépôt du site. Elle reste dans ce navigateur et n'est envoyée qu'à GitHub.</p>
+        <ol>
+          <li>Sur GitHub : Settings → Developer settings → Fine-grained tokens → Generate new token.</li>
+          <li>Repository access : <b>Only select repositories</b> → reseau-idees.</li>
+          <li>Permissions → Contents : <b>Read and write</b>.</li>
+          <li>Copie la clé générée et colle-la ci-dessous.</li>
+        </ol>
+        <div class="field"><div class="label">// Clé de publication</div><input id="peToken" type="password" placeholder="github_pat_…" autocomplete="off" spellcheck="false"></div>
+      </div>
+      <div id="pStatus"></div>
+      <div class="actions">
+        <button id="pePublish" class="btn solid">Publier</button>
+        <button id="peCancel" class="btn">Annuler</button>
+        <button id="peDel" class="ib danger push" aria-label="Supprimer" title="Supprimer"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>
       </div>
     </aside>
   </div>
@@ -1079,7 +1201,7 @@ function trace(p,q){
 }
 function draw(t){
   requestAnimationFrame(draw);
-  if(hubOpen||agendaOpen) return;
+  if(hubOpen||agendaOpen||pnOpen) return;
   step();
   if(alpha>0) dirty=2;
   var anim=fx&&state.links.length>0;
@@ -1637,7 +1759,7 @@ $('btnSearch').onclick=function(){
 };
 document.addEventListener('keydown',function(e){
   var typing=/^(INPUT|TEXTAREA)$/.test(e.target.tagName);
-  if(hubOpen||agendaOpen) return;
+  if(hubOpen||agendaOpen||pnOpen) return;
   if(e.key==='/'&&!typing&&!e.ctrlKey&&!e.metaKey){ e.preventDefault(); $('search').focus(); return; }
   if(e.key!=='Escape') return;
   if(linkFrom) endLink();
@@ -2143,7 +2265,7 @@ function openAgenda(){
   var h=$('hub');
   if(!selDay) selDay=todayIso();
   syncCal();
-  hubOpen=false; agendaOpen=true; $('agenda').hidden=false; renderAgenda();
+  hubOpen=false; agendaOpen=true; pnOpen=false; $('patch').hidden=true; $('agenda').hidden=false; renderAgenda();
   document.title='Planificateur · Bcorps Labs'; setHash('agenda');
   h.classList.add('out');
   setTimeout(function(){ if(h.classList.contains('out')) h.hidden=true; },300);
@@ -2197,12 +2319,200 @@ function renderHubLinks(){
       play.href='roblox://experiences/start?placeId='+o.placeId; play.textContent='Lancer le jeu';
       play.title='Ouvre Roblox directement sur '+o.name;
       outLink(page,'https://www.roblox.com/games/'+o.placeId); page.textContent='Page Roblox';
-      acts.appendChild(play); acts.appendChild(page); c.appendChild(acts);
+      /* accès aux patch notes du jeu, avec leur nombre */
+      var pn=el('button','btn'), cnt=notesOf(o).length;
+      pn.type='button'; pn.textContent='Patch notes'+(cnt?' · '+two0(cnt):''); pn.onclick=function(){openPatch(o);};
+      acts.appendChild(play); acts.appendChild(page); acts.appendChild(pn); c.appendChild(acts);
       grid.appendChild(c);
     });
     crea.appendChild(head); crea.appendChild(grid);
   });
 }
+
+/* ---------- patch notes des jeux ---------- */
+/* Les patch notes sont publics : ils vivent dans le fichier patchnotes.json du dépôt, lu par tous les visiteurs.
+   Publier, c'est réécrire ce fichier par l'API GitHub, avec une clé gardée dans ce navigateur. */
+var KEY_PN='bcorps-patch-cache', KEY_GH='bcorps-cle-github', REPO='ADLAD98/reseau-idees', PN_FILE='patchnotes.json';
+var patchNotes=[], pnUpdated=0, pnGame=null, pnEdit=null, pnMode='', pnOpen=false, pnBusy=false;
+function ghKey(){try{return localStorage.getItem(KEY_GH)||'';}catch(e){return '';}}
+function ghHeaders(key){return {Authorization:'Bearer '+key,Accept:'application/vnd.github+json'};}
+/* une ligne de texte par élément ; les puces tapées à la main sont retirées */
+function toLines(v){
+  return String(v||'').split('\n').map(function(s){return s.replace(/^\s*[-+*~!•]\s*/,'').trim();})
+    .filter(Boolean).slice(0,60).map(function(s){return s.slice(0,300);});
+}
+function normNotes(a){
+  var arr=function(x){
+    return (Array.isArray(x)?x:[]).filter(function(s){return typeof s==='string'&&s.trim();}).slice(0,60).map(function(s){return s.slice(0,300);});
+  };
+  return (Array.isArray(a)?a:[]).filter(function(n){return n&&typeof n==='object';}).map(function(n,i){
+    return {id:String(n.id||'p'+i),game:String(n.game||''),version:String(n.version||'').slice(0,20),date:ISO_RE.test(n.date)?n.date:todayIso(),
+      title:String(n.title||'').slice(0,120),added:arr(n.added),changed:arr(n.changed),fixed:arr(n.fixed)};
+  }).sort(function(a,b){return a.date<b.date?1:a.date>b.date?-1:0;});
+}
+function cacheNotes(){try{localStorage.setItem(KEY_PN,JSON.stringify({updated:pnUpdated,notes:patchNotes}));}catch(e){}}
+/* juste après une publication, le fichier en ligne a une minute de retard : on garde alors la version la plus récente */
+function useNotes(o){
+  if(!o||!Array.isArray(o.notes)||(+o.updated||0)<pnUpdated) return;
+  pnUpdated=+o.updated||0; patchNotes=normNotes(o.notes);
+}
+function loadNotes(){
+  try{useNotes(JSON.parse(localStorage.getItem(KEY_PN)||'null'));}catch(e){}
+  if(!window.fetch) return;
+  fetch(PN_FILE+'?t='+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.json():null;}).then(function(o){
+    if(!o) return;
+    useNotes(o); cacheNotes(); renderHubLinks();
+    if(pnOpen) renderPatch();
+  }).catch(function(){});
+}
+function notesOf(g){return patchNotes.filter(function(n){return n.game===g.placeId;});}
+function gameById(id){
+  var found=null;
+  CREATIONS.forEach(function(cat){cat.items.forEach(function(o){ if(o.placeId===id) found=o; });});
+  return found;
+}
+function renderPatch(){
+  var g=pnGame, head=$('pHead'), list=$('pList'), notes=notesOf(g), key=ghKey();
+  var box=el('div'), h=el('h2'), sub=el('span','mono'), play=el('a','btn solid');
+  $('pGame').textContent=g.name;
+  $('pNew').hidden=!key;
+  head.textContent=''; list.textContent='';
+  if(g.img){ var im=el('img'); im.src=g.img; im.alt=''; head.appendChild(im); }
+  h.textContent='Patch notes';
+  sub.textContent=g.name+' · '+(notes.length?plural(notes.length,'mise')+' à jour':'aucune mise à jour');
+  box.appendChild(h); box.appendChild(sub); head.appendChild(box);
+  play.href='roblox://experiences/start?placeId='+g.placeId; play.textContent='Lancer le jeu'; head.appendChild(play);
+  if(!notes.length){
+    var none=el('div','pn-none');
+    none.textContent=key?'Aucun patch note pour l\'instant. Clique sur « Patch note » en haut à droite pour publier le premier.':'Aucun patch note publié pour l\'instant.';
+    list.appendChild(none); return;
+  }
+  notes.forEach(function(n){
+    var art=el('article','pn'), top=el('div','pn-top'), d=el('span','pn-d mono');
+    if(n.version){ var v=el('span','pn-v'); v.textContent='V '+n.version; top.appendChild(v); }
+    d.textContent=longDate(n.date)+' '+n.date.slice(0,4); top.appendChild(d);
+    if(key){
+      var ed=el('button','ib'); ed.type='button'; ed.innerHTML=PEN_ICON; ed.title='Modifier ce patch note'; ed.setAttribute('aria-label',ed.title);
+      ed.onclick=function(){openEditor('note',n);};
+      top.appendChild(ed);
+    }
+    art.appendChild(top);
+    if(n.title){ var t=el('h3'); t.textContent=n.title; art.appendChild(t); }
+    [['add','Ajouts',n.added],['chg','Modifications',n.changed],['fix','Corrections',n.fixed]].forEach(function(s){
+      if(!s[2].length) return;
+      var sec=el('div','pn-sec '+s[0]), k=el('div','k'), ul=el('ul');
+      k.textContent=s[1];
+      s[2].forEach(function(line){var li=el('li'); li.textContent=line; ul.appendChild(li);});
+      sec.appendChild(k); sec.appendChild(ul); art.appendChild(sec);
+    });
+    list.appendChild(art);
+  });
+}
+function setStatus(msg,cls){var s=$('pStatus'); s.textContent=msg||''; s.className=cls||'';}
+/* le même panneau sert à écrire un patch note (mode « note ») et à régler la clé (mode « key ») */
+function openEditor(mode,note){
+  var has=!!ghKey();
+  pnMode=mode; pnEdit=note||null;
+  $('pEdit').hidden=false; $('pBody').classList.add('with-panel');
+  $('peForm').hidden=mode!=='note'; $('peKey').hidden=mode!=='key';
+  setStatus('');
+  if(mode==='key'){
+    $('peMeta').textContent='Clé de publication';
+    $('peToken').value='';
+    $('pePublish').textContent=has?'Remplacer la clé':'Enregistrer la clé';
+    $('peDel').hidden=!has; $('peDel').title='Retirer la clé de ce navigateur';
+    if(has) setStatus('Une clé est déjà enregistrée dans ce navigateur.','ok');
+    $('peToken').focus();
+  }else{
+    $('peMeta').textContent=note?'Modifier le patch note':'Nouveau patch note';
+    $('peVersion').value=note?note.version:''; $('peDate').value=note?note.date:todayIso(); $('peTitle').value=note?note.title:'';
+    $('peAdded').value=note?note.added.join('\n'):''; $('peChanged').value=note?note.changed.join('\n'):''; $('peFixed').value=note?note.fixed.join('\n'):'';
+    $('pePublish').textContent='Publier';
+    $('peDel').hidden=!note; $('peDel').title='Supprimer ce patch note';
+    $('peVersion').focus();
+  }
+  $('peDel').setAttribute('aria-label',$('peDel').title);
+}
+function closeEditor(){
+  pnMode=''; pnEdit=null;
+  $('pEdit').hidden=true; $('pBody').classList.remove('with-panel');
+}
+function b64(s){return btoa(unescape(encodeURIComponent(s)));}
+function ghError(e){return e&&e.message&&e.message!=='Failed to fetch'?e.message:'Connexion à GitHub impossible.';}
+/* réécrit patchnotes.json dans le dépôt ; GitHub Pages le remet en ligne en une minute environ */
+function pushNotes(message){
+  var url='https://api.github.com/repos/'+REPO+'/contents/'+PN_FILE, H=ghHeaders(ghKey());
+  var data={updated:Date.now(),notes:patchNotes};
+  return fetch(url,{headers:H,cache:'no-store'}).then(function(r){
+    if(r.status===404) return null;
+    if(!r.ok) throw new Error(r.status===401?'Clé refusée par GitHub.':'GitHub a répondu '+r.status+'.');
+    return r.json();
+  }).then(function(j){
+    return fetch(url,{method:'PUT',headers:H,body:JSON.stringify({message:message,content:b64(JSON.stringify(data,null,2)+'\n'),sha:j?j.sha:undefined})});
+  }).then(function(r){
+    if(!r.ok) throw new Error(r.status===401||r.status===403||r.status===404?'La clé n\'a pas le droit d\'écrire dans le dépôt.':'GitHub a répondu '+r.status+'.');
+    pnUpdated=data.updated; cacheNotes();
+  });
+}
+/* publie l'état courant ; en cas d'échec, on revient à la liste d'avant */
+function commitNotes(before,message,done){
+  if(pnBusy) return;
+  pnBusy=true; $('pePublish').disabled=true; setStatus('Publication en cours…');
+  pushNotes(message).then(function(){
+    closeEditor(); renderPatch(); renderHubLinks(); toast(done);
+  }).catch(function(e){
+    patchNotes=before; setStatus(ghError(e),'err');
+  }).then(function(){ pnBusy=false; $('pePublish').disabled=false; });
+}
+function saveNote(){
+  var before=patchNotes.slice(), v=$('peVersion').value.trim(), title=$('peTitle').value.trim();
+  var n={id:pnEdit?pnEdit.id:uid(),game:pnGame.placeId,version:v,date:$('peDate').value,title:title,
+    added:toLines($('peAdded').value),changed:toLines($('peChanged').value),fixed:toLines($('peFixed').value)};
+  if(!v&&!title){ setStatus('Donne au moins une version ou un titre.','err'); return; }
+  if(!n.added.length&&!n.changed.length&&!n.fixed.length){ setStatus('Écris au moins une ligne dans Ajouts, Modifications ou Corrections.','err'); return; }
+  patchNotes=normNotes([n].concat(patchNotes.filter(function(o){return o.id!==n.id;})));
+  commitNotes(before,(pnEdit?'Patch note modifie : ':'Patch note : ')+pnGame.name+' '+(v||title),'Patch note publié · visible par tous dans une minute');
+}
+function saveKey(){
+  var k=$('peToken').value.trim();
+  if(!k){ setStatus('Colle d\'abord la clé.','err'); return; }
+  setStatus('Vérification de la clé…');
+  fetch('https://api.github.com/repos/'+REPO,{headers:ghHeaders(k),cache:'no-store'}).then(function(r){
+    if(!r.ok) throw new Error(r.status===401?'Clé refusée par GitHub.':'Cette clé ne donne pas accès au dépôt du site.');
+    try{localStorage.setItem(KEY_GH,k);}catch(e){}
+    closeEditor(); renderPatch(); toast('Clé enregistrée · tu peux publier');
+  }).catch(function(e){ setStatus(ghError(e),'err'); });
+}
+function openPatch(g){
+  var h=$('hub');
+  pnGame=g; hubOpen=false; agendaOpen=false; pnOpen=true;
+  $('agenda').hidden=true; $('patch').hidden=false;
+  closeEditor(); renderPatch();
+  document.title='Patch notes '+g.name+' · Bcorps Labs'; setHash('patch-'+g.placeId);
+  h.classList.add('out');
+  setTimeout(function(){ if(h.classList.contains('out')) h.hidden=true; },300);
+}
+$('pHome').onclick=function(){showHub();};
+$('pNew').onclick=function(){openEditor('note',null);};
+$('pKey').onclick=function(){ if(pnMode==='key') closeEditor(); else openEditor('key',null); };
+$('peClose').onclick=closeEditor;
+$('peCancel').onclick=closeEditor;
+$('pePublish').onclick=function(){ if(pnMode==='key') saveKey(); else saveNote(); };
+$('peDel').onclick=function(){
+  if(pnMode==='key'){
+    if(!confirm('Retirer la clé de ce navigateur ? Tu ne pourras plus publier tant que tu n\'en auras pas remis une.')) return;
+    try{localStorage.removeItem(KEY_GH);}catch(e){}
+    closeEditor(); renderPatch(); toast('Clé retirée');
+    return;
+  }
+  var n=pnEdit, before=patchNotes.slice();
+  if(!n||!confirm('Supprimer le patch note « '+(n.title||n.version)+' » ? Il disparaîtra pour tout le monde.')) return;
+  patchNotes=patchNotes.filter(function(o){return o.id!==n.id;});
+  commitNotes(before,'Patch note supprime : '+pnGame.name+' '+(n.version||n.title),'Patch note supprimé');
+};
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape'&&pnOpen&&!hubOpen&&pnMode) closeEditor();
+});
 
 /* ---------- console d'accueil ---------- */
 function clock(){return new Date().toLocaleTimeString('fr-FR');}
@@ -2232,7 +2542,7 @@ function showHub(){
 }
 function openTool(){
   var h=$('hub');
-  hubOpen=false; agendaOpen=false; $('agenda').hidden=true;
+  hubOpen=false; agendaOpen=false; pnOpen=false; $('agenda').hidden=true; $('patch').hidden=true;
   h.classList.add('out'); renderBoards(); touch();
   setTimeout(function(){ if(h.classList.contains('out')) h.hidden=true; },300);
 }
@@ -2268,10 +2578,14 @@ switchBoard(first);
 var start=startId?byId(startId):null;
 loadTasks();
 renderHubLinks();
+loadNotes();
 /* demande au navigateur de ne pas évincer ces données de lui-même (sans effet sur un effacement réglé par l'utilisateur) */
 try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist().catch(function(){}); }catch(e){}
 /* un lien direct vers une idée ou vers le planificateur saute la console d'accueil */
-if(startId==='agenda'){ $('hub').hidden=true; $('hub').classList.add('out'); openAgenda(); }
+/* lien direct vers les patch notes d'un jeu : #patch-<identifiant du jeu> */
+var startGame=startId.indexOf('patch-')===0?gameById(startId.slice(6)):null;
+if(startGame){ $('hub').hidden=true; $('hub').classList.add('out'); openPatch(startGame); }
+else if(startId==='agenda'){ $('hub').hidden=true; $('hub').classList.add('out'); openAgenda(); }
 else if(start){ hubOpen=false; $('hub').hidden=true; $('hub').classList.add('out'); renderBoards(); select(start); fit(); reveal(start); }
 else showHub();
 requestAnimationFrame(draw);
