@@ -84,8 +84,11 @@ h1,h2,h3,p{margin:0}
 .card.t3{--tc:var(--t3);--tc2:#a8780a}
 .card.t4{--tc:var(--t4);--tc2:#ff2a6d}
 .card.t5{--tc:var(--t5);--tc2:#00e5ff}
-.card-in{position:absolute;inset:0;transform-style:preserve-3d;transition:transform .7s cubic-bezier(.2,.75,.2,1)}
+.card-in{position:absolute;inset:0;transform-style:preserve-3d;transition:transform var(--flip,.7s) cubic-bezier(.2,.75,.2,1)}
 .card.is-back .card-in{transform:rotateY(180deg)}
+/* à mi-retournement, la face qui ne doit plus se voir est masquée pour de bon : certains navigateurs (iPhone) montrent sinon l'envers par transparence */
+.card-front,.card-back{transition:visibility 0s calc(var(--flip,.7s) / 2)}
+.card.is-back .card-front,.card:not(.is-back) .card-back{visibility:hidden}
 .card-face{--k:8cqw;position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;
   background:linear-gradient(155deg,var(--tc) 0%,var(--tc2) 34%,#101822 52%,var(--tc2) 72%,var(--tc) 100%);
   clip-path:polygon(0 0,calc(100% - var(--k)) 0,100% var(--k),100% 100%,var(--k) 100%,0 calc(100% - var(--k)))}
@@ -345,7 +348,7 @@ body.fx .op-slot.bob{animation:bob 2.2s ease-in-out infinite}
 .op-slot .card.is-back .card-back{background:linear-gradient(155deg,var(--hint,#1e6f85),#0b2733 40%,#123a4a 70%,var(--hint,#1e6f85))}
 .op-slot .card.tease .card-back{animation:tease .5s ease-in-out infinite alternate}
 @keyframes tease{from{filter:brightness(1)}to{filter:brightness(1.7) drop-shadow(0 0 22px var(--tc))}}
-.op-slot .card.slow .card-in{transition-duration:1.25s}
+.op-slot .card.slow{--flip:1.25s}
 .op-slot .card.t3:not(.is-back),.op-slot .card.t4:not(.is-back),.op-slot .card.t5:not(.is-back){filter:drop-shadow(0 0 26px color-mix(in srgb,var(--tc) 55%,transparent))}
 .op-slot .card.t5:not(.is-back){filter:drop-shadow(0 0 22px #00e5ff) drop-shadow(0 0 40px rgba(179,136,255,.7))}
 .op-sparks{position:absolute;top:50%;left:50%;width:0;height:0;pointer-events:none}
