@@ -22,6 +22,8 @@
   --top:48px; --bot:34px;
 }
 *{box-sizing:border-box}
+/* un élément marqué « hidden » reste caché, même si une classe lui donne un affichage */
+[hidden]{display:none!important}
 html,body{height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--txt);
   font:14px/1.5 var(--ui);-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
 canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;background:var(--bg)}
@@ -601,6 +603,8 @@ body.fx #patch{animation:tool-in .22s ease-out}
 #pHome{width:32px;height:32px;display:grid;place-items:center;padding:0;border:0;background:none}
 #pHome:hover{background:var(--raise)}
 #pHome svg{width:22px;height:22px;stroke:none}
+#pKey.btn{height:30px;padding:0 11px;font-size:11px}
+#pKeyText[hidden]{display:none}
 .p-body{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr)}
 .p-body.with-panel{grid-template-columns:minmax(0,1fr) 404px}
 .p-main{overflow:auto;padding:28px 24px 44px}
@@ -654,6 +658,7 @@ body.fx #patch{animation:tool-in .22s ease-out}
 @media (max-width:760px){
   #patch .a-bar .c1,#patch .a-bar .crumbs>i{display:none}
   #pNew span{display:none}
+  #pKey.btn{padding:0 9px;font-size:10px;letter-spacing:.06em}
   .p-main{padding:18px 14px 30px}
   .pn-head{flex-wrap:wrap}
   .pn-head h2{font-size:22px}
@@ -812,7 +817,7 @@ body.fx #patch{animation:tool-in .22s ease-out}
     <button id="pHome" aria-label="Console Bcorps Labs" title="Console Bcorps Labs"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="38" fill="none" stroke="#00e5ff" stroke-width="20"/><circle cx="60" cy="60" r="9" fill="#e8f1f8"/></svg></button>
     <nav class="crumbs"><span class="c1">BL//NET</span><i>›</i><span class="c1">Jeux Roblox</span><i>›</i><span class="a-name" id="pGame"></span></nav>
     <span class="spacer"></span>
-    <button id="pKey" class="ib" aria-label="Clé de publication" title="Clé de publication"><svg viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l3 3M14 9l2 2"/></svg></button>
+    <button id="pKey" class="btn" title="Clé de publication"><svg viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l3 3M14 9l2 2"/></svg><span id="pKeyText">Activer la publication</span></button>
     <button id="pNew" class="btn solid" hidden><svg viewBox="0 0 24 24" style="stroke-width:2.2"><path d="M12 5v14M5 12h14"/></svg><span>Patch note</span></button>
   </header>
   <div class="p-body" id="pBody">
@@ -2376,6 +2381,8 @@ function renderPatch(){
   var box=el('div'), h=el('h2'), sub=el('span','mono'), play=el('a','btn solid');
   $('pGame').textContent=g.name;
   $('pNew').hidden=!key;
+  /* sans clé, le bouton dit clairement quoi faire ; avec une clé, il se réduit à son icône */
+  $('pKey').className=key?'ib':'btn line'; $('pKeyText').hidden=!!key;
   head.textContent=''; list.textContent='';
   if(g.img){ var im=el('img'); im.src=g.img; im.alt=''; head.appendChild(im); }
   h.textContent='Patch notes';
@@ -2384,7 +2391,7 @@ function renderPatch(){
   play.href='roblox://experiences/start?placeId='+g.placeId; play.textContent='Lancer le jeu'; head.appendChild(play);
   if(!notes.length){
     var none=el('div','pn-none');
-    none.textContent=key?'Aucun patch note pour l\'instant. Clique sur « Patch note » en haut à droite pour publier le premier.':'Aucun patch note publié pour l\'instant.';
+    none.textContent=key?'Aucun patch note pour l\'instant. Clique sur « Patch note » en haut à droite pour publier le premier. Tu peux en publier autant que tu veux.':'Aucun patch note publié pour l\'instant.';
     list.appendChild(none); return;
   }
   notes.forEach(function(n){
