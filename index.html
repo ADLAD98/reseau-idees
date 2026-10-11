@@ -214,6 +214,8 @@ body.fx #hubTitle::after{color:var(--alert);animation:glitch-b 5.2s steps(1) inf
 .h-read div{display:flex;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px solid var(--line)}
 .h-read dt{color:var(--faint)}
 .h-read dd{margin:0;color:var(--txt);text-align:right}
+.h-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}
+.h-note{margin:14px 0 0;color:var(--faint);text-transform:none;letter-spacing:.04em;line-height:1.7}
 .sec{display:flex;align-items:center;gap:12px;margin-bottom:16px;color:var(--mut)}
 .sec::after{content:"";flex:1;height:1px;background:var(--line2)}
 .sec b{font-weight:400;color:var(--acc)}
@@ -450,7 +452,13 @@ button.mod:hover .m-go,button.mod:focus-visible .m-go{background:var(--acc);colo
         <div><dt>Modules</dt><dd>02 actifs · 01 verrouillé</dd></div>
         <div><dt>Données</dt><dd id="hubData"></dd></div>
         <div><dt>Stockage local</dt><dd id="hubSize"></dd></div>
+        <div><dt>Sauvegarde fichier</dt><dd id="hubBackup"></dd></div>
       </dl>
+      <div class="h-acts">
+        <button id="hubSave" class="btn solid">Sauvegarder tout</button>
+        <button id="hubRestore" class="btn">Restaurer</button>
+      </div>
+      <p class="h-note mono">Les données vivent dans ce navigateur, qui peut les effacer. Garde une sauvegarde en fichier.</p>
     </section>
     <section>
       <div class="sec mono"><b>//</b> Modules</div>
@@ -580,7 +588,7 @@ button.mod:hover .m-go,button.mod:focus-visible .m-go{background:var(--acc);colo
       <button id="mFx" class="item">Animations <small id="fxState"></small></button>
       <hr>
       <button id="mExport" class="item">Exporter ce réseau</button>
-      <button id="mExportAll" class="item">Exporter tous les réseaux</button>
+      <button id="mExportAll" class="item">Sauvegarder tout</button>
       <button id="mImport" class="item">Importer une sauvegarde</button>
       <hr>
       <button id="mReset" class="item danger">Vider ce réseau</button>
@@ -1363,29 +1371,54 @@ $('mExport').onclick=function(){
   $('menu').hidden=true; saveNow();
   download(boardOut(state),fileName(state.name));
 };
-$('mExportAll').onclick=function(){
-  $('menu').hidden=true; saveNow();
-  download({boards:store.boards.map(boardOut)},'tous-mes-reseaux');
-};
+/* sauvegarde complète dans un fichier : tous les réseaux et toutes les tâches */
+var KEY_BK='bcorps-sauvegarde';
+function fullBackup(){
+  saveNow(); saveTasks();
+  download({app:'bcorps-labs',version:1,exported:new Date().toISOString(),boards:store.boards.map(boardOut),tasks:tasks},'bcorps-labs-sauvegarde');
+  try{localStorage.setItem(KEY_BK,String(Date.now()));}catch(e){}
+  if(hubOpen) showHub();
+}
+$('mExportAll').onclick=function(){$('menu').hidden=true;fullBackup();};
 $('mImport').onclick=function(){$('menu').hidden=true;$('file').click();};
 $('file').addEventListener('change',function(){
   var f=this.files[0]; this.value=''; if(!f) return;
   var rd=new FileReader();
   rd.onload=function(){
-    /* une sauvegarde s'ajoute toujours comme nouveau(x) réseau(x), sans rien remplacer */
-    var o=null, added=[];
+    var o=null, added=[], fresh=[], known={}, hasTasks;
     try{o=JSON.parse(rd.result);}catch(e){}
+    hasTasks=!!o&&Array.isArray(o.tasks);
     if(o&&Array.isArray(o.boards)) added=readBoards(o.boards);
-    else{
+    else if(!hasTasks){
       var s=clean(o);
       if(s) added=[newBoard(o.name||f.name.replace(/(-\d{4}-\d{2}-\d{2})?\.json$/i,'')||'Réseau importé',s)];
     }
-    if(!added.length){alert('Ce fichier n\'est pas une sauvegarde valide.');return;}
-    added.forEach(function(b){b.id=uid()+store.boards.length; store.boards.push(b);});
-    switchBoard(added[0]);
+    if(!added.length&&!hasTasks){alert('Ce fichier n\'est pas une sauvegarde valide.');return;}
+    if(hasTasks){
+      /* seules les tâches absentes sont ajoutées : restaurer deux fois ne crée pas de doublons */
+      tasks.forEach(function(t){known[t.id]=true;});
+      fresh=normTasks(o.tasks).filter(function(t){return !known[t.id];});
+      if(fresh.length){ tasks=tasks.concat(fresh); saveTasks(); }
+    }
+    if(added.length){
+      /* site vide (par exemple après un effacement par le navigateur) : la sauvegarde prend toute la place ;
+         sinon ses réseaux s'ajoutent à ceux qui existent, sans rien remplacer */
+      if(store.boards.every(function(b){return !b.nodes.length;})) store.boards=[];
+      /* un réseau déjà présent à l'identique (même nom, mêmes idées) n'est pas ajouté une seconde fois */
+      var sig=function(b){return b.name+'|'+b.nodes.map(function(n){return n.id;}).sort().join(',');}, have={};
+      store.boards.forEach(function(b){have[sig(b)]=true;});
+      added=added.filter(function(b){return !have[sig(b)];});
+      added.forEach(function(b){b.id=uid()+store.boards.length; store.boards.push(b);});
+      if(added.length) switchBoard(added[0]);
+    }
+    if(agendaOpen) renderAgenda();
+    if(hubOpen) showHub();
+    alert('Restauration terminée : '+added.length+' réseau'+(added.length>1?'x':'')+' et '+plural(fresh.length,'tâche')+' ajouté'+(added.length+fresh.length>1?'s':'')+'.');
   };
   rd.readAsText(f);
 });
+$('hubSave').onclick=fullBackup;
+$('hubRestore').onclick=function(){$('file').click();};
 $('mReset').onclick=function(){
   $('menu').hidden=true;
   if(!confirm('Vider le réseau « '+state.name+' » ? Toutes ses idées seront effacées, définitivement.')) return;
@@ -1430,13 +1463,16 @@ function todayIso(){return iso(new Date());}
 function weekEndIso(){var d=new Date(); d.setDate(d.getDate()+(7-d.getDay())%7); return iso(d);}
 function monthEndIso(){var d=new Date(); return iso(new Date(d.getFullYear(),d.getMonth()+1,0));}
 function shortDate(s){var d=fromIso(s); return DOW[d.getDay()]+' '+two0(d.getDate())+'/'+two0(d.getMonth()+1);}
+function normTasks(a){
+  return a.filter(function(t){return t&&typeof t.title==='string';}).map(function(t,i){
+    return {id:String(t.id||uid()+i),title:t.title.slice(0,140),date:/^\d{4}-\d{2}-\d{2}$/.test(t.date)?t.date:null,
+      done:!!t.done,hi:!!t.hi,created:+t.created||0};
+  });
+}
 function loadTasks(){
   try{
     var a=JSON.parse(localStorage.getItem(KEY_T)||'[]');
-    if(Array.isArray(a)) tasks=a.filter(function(t){return t&&typeof t.title==='string';}).map(function(t,i){
-      return {id:String(t.id||uid()+i),title:t.title.slice(0,140),date:/^\d{4}-\d{2}-\d{2}$/.test(t.date)?t.date:null,
-        done:!!t.done,hi:!!t.hi,created:+t.created||0};
-    });
+    if(Array.isArray(a)) tasks=normTasks(a);
   }catch(e){}
 }
 function saveTasks(){try{localStorage.setItem(KEY_T,JSON.stringify(tasks));}catch(e){}}
@@ -1646,6 +1682,12 @@ function showHub(){
   $('hubData').textContent=plural(n,'idée')+' · '+plural(tasks.length,'tâche');
   agendaHub(); setHash('');
   $('hubSize').textContent=(size/1024).toFixed(1).replace('.',',')+' ko';
+  /* date de la dernière sauvegarde en fichier : en rouge si elle manque ou date de plus d'une semaine */
+  var bk=0, hb=$('hubBackup'), days;
+  try{bk=+localStorage.getItem(KEY_BK)||0;}catch(e){}
+  days=Math.floor((Date.now()-bk)/864e5);
+  hb.textContent=!bk?'Jamais':days<1?'Aujourd\'hui':days===1?'Hier':'Il y a '+days+' jours';
+  hb.style.color=(!bk||days>7)?'var(--alert)':'var(--ok)';
   $('hubDate').textContent=new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});
   $('hubClock').textContent=now;
   log.textContent='';
@@ -1689,6 +1731,8 @@ if(startId) store.boards.forEach(function(b){
 switchBoard(first);
 var start=startId?byId(startId):null;
 loadTasks();
+/* demande au navigateur de ne pas évincer ces données de lui-même (sans effet sur un effacement réglé par l'utilisateur) */
+try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist().catch(function(){}); }catch(e){}
 /* un lien direct vers une idée ou vers le planificateur saute la console d'accueil */
 if(startId==='agenda'){ $('hub').hidden=true; $('hub').classList.add('out'); openAgenda(); }
 else if(start){ hubOpen=false; $('hub').hidden=true; $('hub').classList.add('out'); renderBoards(); select(start); fit(); reveal(start); }
