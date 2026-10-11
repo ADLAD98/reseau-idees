@@ -1,0 +1,4 @@
+Coffre de Bcorps Labs.
+
+Cette branche ne contient que des fichiers chiffres par un code secret.
+Elle est ecrite automatiquement par le site ; ne rien modifier a la main.
