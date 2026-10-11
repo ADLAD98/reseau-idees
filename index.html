@@ -198,9 +198,9 @@ body.fx #panel{animation:panel-in .16s ease-out}
 .h-top .mk b{font-weight:400;color:var(--acc)}
 #hubClock{color:var(--txt)}
 .h-main{flex:1;width:min(1280px,100%);margin:0 auto;padding:clamp(28px,6vh,64px) 32px 28px;
-  display:grid;grid-template-columns:minmax(300px,380px) minmax(0,1fr);gap:clamp(32px,5vw,72px);align-items:start}
+  display:grid;grid-template-columns:minmax(250px,310px) minmax(0,1fr) 352px;gap:clamp(24px,3vw,44px);align-items:start}
 .tag{display:inline-flex;align-items:center;gap:9px;padding:5px 9px;border:1px solid rgba(255,42,109,.45);color:var(--alert)}
-#hubTitle{position:relative;margin:26px 0 0;font:700 clamp(44px,5.6vw,76px)/.92 var(--ui);letter-spacing:.05em;text-transform:uppercase}
+#hubTitle{position:relative;margin:26px 0 0;font:700 clamp(42px,4.5vw,60px)/.92 var(--ui);letter-spacing:.05em;text-transform:uppercase}
 #hubTitle span{display:block;color:var(--acc)}
 /* glitch : deux copies décalées du titre qui n'apparaissent que par à-coups */
 body.fx #hubTitle::before,body.fx #hubTitle::after{content:attr(data-text);position:absolute;inset:0;white-space:pre-line;pointer-events:none;opacity:0}
@@ -219,33 +219,59 @@ body.fx #hubTitle::after{color:var(--alert);animation:glitch-b 5.2s steps(1) inf
 .sec{display:flex;align-items:center;gap:12px;margin-bottom:16px;color:var(--mut)}
 .sec::after{content:"";flex:1;height:1px;background:var(--line2)}
 .sec b{font-weight:400;color:var(--acc)}
-.mods{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
-.mod{--c:18px;--fill:#070b11;display:flex;flex-direction:column;gap:12px;padding:16px 16px 0;border:0;text-align:left;min-height:400px;transition:transform .15s}
-.m-head{display:flex;justify-content:space-between;align-items:center;color:var(--mut)}
-.m-view{position:relative;display:block;height:132px;border:1px solid var(--line);
-  background:linear-gradient(rgba(120,200,255,.05) 1px,transparent 1px) 0 0/100% 16px,linear-gradient(90deg,rgba(120,200,255,.05) 1px,transparent 1px) 0 0/16px 100%}
-.m-view::before,.m-view::after{content:"";position:absolute;width:10px;height:10px;border:solid var(--acc);border-width:0}
+/* fenêtre latérale des modules */
+.win{--c:14px;--fill:#070b11}
+.win-bar{display:flex;align-items:center;gap:10px;height:38px;padding:0 14px;border-bottom:1px solid var(--line2);color:var(--mut);background:rgba(0,229,255,.05)}
+.win-bar b{font-weight:400;color:var(--acc)}
+.win-bar .dots{margin-left:auto;display:flex;gap:5px}
+.win-bar .dots i{width:7px;height:7px;border:1px solid var(--line2)}
+.win-bar .dots i:last-child{background:var(--acc);border-color:var(--acc)}
+.win-body{display:flex;flex-direction:column;padding:8px}
+.mod{display:grid;grid-template-columns:96px minmax(0,1fr) 16px;gap:12px;align-items:center;width:100%;padding:10px;
+  border:1px solid transparent;border-bottom-color:var(--line);background:none;text-align:left;transition:background .15s,border-color .15s}
+.mod:last-child{border-bottom-color:transparent}
+button.mod:hover,button.mod:focus-visible{background:var(--acc-soft);border-color:var(--acc-line);outline:none}
+.mod>svg{color:var(--faint);transition:color .15s,transform .15s}
+button.mod:hover>svg,button.mod:focus-visible>svg{color:var(--acc);transform:translateX(3px)}
+.m-view{position:relative;display:block;height:76px;border:1px solid var(--line);
+  background:linear-gradient(rgba(120,200,255,.05) 1px,transparent 1px) 0 0/100% 12px,linear-gradient(90deg,rgba(120,200,255,.05) 1px,transparent 1px) 0 0/12px 100%}
+.m-view::before,.m-view::after{content:"";position:absolute;width:7px;height:7px;border:solid var(--acc);border-width:0}
 .m-view::before{left:-1px;top:-1px;border-left-width:2px;border-top-width:2px}
 .m-view::after{right:-1px;bottom:-1px;border-right-width:2px;border-bottom-width:2px}
 #toolPreview{width:100%;height:100%;display:block}
-.m-name{font:700 22px/1.1 var(--ui);letter-spacing:.07em;text-transform:uppercase}
-.m-desc{color:var(--mut);font-size:13.5px;line-height:1.55}
-.m-data{display:flex;flex-direction:column;margin-top:auto}
-.m-data span{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--line2);color:var(--faint)}
+.m-body{display:flex;flex-direction:column;gap:7px;min-width:0}
+.m-head{display:flex;justify-content:space-between;align-items:center;gap:8px;color:var(--mut);font-size:10px}
+.m-name{font:700 15px/1.1 var(--ui);letter-spacing:.08em;text-transform:uppercase}
+.m-data{display:flex;flex-wrap:wrap;gap:3px 10px;color:var(--faint);font-size:10px}
+.m-data span{display:inline-flex;gap:5px}
 .m-data i{font-style:normal}
 .m-data b{font-weight:400;color:var(--txt)}
-.m-go{display:flex;justify-content:space-between;align-items:center;margin:4px -16px 0;padding:14px 16px 14px 34px;
-  background:var(--acc-soft);color:var(--acc);font-size:12px;letter-spacing:.24em;transition:background .15s,color .15s}
-button.mod:hover,button.mod:focus-visible{--edge:var(--acc);transform:translateY(-3px);outline:none}
-button.mod:hover .m-go,button.mod:focus-visible .m-go{background:var(--acc);color:var(--acc-ink)}
 .mod.locked{color:var(--faint)}
 .mod.locked .m-head span:last-child{color:var(--warn)}
-.hz{display:grid;place-items:center;gap:8px;align-content:center;height:132px;border:1px solid rgba(255,214,10,.3);color:var(--warn);
-  background:repeating-linear-gradient(-45deg,rgba(255,214,10,.11) 0 10px,transparent 10px 20px)}
-.hz svg{width:22px;height:22px}
 .mod.locked .m-name{color:var(--mut)}
-.mod.locked .m-desc{color:var(--faint);font:12px/1.7 var(--mono);letter-spacing:.06em}
-.mod.locked .m-go{background:none;border-top:1px dashed var(--line2);color:var(--faint);justify-content:flex-start}
+.hz{display:grid;place-items:center;height:76px;border:1px solid rgba(255,214,10,.3);color:var(--warn);
+  background:repeating-linear-gradient(-45deg,rgba(255,214,10,.11) 0 8px,transparent 8px 16px)}
+.hz svg{width:18px;height:18px}
+/* espaces de liens : réseaux et créations */
+.spaces{display:flex;flex-direction:column;gap:34px;min-width:0}
+.sub-cat{display:flex;align-items:center;gap:8px;margin:0 0 10px;color:var(--mut)}
+.sub-cat::before{content:"";width:6px;height:6px;background:var(--acc);transform:rotate(45deg)}
+.sub-cat b{font-weight:400;color:var(--faint)}
+.links{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.lnk{--c:12px;--fill:#070b11;display:grid;grid-template-columns:46px minmax(0,1fr) auto;gap:12px 14px;align-items:center;padding:14px;
+  color:inherit;text-decoration:none;transition:transform .15s}
+a.lnk:hover,a.lnk:focus-visible{--edge:var(--acc);transform:translateY(-2px);outline:none}
+.l-ico{display:grid;place-items:center;width:46px;height:46px;border:1px solid var(--line2);color:var(--k,var(--acc));background:rgba(120,200,255,.04)}
+.l-ico svg{width:22px;height:22px}
+.l-txt{min-width:0}
+.l-kind{display:block;color:var(--mut);font-size:10px}
+.l-name{display:block;margin-top:3px;font:600 17px/1.2 var(--ui);letter-spacing:.03em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.l-url{display:block;margin-top:3px;color:var(--faint);font:11px/1.3 var(--mono);letter-spacing:.04em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.l-out{color:var(--faint);transition:color .15s}
+a.lnk:hover .l-out,a.lnk:focus-visible .l-out{color:var(--acc)}
+.l-acts{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px}
+.l-acts .btn{flex:1}
+a.btn{color:var(--txt);text-decoration:none}
 .h-log{flex:none;padding:12px 24px calc(14px + env(safe-area-inset-bottom));border-top:1px solid var(--line);color:var(--faint);
   background:rgba(5,7,11,.7);line-height:1.9;text-transform:none;letter-spacing:.06em}
 .h-log div:last-child{color:var(--mut)}
@@ -334,8 +360,8 @@ button.mod:hover .m-go,button.mod:focus-visible .m-go{background:var(--acc);colo
 .later .label{padding:0 8px 4px}
 .day .tasks{padding:8px 0 0}
 .day .task{padding-left:6px}
-.mini-cal{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:grid;grid-template-columns:repeat(7,12px);gap:4px}
-.mini-cal i{width:12px;height:12px;border:1px solid var(--line2)}
+.mini-cal{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:grid;grid-template-columns:repeat(7,8px);gap:3px}
+.mini-cal i{width:8px;height:8px;border:1px solid var(--line2)}
 .mini-cal .x{border-color:transparent}
 .mini-cal .has{background:var(--acc-soft);border-color:var(--acc-line)}
 .mini-cal .ok{background:rgba(57,255,159,.22);border-color:var(--ok)}
@@ -382,8 +408,18 @@ button.mod:hover .m-go,button.mod:focus-visible .m-go{background:var(--acc);colo
 #intro.granted .gate{opacity:1;transform:none;transition-delay:.3s}
 .skip{align-self:end;margin-bottom:calc(22px + env(safe-area-inset-bottom));color:var(--faint);font-size:10.5px;letter-spacing:.14em}
 
-@media (max-width:1040px){
+/* écran moyen : la fenêtre des modules passe au-dessus des espaces, dans la colonne de droite */
+@media (max-width:1180px){
+  .h-main{grid-template-columns:minmax(250px,310px) minmax(0,1fr)}
+  .h-main>section:first-child{grid-row:1/3}
+  .win{grid-column:2;grid-row:1}
+  .spaces{grid-column:2;grid-row:2}
+}
+@media (max-width:860px){
   .h-main{grid-template-columns:1fr}
+  .h-main>section:first-child,.win,.spaces{grid-column:1;grid-row:auto}
+  .win{order:2}
+  .spaces{order:3}
   .h-read{display:grid;grid-template-columns:1fr 1fr;column-gap:24px}
 }
 @media (max-width:760px){
@@ -411,9 +447,7 @@ button.mod:hover .m-go,button.mod:focus-visible .m-go{background:var(--acc);colo
   .h-top .hide-s{display:none}
   .h-main{padding:26px 16px 22px;gap:30px}
   .h-read{display:block;margin-top:24px}
-  .mods{grid-template-columns:1fr}
-  .mod{min-height:0}
-  .mod.locked .hz,.mod.locked .m-desc{display:none}
+  .links{grid-template-columns:1fr}
   .h-log{padding-left:16px;padding-right:16px}
   .h-log div:first-child{display:none}
 }
@@ -460,34 +494,47 @@ button.mod:hover .m-go,button.mod:focus-visible .m-go{background:var(--acc);colo
       </div>
       <p class="h-note mono">Les données vivent dans ce navigateur, qui peut les effacer. Garde une sauvegarde en fichier.</p>
     </section>
-    <section>
-      <div class="sec mono"><b>//</b> Modules</div>
-      <div class="mods">
-        <button class="mod cut" id="toolReseau">
-          <span class="m-head mono"><span>MOD-01</span><span class="live">En ligne</span></span>
-          <span class="m-view"><canvas id="toolPreview"></canvas></span>
-          <span class="m-name">Réseau neuronal</span>
-          <span class="m-desc">Cartographie d'idées : nœuds, sous-nœuds, notes et liaisons.</span>
-          <span class="m-data mono" id="toolStats"></span>
-          <span class="m-go mono">Accéder <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
-        </button>
-        <button class="mod cut" id="toolAgenda">
-          <span class="m-head mono"><span>MOD-02</span><span class="live">En ligne</span></span>
-          <span class="m-view"><span id="agendaPreview" class="mini-cal"></span></span>
-          <span class="m-name">Planificateur</span>
-          <span class="m-desc">Tâches du jour, de la semaine et du mois, sur calendrier.</span>
-          <span class="m-data mono" id="agendaStats"></span>
-          <span class="m-go mono">Accéder <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
-        </button>
-        <div class="mod cut locked">
-          <span class="m-head mono"><span>MOD-03</span><span>Verrouillé</span></span>
-          <span class="hz mono"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Accès restreint</span>
-          <span class="m-name">[ Classifié ]</span>
-          <span class="m-desc">Emplacement réservé.<br>En attente d'affectation.</span>
-          <span class="m-go mono">Indisponible</span>
-        </div>
+    <section class="spaces">
+      <div>
+        <div class="sec mono"><b>//</b> Réseaux</div>
+        <div class="links" id="netList"></div>
+      </div>
+      <div>
+        <div class="sec mono"><b>//</b> Mes créations</div>
+        <div id="creaList"></div>
       </div>
     </section>
+    <aside class="win cut">
+      <div class="win-bar mono"><b>//</b> Modules <span class="dots"><i></i><i></i><i></i></span></div>
+      <div class="win-body">
+        <button class="mod" id="toolReseau">
+          <span class="m-view"><canvas id="toolPreview"></canvas></span>
+          <span class="m-body">
+            <span class="m-head mono"><span>MOD-01</span><span class="live">En ligne</span></span>
+            <span class="m-name">Réseau neuronal</span>
+            <span class="m-data mono" id="toolStats"></span>
+          </span>
+          <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+        <button class="mod" id="toolAgenda">
+          <span class="m-view"><span id="agendaPreview" class="mini-cal"></span></span>
+          <span class="m-body">
+            <span class="m-head mono"><span>MOD-02</span><span class="live">En ligne</span></span>
+            <span class="m-name">Planificateur</span>
+            <span class="m-data mono" id="agendaStats"></span>
+          </span>
+          <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+        <div class="mod locked">
+          <span class="hz"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
+          <span class="m-body">
+            <span class="m-head mono"><span>MOD-03</span><span>Verrouillé</span></span>
+            <span class="m-name">[ Classifié ]</span>
+            <span class="m-data mono"><span><i>Emplacement réservé</i></span></span>
+          </span>
+        </div>
+      </div>
+    </aside>
   </main>
   <footer class="h-log mono" id="hubLog"></footer>
 </div>
@@ -1654,6 +1701,55 @@ $('aPurge').onclick=function(){
   tasks=tasks.filter(function(t){return !t.done;}); commitTasks();
 };
 
+/* ---------- liens de la console : réseaux et créations ---------- */
+/* pour ajouter un réseau ou un jeu, il suffit d'ajouter une ligne dans ces deux listes */
+var NETS=[
+  {kind:'Twitch',name:'babooth_lol',url:'https://www.twitch.tv/babooth_lol',icon:'twitch',color:'#b388ff'}
+];
+var CREATIONS=[
+  {title:'Jeux Roblox',items:[
+    {kind:'Jeu Roblox',name:'Bistro Boss',sub:'Restaurant Tycoon',placeId:'100518177726638',icon:'roblox',color:'#d6e6f2'}
+  ]}
+];
+var LINK_ICONS={
+  twitch:'<svg viewBox="0 0 24 24"><path d="M5 3h15v11l-4 4h-4l-3 3v-3H5z"/><path d="M11 7v5M16 7v5"/></svg>',
+  roblox:'<svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" transform="rotate(13 12 12)"/><rect x="10.2" y="10.2" width="3.6" height="3.6" transform="rotate(13 12 12)"/></svg>',
+  out:'<svg viewBox="0 0 24 24"><path d="M8 16 17 7M9 7h8v8"/></svg>'
+};
+function linkCard(name,o){
+  var c=el(name,'lnk cut'), ico=el('span','l-ico'), tx=el('span','l-txt'), k=el('span','l-kind mono'), n=el('span','l-name'), u=el('span','l-url');
+  ico.innerHTML=LINK_ICONS[o.icon]||''; ico.style.setProperty('--k',o.color);
+  k.textContent=o.kind; n.textContent=o.name; u.textContent=o.sub||o.url.replace(/^https?:\/\/(www\.)?/,'');
+  tx.appendChild(k); tx.appendChild(n); tx.appendChild(u);
+  c.appendChild(ico); c.appendChild(tx);
+  return c;
+}
+function outLink(a,url){a.href=url; a.target='_blank'; a.rel='noopener';}
+function renderHubLinks(){
+  var nets=$('netList'), crea=$('creaList');
+  nets.textContent=''; crea.textContent='';
+  NETS.forEach(function(o){
+    var a=linkCard('a',o), out=el('span','l-out');
+    outLink(a,o.url); out.innerHTML=LINK_ICONS.out; a.appendChild(out);
+    a.title='Ouvrir '+o.kind+' : '+o.name;
+    nets.appendChild(a);
+  });
+  CREATIONS.forEach(function(cat){
+    var head=el('div','sub-cat mono'), ct=el('b'), grid=el('div','links');
+    head.appendChild(document.createTextNode(cat.title)); ct.textContent=two0(cat.items.length); head.appendChild(ct);
+    cat.items.forEach(function(o){
+      var c=linkCard('div',o), acts=el('span','l-acts'), play=el('a','btn solid'), page=el('a','btn');
+      /* lien roblox:// : ouvre directement l'application Roblox sur le jeu */
+      play.href='roblox://experiences/start?placeId='+o.placeId; play.textContent='Lancer le jeu';
+      play.title='Ouvre Roblox directement sur '+o.name;
+      outLink(page,'https://www.roblox.com/games/'+o.placeId); page.textContent='Page Roblox';
+      acts.appendChild(play); acts.appendChild(page); c.appendChild(acts);
+      grid.appendChild(c);
+    });
+    crea.appendChild(head); crea.appendChild(grid);
+  });
+}
+
 /* ---------- console d'accueil ---------- */
 /* texte qui se « déchiffre » : des glyphes aléatoires laissent place aux vraies lettres */
 function scramble(el,text,ms,done){
@@ -1731,6 +1827,7 @@ if(startId) store.boards.forEach(function(b){
 switchBoard(first);
 var start=startId?byId(startId):null;
 loadTasks();
+renderHubLinks();
 /* demande au navigateur de ne pas évincer ces données de lui-même (sans effet sur un effacement réglé par l'utilisateur) */
 try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist().catch(function(){}); }catch(e){}
 /* un lien direct vers une idée ou vers le planificateur saute la console d'accueil */
