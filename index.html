@@ -284,6 +284,8 @@ a.lnk:hover,a.lnk:focus-visible{--edge:var(--acc);transform:translateY(-2px);out
 a.lnk:hover .l-out,a.lnk:focus-visible .l-out{color:var(--acc)}
 .l-acts{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px}
 .l-acts .btn{flex:1}
+.lnk-empty{padding:18px;border:1px dashed var(--line2);color:var(--faint);text-transform:none;letter-spacing:.04em;line-height:1.6}
+.sub-cat:not(:first-child){margin-top:22px}
 a.btn{color:var(--txt);text-decoration:none}
 .h-log{flex:none;padding:12px 24px calc(14px + env(safe-area-inset-bottom));border-top:1px solid var(--line);color:var(--faint);
   background:rgba(5,7,11,.7);line-height:1.9;text-transform:none;letter-spacing:.06em}
@@ -2593,11 +2595,14 @@ var NETS=[
 var CREATIONS=[
   {title:'Jeux Roblox',items:[
     {kind:'Jeu Roblox',name:'Bistro Boss',sub:'Restaurant Tycoon',placeId:'100518177726638',icon:'roblox',color:'#d6e6f2',img:'img/bistro-boss-icone.jpg'}
-  ]}
+  ]},
+  /* un jeu navigateur se déclare avec « url » : le dossier du jeu dans le site, par exemple 'jeux/mon-jeu/' */
+  {title:'Jeux navigateur',empty:'Aucun jeu pour l\'instant. Le premier est en préparation.',items:[]}
 ];
 var LINK_ICONS={
   twitch:'<svg viewBox="0 0 24 24"><path d="M5 3h15v11l-4 4h-4l-3 3v-3H5z"/><path d="M11 7v5M16 7v5"/></svg>',
   roblox:'<svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" transform="rotate(13 12 12)"/><rect x="10.2" y="10.2" width="3.6" height="3.6" transform="rotate(13 12 12)"/></svg>',
+  pad:'<svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="9"/><path d="M8 11v3M6.5 12.5h3M15.5 11.5h.01M17.5 13.5h.01"/></svg>',
   out:'<svg viewBox="0 0 24 24"><path d="M8 16 17 7M9 7h8v8"/></svg>'
 };
 function linkCard(name,o){
@@ -2621,6 +2626,9 @@ function renderHubLinks(){
   CREATIONS.forEach(function(cat){
     var head=el('div','sub-cat mono'), ct=el('b'), grid=el('div','links');
     head.appendChild(document.createTextNode(cat.title)); ct.textContent=two0(cat.items.length); head.appendChild(ct);
+    if(!cat.items.length){
+      var none=el('div','lnk-empty mono'); none.textContent=cat.empty||'Rien ici pour l\'instant.'; grid.appendChild(none);
+    }
     cat.items.forEach(function(o){
       var c=linkCard('div',o), acts=el('span','l-acts'), play=el('a','btn solid'), page=el('a','btn');
       if(o.img){
@@ -2628,6 +2636,12 @@ function renderHubLinks(){
         var im=el('img');
         im.src=o.img; im.alt='Icône de '+o.name; im.width=256; im.height=256;
         c.firstChild.textContent=''; c.firstChild.appendChild(im); c.className+=' has-icon';
+      }
+      if(o.url){
+        /* jeu navigateur : il se joue directement dans le site */
+        play.href=o.url; play.textContent='Jouer'; play.title='Lancer '+o.name;
+        acts.appendChild(play); c.appendChild(acts); grid.appendChild(c);
+        return;
       }
       /* lien roblox:// : ouvre directement l'application Roblox sur le jeu */
       play.href='roblox://experiences/start?placeId='+o.placeId; play.textContent='Lancer le jeu';
