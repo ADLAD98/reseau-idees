@@ -2597,12 +2597,15 @@ var CREATIONS=[
     {kind:'Jeu Roblox',name:'Bistro Boss',sub:'Restaurant Tycoon',placeId:'100518177726638',icon:'roblox',color:'#d6e6f2',img:'img/bistro-boss-icone.jpg'}
   ]},
   /* un jeu navigateur se déclare avec « url » : le dossier du jeu dans le site, par exemple 'jeux/mon-jeu/' */
-  {title:'Jeux navigateur',empty:'Aucun jeu pour l\'instant. Le premier est en préparation.',items:[]}
+  {title:'Jeux navigateur',empty:'Aucun jeu pour l\'instant. Le premier est en préparation.',items:[
+    {kind:'Jeu de cartes e-sport',name:'Roster',sub:'Packs et collection · saison 2026',url:'jeux/roster/',icon:'cards',color:'#00e5ff'}
+  ]}
 ];
 var LINK_ICONS={
   twitch:'<svg viewBox="0 0 24 24"><path d="M5 3h15v11l-4 4h-4l-3 3v-3H5z"/><path d="M11 7v5M16 7v5"/></svg>',
   roblox:'<svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" transform="rotate(13 12 12)"/><rect x="10.2" y="10.2" width="3.6" height="3.6" transform="rotate(13 12 12)"/></svg>',
   pad:'<svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="9"/><path d="M8 11v3M6.5 12.5h3M15.5 11.5h.01M17.5 13.5h.01"/></svg>',
+  cards:'<svg viewBox="0 0 24 24"><path d="M8 4h11v15H8zM5 7v13h11"/><circle cx="13.5" cy="11.5" r="2.2"/></svg>',
   out:'<svg viewBox="0 0 24 24"><path d="M8 16 17 7M9 7h8v8"/></svg>'
 };
 function linkCard(name,o){

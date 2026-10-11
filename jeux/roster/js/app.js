@@ -1,0 +1,483 @@
+/* Roster — le jeu. Quatre écrans : Packs, Collection, Classement, Profil.
+   Le serveur décide de tout (cartes tirées, délais, collection) ; cette page affiche et met en scène. */
+import { ApiError, call, clearSession, deriveKey, loadSession, saveSession } from './api.js';
+import { cardHTML, esc, flagUrl, iconUrl, prepare, statsOf } from './cards.js';
+import { GAME_NAME, ROLE_NAME, ROLE_ORDER, STORE } from './config.js';
+import { packHTML, runOpening } from './opening.js';
+
+const app = document.getElementById('app');
+const $ = (sel, root) => (root || document).querySelector(sel);
+const NAME_RULE = /^[A-Za-z0-9][A-Za-z0-9_-]{2,15}$/;
+const TABS = [
+  ['packs', 'Packs', 'i-pack'],
+  ['collection', 'Collection', 'i-cards'],
+  ['classement', 'Classement', 'i-board'],
+  ['profil', 'Profil', 'i-user'],
+];
+
+const S = {
+  session: null,          // { token, name } gardé dans ce navigateur
+  player: null,           // ce que le serveur dit du joueur
+  free: null,             // pack gratuit : { readyAt, cooldownMs, size }
+  skew: 0,                // heure du serveur − heure de cet appareil
+  cat: null,              // catalogue des cartes
+  owned: new Map(),       // identifiant de carte → { qty, at }
+  filters: { q: '', league: '', team: '', role: '', tier: '', own: '', sort: 'ovr' },
+  fx: true,               // animations
+  filtersOpen: false,     // listes de filtres dépliées (téléphone)
+  opening: false,
+};
+
+/* ---------- petits outils ---------- */
+const icon = (id) => '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#' + id + '"/></svg>';
+const now = () => Date.now() + S.skew;
+const pct = (a, b) => (b ? Math.round((100 * a) / b) : 0);
+const frDate = (ms) => new Date(ms).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+const frNum = (n) => String(n).replace('.', ',');
+function clock(ms) {
+  const s = Math.max(0, Math.ceil(ms / 1000));
+  return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+}
+function toast(message, bad) {
+  const box = document.getElementById('toasts');
+  const el = document.createElement('div');
+  el.className = 'toast cut' + (bad ? ' bad' : '');
+  el.textContent = message;
+  box.appendChild(el);
+  setTimeout(() => el.remove(), bad ? 5200 : 3200);
+}
+function applyState(data) {
+  if (data.player) S.player = data.player;
+  if (data.free) S.free = data.free;
+  if (typeof data.skew === 'number') S.skew = data.skew;
+}
+/** Lance une action qui parle au serveur ; une connexion expirée ramène à l'écran de connexion. */
+async function guard(action) {
+  try {
+    return await action();
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 401) {
+      clearSession();
+      S.session = null;
+      showAuth('Ta connexion a expiré. Reconnecte-toi.');
+    } else {
+      toast(e instanceof ApiError ? e.message : 'Un problème est survenu.', true);
+      if (!(e instanceof ApiError)) console.error(e);
+    }
+    return null;
+  }
+}
+
+/* ---------- démarrage ---------- */
+async function loadCatalogue(version) {
+  if (S.cat && (!version || S.cat.version === version)) return;
+  let raw = null;
+  try {
+    const kept = JSON.parse(localStorage.getItem(STORE + 'catalogue') || 'null');
+    if (kept && kept.cards && (!version || kept.version === version)) raw = kept;
+  } catch (e) { raw = null; }
+  if (!raw) {
+    raw = await call('GET', '/api/catalogue');
+    try { localStorage.setItem(STORE + 'catalogue', JSON.stringify(raw)); } catch (e) { /* pas de place : on le redemandera */ }
+  }
+  S.cat = prepare(raw);
+}
+async function loadGame() {
+  const data = await call('GET', '/api/collection');
+  applyState(data);
+  S.owned = new Map(data.cards.map((row) => [row[0], { qty: row[1], at: row[2] }]));
+  await loadCatalogue(data.catalogVersion);
+}
+async function boot() {
+  try { S.fx = localStorage.getItem(STORE + 'fx') !== '0'; } catch (e) { S.fx = true; }
+  document.body.classList.toggle('fx', S.fx);
+  S.session = loadSession();
+  if (!S.session) return showAuth();
+  app.innerHTML = '<div class="center"><div><div class="spin"></div>Connexion au serveur…</div></div>';
+  try {
+    await loadGame();
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 401) { clearSession(); S.session = null; return showAuth(); }
+    app.innerHTML = '<div class="center"><div><p>' + esc(e.message || 'Serveur injoignable.') + '</p><p style="margin-top:16px"><button class="btn line" id="retry">Réessayer</button></p></div></div>';
+    $('#retry').addEventListener('click', boot);
+    return;
+  }
+  shell();
+  route();
+}
+
+/* ---------- connexion ---------- */
+function showAuth(message) {
+  let mode = 'login';
+  app.innerHTML = '<div class="auth"><div class="auth-brand">'
+    + '<svg class="mark" viewBox="0 0 100 100" aria-hidden="true"><use href="#mark"/></svg>'
+    + '<h1>' + esc(GAME_NAME) + '</h1>'
+    + '<p>Ouvre des packs, collectionne les joueurs et les coachs pros de la saison, et compose ton équipe de rêve.</p>'
+    + '<div class="auth-fan" id="fan"></div></div>'
+    + '<form class="auth-form cut" id="authForm" novalidate>'
+    + '<div class="seg"><button type="button" data-mode="login" class="on">Connexion</button><button type="button" data-mode="register">Créer un compte</button></div>'
+    + '<label class="field">Pseudo<input name="name" autocomplete="username" autocapitalize="off" spellcheck="false" maxlength="16" required></label>'
+    + '<label class="field">Mot de passe<input name="password" type="password" autocomplete="current-password" required></label>'
+    + '<label class="field" data-only="register" hidden>Mot de passe, une seconde fois<input name="password2" type="password" autocomplete="new-password"></label>'
+    + '<p class="hint" data-only="register" hidden>Aucune adresse e-mail n\'est demandée : note bien ton mot de passe, il ne pourra pas être retrouvé.</p>'
+    + '<p class="form-error" role="alert">' + esc(message || '') + '</p>'
+    + '<button class="btn solid big" type="submit">Entrer</button>'
+    + '<p class="legal">Projet de fan gratuit, sans lien avec Riot Games ni avec les équipes citées. <a href="../../">Retour à Bcorps Labs</a></p>'
+    + '</form></div>';
+  const form = $('#authForm'), error = $('.form-error', form), submit = $('button[type=submit]', form);
+  const setMode = (m) => {
+    mode = m;
+    form.querySelectorAll('[data-mode]').forEach((b) => b.classList.toggle('on', b.dataset.mode === m));
+    form.querySelectorAll('[data-only]').forEach((el) => { el.hidden = el.dataset.only !== m; });
+    form.password.autocomplete = m === 'register' ? 'new-password' : 'current-password';
+    submit.textContent = m === 'register' ? 'Créer mon compte' : 'Entrer';
+    error.textContent = '';
+  };
+  form.addEventListener('click', (e) => { const b = e.target.closest('[data-mode]'); if (b) setMode(b.dataset.mode); });
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = form.name.value.trim(), password = form.password.value;
+    if (!NAME_RULE.test(name)) { error.textContent = 'Pseudo : 3 à 16 caractères, lettres, chiffres, tiret ou tiret bas.'; return; }
+    if (password.length < 8) { error.textContent = 'Mot de passe : 8 caractères au minimum.'; return; }
+    if (mode === 'register' && password !== form.password2.value) { error.textContent = 'Les deux mots de passe sont différents.'; return; }
+    const label = submit.textContent;
+    submit.disabled = true;
+    submit.textContent = 'Un instant…';
+    error.textContent = '';
+    try {
+      const key = await deriveKey(name, password);
+      const data = await call('POST', mode === 'register' ? '/api/register' : '/api/login', { name, key });
+      S.session = { token: data.token, name: data.player.name };
+      saveSession(S.session);
+      await loadGame();
+      location.hash = '#/packs';
+      shell();
+      route();
+    } catch (err) {
+      error.textContent = err instanceof ApiError ? err.message : 'Un problème est survenu. Réessaie.';
+      if (!(err instanceof ApiError)) console.error(err);
+      submit.disabled = false;
+      submit.textContent = label;
+    }
+  });
+  /* quelques-unes des meilleures cartes en éventail, pour donner envie (le catalogue est public) */
+  loadCatalogue().then(() => {
+    const fan = document.getElementById('fan');
+    if (!fan || !S.cat) return;
+    const picks = [];
+    for (const role of ['TOP', 'JGL', 'MID', 'BOT', 'SUP']) {
+      const c = S.cat.cards.find((x) => x.role === role && x.art);
+      if (c) picks.push(c);
+    }
+    fan.innerHTML = picks.map((c, i) => cardHTML(c, S.cat, { eager: true }).replace('<article class="', '<article style="--i:' + i + '" class="')).join('');
+  }).catch(() => { /* pas grave : la page de connexion marche sans */ });
+}
+
+/* ---------- ossature et navigation ---------- */
+function shell() {
+  app.innerHTML = '<header class="top"><a class="brand" href="#/packs"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#mark"/></svg>' + esc(GAME_NAME) + '<small>saison ' + S.cat.season + '</small></a>'
+    + '<nav class="nav">' + TABS.map((t) => '<a href="#/' + t[0] + '" data-tab="' + t[0] + '">' + t[1] + '</a>').join('') + '</nav>'
+    + '<span class="spacer"></span><a class="who" href="#/profil">' + icon('i-user') + '<b>' + esc(S.player.name) + '</b></a></header>'
+    + '<main class="main" id="main"></main>'
+    + '<nav class="tabs">' + TABS.map((t) => '<a href="#/' + t[0] + '" data-tab="' + t[0] + '">' + icon(t[2]) + t[1] + '</a>').join('') + '</nav>';
+}
+const VIEWS = { packs: viewPacks, collection: viewCollection, classement: viewBoard, profil: viewProfile };
+function route() {
+  if (!S.session || !S.cat || !$('#main')) return;
+  const name = (location.hash.replace(/^#\/?/, '').split('/')[0]) || 'packs';
+  const tab = VIEWS[name] ? name : 'packs';
+  document.querySelectorAll('[data-tab]').forEach((a) => a.classList.toggle('on', a.dataset.tab === tab));
+  window.scrollTo(0, 0);
+  VIEWS[tab]($('#main'));
+}
+window.addEventListener('hashchange', route);
+
+/* ---------- carte cliquable ---------- */
+function tile(card, extra) {
+  const own = S.owned.get(card.id);
+  return '<button class="tile" type="button" data-card="' + esc(card.id) + '" aria-label="' + esc(card.name) + ', note ' + card.ovr + '">'
+    + cardHTML(card, S.cat, { cls: own ? '' : 'missing' })
+    + (own && own.qty > 1 ? '<span class="badge qty">×' + own.qty + '</span>' : '') + (extra || '') + '</button>';
+}
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-card]');
+  if (t && S.cat) showSheet(t.dataset.card);
+});
+/* une illustration qui ne charge pas laisse place au fond de la carte, sans icône d'image cassée */
+document.addEventListener('error', (e) => {
+  if (e.target && e.target.classList && e.target.classList.contains('card-art')) e.target.style.visibility = 'hidden';
+}, true);
+
+/* ---------- écran Packs ---------- */
+const packReady = () => S.free.readyAt <= now();
+function progressHTML() {
+  const total = S.cat.cards.length, have = S.owned.size;
+  const tiers = [...S.cat.tiers].reverse().map((t) => {
+    const all = S.cat.cards.filter((c) => c.tier === t.id);
+    return '<span style="--tc:var(--t' + t.id + ')"><i></i>' + esc(t.name) + ' ' + all.filter((c) => S.owned.has(c.id)).length + '/' + all.length + '</span>';
+  }).join('');
+  return '<div class="meter"><div class="meter-head"><span class="mono">Collection</span><span><b>' + have + '</b> / ' + total + ' cartes</span></div>'
+    + '<div class="bar"><i style="width:' + pct(have, total) + '%"></i></div><div class="tiers">' + tiers + '</div></div>';
+}
+function packActionHTML() {
+  if (packReady()) return '<button class="btn solid big" type="button" id="openPack">Ouvrir le pack</button>';
+  const left = S.free.readyAt - now();
+  return '<div class="wait"><div class="wait-time"><b id="count">' + clock(left) + '</b><span>avant le prochain pack</span></div>'
+    + '<div class="bar"><i id="countBar" style="width:' + Math.min(100, 100 - (100 * left) / S.free.cooldownMs) + '%"></i></div></div>';
+}
+function viewPacks(main) {
+  const recent = [...S.owned.entries()].sort((a, b) => b[1].at - a[1].at).slice(0, 6).map(([id]) => S.cat.cardById.get(id)).filter(Boolean);
+  main.innerHTML = '<section class="home"><div class="home-pack" id="packBox">' + packHTML(packReady() ? 'ready' : 'waiting', S.cat.season, S.free.size) + '</div>'
+    + '<div class="home-side"><div class="eyebrow mono">Pack gratuit · toutes les ' + Math.round(S.free.cooldownMs / 60000) + ' minutes</div>'
+    + '<h1 class="h1">' + S.free.size + ' cartes à découvrir</h1>'
+    + '<p class="lead">Joueurs et coachs pros de la saison ' + S.cat.season + '. La dernière carte du pack est une carte bonus : rang Titulaire au minimum.</p>'
+    + '<div id="packAction">' + packActionHTML() + '</div>' + progressHTML() + '</div></section>'
+    + '<section><h2 class="h2">Dernières cartes obtenues</h2>'
+    + (recent.length ? '<div class="row-cards">' + recent.map((c) => tile(c)).join('') + '</div>' : '<p class="empty">Ta collection est vide. Ouvre ton premier pack !</p>')
+    + '</section>';
+}
+/* compte à rebours : mis à jour chaque seconde, sans redessiner l'écran */
+setInterval(() => {
+  const box = document.getElementById('packAction');
+  if (!box || !S.free || S.opening) return;
+  const count = document.getElementById('count');
+  if (packReady()) {
+    if (count) {
+      box.innerHTML = packActionHTML();
+      const pack = $('#packBox .pack');
+      if (pack) pack.className = 'pack ready';
+    }
+    return;
+  }
+  const left = S.free.readyAt - now();
+  if (!count) { box.innerHTML = packActionHTML(); return; }
+  count.textContent = clock(left);
+  document.getElementById('countBar').style.width = Math.min(100, 100 - (100 * left) / S.free.cooldownMs) + '%';
+}, 1000);
+document.addEventListener('click', async (e) => {
+  if (!e.target.closest('#openPack') || S.opening) return;
+  S.opening = true;
+  try {
+    const result = await runOpening({
+      request: async () => {
+        const data = await call('POST', '/api/packs/free');
+        /* le serveur vient d'être mis à jour avec de nouvelles cartes : on recharge le catalogue avant de les montrer */
+        if (data.catalogVersion && data.catalogVersion !== S.cat.version) await loadCatalogue(data.catalogVersion);
+        return data;
+      },
+      getCat: () => S.cat, fx: S.fx, size: S.free.size,
+    });
+    applyState(result.data);
+    for (const p of result.data.pack.cards) {
+      const had = S.owned.get(p.id);
+      S.owned.set(p.id, { qty: p.qty, at: had ? had.at : now() });
+    }
+    S.opening = false;
+    if (result.goTo === 'collection') { S.filters.sort = 'recent'; S.filters.own = 'owned'; location.hash = '#/collection'; }
+    else route();
+  } catch (err) {
+    S.opening = false;
+    if (err instanceof ApiError && err.code === 'pas_pret') { applyState({ free: err.data.free, skew: err.data.skew }); toast(err.message, true); route(); }
+    else if (err instanceof ApiError && err.status === 401) { clearSession(); S.session = null; showAuth('Ta connexion a expiré. Reconnecte-toi.'); }
+    else { toast(err instanceof ApiError ? err.message : 'Un problème est survenu.', true); if (!(err instanceof ApiError)) console.error(err); }
+  }
+});
+
+/* ---------- écran Collection ---------- */
+function filteredCards() {
+  const f = S.filters, q = f.q.trim().toLowerCase();
+  const list = S.cat.cards.filter((c) => {
+    const own = S.owned.has(c.id);
+    if (f.own === 'owned' && !own) return false;
+    if (f.own === 'missing' && own) return false;
+    if (f.league && c.league !== f.league) return false;
+    if (f.team && c.team !== f.team) return false;
+    if (f.role && c.role !== f.role) return false;
+    if (f.tier && c.tier !== Number(f.tier)) return false;
+    if (q) {
+      const team = S.cat.teamById.get(c.team);
+      if (!(c.name.toLowerCase().includes(q) || (team && (team.name.toLowerCase().includes(q) || team.short.toLowerCase() === q)))) return false;
+    }
+    return true;
+  });
+  const at = (c) => (S.owned.get(c.id) || { at: 0 }).at;
+  const qty = (c) => (S.owned.get(c.id) || { qty: 0 }).qty;
+  const sorts = {
+    ovr: (a, b) => b.ovr - a.ovr || a.name.localeCompare(b.name),
+    name: (a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }),
+    recent: (a, b) => at(b) - at(a) || b.ovr - a.ovr,
+    qty: (a, b) => qty(b) - qty(a) || b.ovr - a.ovr,
+    team: (a, b) => a.league.localeCompare(b.league) || a.team.localeCompare(b.team) || ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role) || b.ovr - a.ovr,
+  };
+  return list.sort(sorts[f.sort] || sorts.ovr);
+}
+function drawGrid() {
+  const grid = document.getElementById('grid');
+  if (!grid) return;
+  const list = filteredCards();
+  $('#gridCount').textContent = list.length + (list.length > 1 ? ' cartes affichées' : ' carte affichée') + ' · ' + list.filter((c) => S.owned.has(c.id)).length + ' possédées';
+  grid.innerHTML = list.length ? list.map((c) => tile(c)).join('') : '';
+  $('#gridEmpty').hidden = list.length > 0;
+}
+function viewCollection(main) {
+  const f = S.filters, cat = S.cat;
+  /* première visite : on montre d'abord ce que le joueur possède, l'album complet est à un clic */
+  if (!f.own) f.own = S.owned.size ? 'owned' : 'all';
+  const option = (value, text, current) => '<option value="' + esc(value) + '"' + (String(current) === String(value) ? ' selected' : '') + '>' + esc(text) + '</option>';
+  const teams = cat.teams.filter((t) => !f.league || t.league === f.league);
+  if (f.team && !teams.some((t) => t.id === f.team)) f.team = '';
+  main.innerHTML = '<div class="col-head"><div><h1 class="h1">Collection</h1><p>' + S.owned.size + ' cartes sur ' + cat.cards.length + ' · ' + S.player.cardsTotal + ' exemplaires en tout</p></div></div>'
+    + '<div class="filters">'
+    + '<input class="inp" id="fq" type="search" placeholder="Joueur ou équipe…" value="' + esc(f.q) + '" autocomplete="off">'
+    /* sur téléphone, les listes de filtres se replient derrière ce bouton */
+    + '<button class="btn filters-toggle' + (S.filtersOpen ? ' on' : '') + '" type="button" id="fmore" aria-expanded="' + !!S.filtersOpen + '">Filtres</button>'
+    + '<div class="filters-more' + (S.filtersOpen ? ' open' : '') + '" id="fbox">'
+    + '<select class="sel" data-f="league" aria-label="Ligue">' + option('', 'Toutes les ligues', f.league) + cat.leagues.map((l) => option(l.id, l.name, f.league)).join('') + '</select>'
+    + '<select class="sel" data-f="team" aria-label="Équipe">' + option('', 'Toutes les équipes', f.team) + teams.map((t) => option(t.id, t.name, f.team)).join('') + '</select>'
+    + '<select class="sel" data-f="role" aria-label="Poste">' + option('', 'Tous les postes', f.role) + ROLE_ORDER.map((r) => option(r, ROLE_NAME[r], f.role)).join('') + '</select>'
+    + '<select class="sel" data-f="tier" aria-label="Rang">' + option('', 'Tous les rangs', f.tier) + [...cat.tiers].reverse().map((t) => option(t.id, t.name, f.tier)).join('') + '</select>'
+    + '<select class="sel" data-f="sort" aria-label="Tri">' + [['ovr', 'Tri : note'], ['name', 'Tri : nom'], ['team', 'Tri : équipe'], ['recent', 'Tri : récentes'], ['qty', 'Tri : exemplaires']].map((s) => option(s[0], s[1], f.sort)).join('') + '</select>'
+    + '</div></div><div class="filters-row"><div class="seg" id="fown">'
+    + [['all', 'Toutes'], ['owned', 'Possédées'], ['missing', 'Manquantes']].map((o) => '<button type="button" data-own="' + o[0] + '"' + (f.own === o[0] ? ' class="on"' : '') + '>' + o[1] + '</button>').join('')
+    + '</div><span class="count" id="gridCount"></span></div>'
+    + '<div class="grid" id="grid"></div><p class="empty" id="gridEmpty" hidden>Aucune carte ne correspond à ces filtres.</p>';
+  drawGrid();
+  let typing = 0;
+  $('#fq').addEventListener('input', (e) => { f.q = e.target.value; clearTimeout(typing); typing = setTimeout(drawGrid, 140); });
+  $('#fmore').addEventListener('click', (e) => {
+    S.filtersOpen = !S.filtersOpen;
+    e.currentTarget.classList.toggle('on', S.filtersOpen);
+    e.currentTarget.setAttribute('aria-expanded', String(S.filtersOpen));
+    $('#fbox').classList.toggle('open', S.filtersOpen);
+  });
+  main.querySelectorAll('[data-f]').forEach((sel) => sel.addEventListener('change', () => {
+    f[sel.dataset.f] = sel.value;
+    if (sel.dataset.f === 'league') viewCollection(main); else drawGrid();
+  }));
+  $('#fown').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-own]');
+    if (!b) return;
+    f.own = b.dataset.own;
+    $('#fown').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+    drawGrid();
+  });
+}
+
+/* ---------- fiche d'une carte ---------- */
+function showSheet(id) {
+  const cat = S.cat, card = cat.cardById.get(id);
+  if (!card) return;
+  const own = S.owned.get(id), team = cat.teamById.get(card.team), tier = cat.tierById.get(card.tier);
+  const league = cat.leagues.find((l) => l.id === card.league);
+  const real = card.real || {};
+  const fact = (value, text) => '<div><b>' + value + '</b><span>' + text + '</span></div>';
+  let facts = '';
+  if (card.kind === 'p' && real.g) {
+    facts = fact(real.g, 'parties') + fact(pct(real.w, real.g) + ' %', 'victoires') + fact(frNum(real.k) + ' / ' + frNum(real.d) + ' / ' + frNum(real.a), 'K / D / A par partie') + fact(frNum(real.kda), 'KDA')
+      + fact(real.kp + ' %', 'participation') + fact(real.dpm, 'dégâts / min') + fact(frNum(real.cspm), 'sbires / min') + fact(frNum(real.vspm), 'vision / min');
+  } else if (card.kind === 'c' && real.g) {
+    facts = fact(real.g, 'parties') + fact(pct(real.w, real.g) + ' %', 'victoires') + fact(real.w, 'gagnées') + fact(real.g - real.w, 'perdues');
+  }
+  const titles = card.titles ? [[card.titles[0], 'Worlds'], [card.titles[1], 'MSI'], [card.titles[2], 'autre titre international']].filter((t) => t[0])
+    .map((t) => '<span class="chip" style="--tc:var(--t3)">' + t[0] + ' × ' + t[1] + '</span>').join('') : '';
+  const sheet = document.createElement('div');
+  sheet.className = 'sheet';
+  sheet.innerHTML = '<div class="sheet-box cut" role="dialog" aria-modal="true" aria-label="' + esc(card.name) + '" style="--tc:var(--t' + card.tier + ')">'
+    + '<div class="sheet-card">' + cardHTML(card, cat, { eager: true, cls: own ? '' : 'missing' })
+    + '<span class="mono" style="color:var(--mut)">' + (own ? (own.qty > 1 ? own.qty + ' exemplaires' : '1 exemplaire') + ' · depuis le ' + frDate(own.at) : 'Carte manquante') + '</span></div>'
+    + '<div class="sheet-info"><div class="sheet-title"><div><h2>' + esc(card.name) + '</h2>'
+    + '<p>' + (card.country ? '<img src="' + flagUrl(card.country) + '" alt="">' + esc(cat.countries[card.country]) + ' · ' : '') + esc(ROLE_NAME[card.role]) + ' · ' + esc(team ? team.name : card.team) + '</p></div>'
+    + '<span class="spacer"></span><button class="close" type="button" aria-label="Fermer">' + icon('i-close') + '</button></div>'
+    + '<div class="chips"><span class="chip">' + esc(tier.name) + ' · ' + card.ovr + '</span><span class="chip" style="--tc:var(--mut)">' + esc(card.league) + (league ? ' · ' + esc(league.region) : '') + '</span>' + titles + '</div>'
+    + '<div><h3 class="h2">Statistiques de la carte</h3><div class="bars">' + statsOf(card).map((s) => '<div title="' + esc(s[3]) + '"><span>' + s[2] + '</span><span class="bar"><i style="width:' + card.stats[s[0]] + '%"></i></span><b>' + card.stats[s[0]] + '</b></div>').join('') + '</div></div>'
+    + (facts ? '<div><h3 class="h2">Saison ' + cat.season + (card.kind === 'c' ? ' de son équipe' : ' en chiffres') + '</h3><div class="facts">' + facts + '</div></div>' : '<p class="note">Aucune partie officielle jouée cette saison : la note est celle d\'un remplaçant.</p>')
+    + (card.champs && card.champs.length ? '<div><h3 class="h2">Champions fétiches</h3><div class="champs">' + card.champs.map((c) => '<div class="champ"><img src="' + iconUrl(cat, c[0]) + '" alt="" loading="lazy"><div><b>' + esc(cat.champions[c[0]] || c[0]) + '</b><span>' + c[1] + ' parties · ' + pct(c[2], c[1]) + ' %</span></div></div>').join('') + '</div></div>' : '')
+    + '<p class="note">Note calculée à partir des statistiques officielles de la saison ' + cat.season + ' (ligue, tournois internationaux, palmarès). Données : Leaguepedia.</p>'
+    + '</div></div>';
+  const close = () => { sheet.remove(); document.removeEventListener('keydown', onKey); document.body.style.overflow = ''; };
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  sheet.addEventListener('click', (e) => { if (e.target === sheet || e.target.closest('.close')) close(); });
+  document.addEventListener('keydown', onKey);
+  document.body.style.overflow = 'hidden';
+  document.body.appendChild(sheet);
+  /* la carte s'incline sous le doigt ou la souris */
+  const el = $('.sheet-card .card', sheet), inner = $('.card-in', el);
+  if (S.fx && own) {
+    el.addEventListener('pointermove', (e) => {
+      const r = el.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width - 0.5, y = (e.clientY - r.top) / r.height - 0.5;
+      inner.style.transform = 'rotateY(' + (x * 22).toFixed(1) + 'deg) rotateX(' + (-y * 22).toFixed(1) + 'deg)';
+    });
+    el.addEventListener('pointerleave', () => { inner.style.transform = ''; });
+  }
+}
+
+/* ---------- écran Classement ---------- */
+async function viewBoard(main) {
+  main.innerHTML = '<div class="col-head"><div><h1 class="h1">Classement</h1><p>Les plus grandes collections.</p></div></div><div id="board"><div class="center" style="min-height:30dvh"><div class="spin"></div></div></div>';
+  const data = await guard(() => call('GET', '/api/leaderboard'));
+  const box = document.getElementById('board');
+  if (!data || !box) return;
+  box.innerHTML = '<table class="board"><thead><tr><th>#</th><th>Joueur</th><th class="num">Cartes</th><th class="num hide-s">Exemplaires</th><th class="num">Packs</th></tr></thead><tbody>'
+    + data.top.map((p, i) => '<tr' + (p.id === data.me ? ' class="me"' : '') + '><td>' + (i + 1) + '</td><td><b>' + esc(p.name) + '</b></td>'
+      + '<td class="num">' + p.cardsUnique + ' / ' + data.totalCards + '</td><td class="num hide-s">' + p.cardsTotal + '</td><td class="num">' + p.packsOpened + '</td></tr>').join('')
+    + '</tbody></table>';
+}
+
+/* ---------- écran Profil ---------- */
+async function viewProfile(main) {
+  const p = S.player;
+  main.innerHTML = '<div class="col-head"><div><h1 class="h1">' + esc(p.name) + '</h1><p>Joueur depuis le ' + frDate(p.createdAt) + '</p></div></div><div class="panels">'
+    + '<section class="panel cut"><h3>Mon compte</h3><div class="kv"><span>Packs ouverts</span><b>' + p.packsOpened + '</b><span>Cartes différentes</span><b>' + p.cardsUnique + ' / ' + S.cat.cards.length + '</b><span>Exemplaires</span><b>' + p.cardsTotal + '</b></div>'
+    + '<div class="switch"><span>Animations</span><button type="button" id="fxSwitch" aria-pressed="' + S.fx + '" aria-label="Animations"></button></div>'
+    + '<div class="actions"><button class="btn" type="button" id="logout">Se déconnecter</button><button class="btn danger" type="button" id="askDelete">Supprimer mon compte</button></div>'
+    + '<form id="deleteForm" hidden style="display:grid;gap:10px"><p class="hint">Ton compte et toutes tes cartes seront effacés pour de bon. Tape ton mot de passe pour confirmer.</p>'
+    + '<input class="inp" name="password" type="password" autocomplete="current-password" placeholder="Mot de passe" required><p class="form-error" role="alert"></p>'
+    + '<div class="actions"><button class="btn danger" type="submit">Effacer définitivement</button><button class="btn" type="button" id="cancelDelete">Annuler</button></div></form></section>'
+    + '<section class="panel cut"><h3>Chances du pack gratuit</h3><div id="odds"><p class="hint">Chargement…</p></div></section>'
+    + '<section class="panel cut"><h3>À propos</h3>'
+    + '<p class="hint">' + esc(GAME_NAME) + ' est un projet de fan gratuit de Bcorps Labs. Les cartes représentent les joueurs et coachs en activité dans les ligues majeures (LCK, LPL, LEC, LCS, LCP, CBLOL), saison ' + S.cat.season + '. Catalogue du ' + frDate(Date.parse(S.cat.generated)) + '.</p>'
+    + '<p class="hint">Effectifs, statistiques et palmarès : <a href="https://lol.fandom.com/" target="_blank" rel="noopener">Leaguepedia</a>, licence CC BY-SA 3.0. Drapeaux : flag-icons (licence MIT).</p>'
+    + '<p class="hint">' + esc(GAME_NAME) + ' was created under Riot Games\' "Legal Jibber Jabber" policy using assets owned by Riot Games. Riot Games does not endorse or sponsor this project. Ce jeu n\'est ni approuvé ni sponsorisé par Riot Games, ni par les équipes et les joueurs cités.</p>'
+    + '<div class="actions"><a class="btn" href="../../">Retour à Bcorps Labs</a></div></section></div>';
+
+  $('#fxSwitch').addEventListener('click', (e) => {
+    S.fx = !S.fx;
+    e.currentTarget.setAttribute('aria-pressed', String(S.fx));
+    document.body.classList.toggle('fx', S.fx);
+    try { localStorage.setItem(STORE + 'fx', S.fx ? '1' : '0'); } catch (err) { /* réglage non gardé */ }
+  });
+  $('#logout').addEventListener('click', async () => {
+    try { await call('POST', '/api/logout'); } catch (err) { /* la connexion sera de toute façon oubliée ici */ }
+    clearSession();
+    S.session = null;
+    showAuth();
+  });
+  const form = $('#deleteForm');
+  $('#askDelete').addEventListener('click', () => { form.hidden = false; form.password.focus(); });
+  $('#cancelDelete').addEventListener('click', () => { form.hidden = true; form.reset(); });
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const error = $('.form-error', form);
+    error.textContent = '';
+    try {
+      const key = await deriveKey(S.player.name, form.password.value);
+      await call('POST', '/api/account/delete', { key });
+      clearSession();
+      S.session = null;
+      showAuth('Ton compte a été supprimé.');
+    } catch (err) {
+      error.textContent = err instanceof ApiError ? err.message : 'Un problème est survenu.';
+    }
+  });
+
+  const data = await guard(() => call('GET', '/api/packs'));
+  const box = document.getElementById('odds');
+  if (!data || !box) return;
+  const pack = data.packs[0], show = (x) => (x ? frNum(Math.round(1000 * x) / 10) + ' %' : '—');
+  box.innerHTML = '<table class="odds"><thead><tr><th>Rang</th><th>Cartes 1 à ' + (pack.size - 1) + '</th><th>Carte bonus</th></tr></thead><tbody>'
+    + [...S.cat.tiers].reverse().map((t) => '<tr style="--tc:var(--t' + t.id + ')"><td>' + esc(t.name) + '</td><td>' + show(pack.odds[t.id - 1]) + '</td><td>' + show(pack.lastOdds[t.id - 1]) + '</td></tr>').join('')
+    + '</tbody></table><p class="hint">Les cartes sont tirées au sort par le serveur. Un coach sort moins souvent qu\'un joueur.</p>';
+}
+
+boot();
