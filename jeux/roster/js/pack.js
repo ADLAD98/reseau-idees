@@ -1,7 +1,8 @@
 /* Le sachet de cartes (« booster ») : un sachet de papier métallisé, soudé et gaufré en haut et en bas, avec une encoche de chaque côté
-   pour le déchirer. Le même dessin sert sur l'accueil et pendant l'ouverture.
+   pour le déchirer et un trou d'accroche dans la soudure du haut. Comme un vrai paquet, il porte une illustration (le champion vedette de la
+   saison), la marque, le nombre de cartes, de petites mentions et un code-barres. Le même dessin sert sur l'accueil et pendant l'ouverture.
    Tout est décrit en pourcentages de la taille du sachet : sa silhouette, la ligne de déchirure, la bouche qui s'ouvre. */
-import { GAME_NAME } from './config.js';
+import { DDRAGON, GAME_NAME } from './config.js';
 import { esc } from './cards.js';
 
 /* ---------- géométrie (en % de la largeur et de la hauteur du sachet) ---------- */
@@ -60,34 +61,44 @@ function artSVG() {
     + '<path class="pk-rays" stroke="none" d="' + rays.join('') + '"/>'
     + '<path class="pk-fr"' + GOLD_LINE + ' d="M26 50H224L236 62V318L224 330H26L14 318V62Z"/>'
     + '<path class="pk-fr thin"' + GOLD_LINE + ' d="M29 56H221L230 65V315L221 324H29L20 315V65Z"/>'
-    + '<path class="pk-orn"' + GOLD_LINE + ' d="M125 96 197 168 125 240 53 168Z"/>'
-    + '<path class="pk-orn thin"' + GOLD_LINE + ' d="M125 112 181 168 125 224 69 168Z"/>'
-    + '<path class="pk-core"' + GOLD_FILL + ' d="M125 136 157 168 125 200 93 168Z"/>'
-    + '<path class="pk-orn thin"' + GOLD_LINE + ' d="M36 168h20M194 168h20M125 70v14M125 252v10"/>'
-    + '<path class="pk-dot"' + GOLD_FILL + ' d="M125 60 129 64 125 68 121 64ZM30 168 34 172 30 176 26 172ZM220 168 224 172 220 176 216 172Z"/>'
+    /* le sceau : l'emblème du jeu, à cheval sur le bas de l'illustration */
+    + '<path class="pk-seal" stroke="none" d="M125 200 151 226 125 252 99 226Z"/>'
+    + '<path class="pk-orn"' + GOLD_LINE + ' d="M125 200 151 226 125 252 99 226Z"/>'
+    + '<path class="pk-orn thin"' + GOLD_LINE + ' d="M125 207 144 226 125 245 106 226Z"/>'
+    + '<path class="pk-core"' + GOLD_FILL + ' d="M125 215 136 226 125 237 114 226Z"/>'
+    + '<path class="pk-orn thin"' + GOLD_LINE + ' d="M30 226h60M160 226h60"/>'
+    + '<path class="pk-dot"' + GOLD_FILL + ' d="M125 46 129 50 125 54 121 50ZM26 226 30 222 34 226 30 230ZM216 226 220 222 224 226 220 230Z"/>'
     + '<path class="pk-orn thin"' + GOLD_LINE + ' d="M52 300h46M152 300h46"/><path class="pk-dot"' + GOLD_FILL + ' d="M125 296 129 300 125 304 121 300Z"/>'
     + '</svg>';
 }
-/* une face du sachet : papier, imprimé, soudures gaufrées, grain, reflets. « lite » : sans l'imprimé (la bande du haut n'en porte pas). */
-function face(cls, shape, season, size, lite) {
+/* le code-barres du bas : des traits de largeurs variées, toujours les mêmes (c'est un dessin, il ne dit rien) */
+const BARS = [2, 1, 1, 3, 1, 2, 1, 1, 2, 3, 1, 1, 2, 1, 3, 1, 2, 2, 1, 1, 3, 1, 2, 1].map((w, k) => '<i style="flex:' + w + '"' + (k % 2 ? ' class="gap"' : '') + '></i>').join('');
+/* une face du sachet : papier, illustration, imprimé, soudures gaufrées, grain, reflets. « lite » : sans l'imprimé (la bande du haut n'en porte pas).
+   look.art : l'illustration du champion vedette (« Ahri_0 »), s'il y en a une. */
+function face(cls, shape, season, size, lite, look) {
+  const art = !lite && look && look.art ? '<img class="pk-hero" src="' + DDRAGON + '/img/champion/loading/' + esc(look.art) + '.jpg" alt="" draggable="false" decoding="async"><i class="pk-veil"></i>' : '';
   return '<div class="pk-face ' + cls + '" style="clip-path:' + shape + ';-webkit-clip-path:' + shape + '">'
-    + (lite ? '' : artSVG()
+    + (lite ? '' : art + artSVG()
       + '<div class="pk-txt"><span class="pk-season">Saison ' + esc(season) + '</span><span class="pk-name">' + esc(GAME_NAME) + '</span>'
-      + '<span class="pk-sub">Joueurs &amp; coachs pros</span><span class="pk-count">' + esc(size) + ' cartes</span></div>')
+      + '<span class="pk-sub">Joueurs &amp; coachs pros</span><span class="pk-count">' + esc(size) + ' cartes</span>'
+      + '<span class="pk-legal">Projet de fan · non officiel · ne peut être vendu</span></div><span class="pk-bars" aria-hidden="true">' + BARS + '</span>')
     + '<i class="pk-crimp top"></i><i class="pk-crimp bot"></i><i class="pk-grain"></i><i class="pk-shade"></i><i class="pk-glare"></i></div>';
 }
+/* la sorte de booster donne ses couleurs au sachet : « free » (bleu, le pack gratuit), « credits » (rouge, le booster à crédits) */
+const kindOf = (look) => ' k-' + ((look && look.kind) || 'free');
 /* le papier blanc mis à nu le long de la déchirure */
 const fiber = (cls) => '<svg class="pk-fiber ' + cls + '" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polyline points="' + tearPoints() + '"/></svg>';
 
-/** Le sachet tel qu'on le voit sur l'accueil. cls : « ready » (prêt à ouvrir) ou « waiting » (en attente). */
-export function packHTML(cls, season, size) {
-  return '<div class="pack ' + (cls || '') + '"><i class="pk-ground"></i><div class="pk-rig">' + face('pk-full', SHAPE_FULL, season, size, false) + '</div></div>';
+/** Le sachet tel qu'on le voit sur l'accueil. cls : « ready » (prêt à ouvrir) ou « waiting » (en attente).
+    look : { kind: la sorte de booster, art: l'illustration du champion vedette }. */
+export function packHTML(cls, season, size, look) {
+  return '<div class="pack ' + (cls || '') + kindOf(look) + '"><i class="pk-ground"></i><div class="pk-rig">' + face('pk-full', SHAPE_FULL, season, size, false, look) + '</div></div>';
 }
 /** Le sachet de l'ouverture, en deux morceaux : le corps, et la bande du haut que l'on arrache (une partie encore attachée, une partie déjà déchirée). */
-export function packSplitHTML(season, size) {
-  const strip = face('pk-strip', SHAPE_STRIP, season, size, true);
-  return '<div class="pack open-front"><i class="pk-ground"></i><div class="pk-rig">'
-    + face('pk-body', shapeBody(), season, size, false)
+export function packSplitHTML(season, size, look) {
+  const strip = face('pk-strip', SHAPE_STRIP, season, size, true, look);
+  return '<div class="pack open-front' + kindOf(look) + '"><i class="pk-ground"></i><div class="pk-rig">'
+    + face('pk-body', shapeBody(), season, size, false, look)
     /* tout ce qui suit la déchirure tient dans une boîte que l'on retourne pour déchirer de droite à gauche */
     + '<div class="pk-tearbox"><div class="pk-win fib"><div class="pk-win-in">' + fiber('body') + '</div></div>'
     + '<div class="pk-win hold"><div class="pk-win-in">' + strip + '</div></div>'
@@ -95,7 +106,8 @@ export function packSplitHTML(season, size) {
     + '<i class="pk-hint"></i></div></div>';
 }
 /** Le fond du sachet : l'intérieur argenté, visible par la bouche une fois le haut arraché. */
-export function packBackHTML() {
+export function packBackHTML(look) {
   const shape = shapeBack();
-  return '<div class="pack open-back"><div class="pk-rig"><div class="pk-inner" style="clip-path:' + shape + ';-webkit-clip-path:' + shape + '"></div></div></div>';
+  /* dans la bouche du sachet : la lueur qui s'en échappe quand il contient une très belle carte */
+  return '<div class="pack open-back' + kindOf(look) + '"><div class="pk-rig"><div class="pk-inner" style="clip-path:' + shape + ';-webkit-clip-path:' + shape + '"></div><i class="pk-aura"></i></div></div>';
 }

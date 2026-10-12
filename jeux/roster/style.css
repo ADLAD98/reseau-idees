@@ -221,6 +221,12 @@ body.fx .card-rays::after{animation:breathe 5.5s ease-in-out infinite alternate}
   repeating-conic-gradient(from 0deg at 50% 44.3%,rgba(214,184,119,.075) 0 .9deg,rgba(0,0,0,0) .9deg 4.5deg),
   radial-gradient(72% 52% at 50% 44.3%,#1a4066,#0b1a2e 62%,#060d19 100%)}
 .back-art{position:absolute;inset:0;width:100%;height:100%;overflow:visible;filter:drop-shadow(0 0 1.1cqw rgba(214,184,119,.4))}
+.back-star{opacity:.55}
+.back-laurel{opacity:.92}
+/* le cristal luit doucement ; sa lueur prend la couleur d'une belle carte pendant l'ouverture d'un pack (pack.css) */
+.back-gem{filter:drop-shadow(0 0 1.6cqw rgba(110,215,255,.75))}
+body.fx .back-gem{animation:gem 4.2s ease-in-out infinite}
+@keyframes gem{50%{filter:drop-shadow(0 0 2.8cqw rgba(140,228,255,.95)) brightness(1.18)}}
 .back-sub{position:absolute;left:0;right:0;top:83.2%;text-align:center;font:600 2.7cqw/1 var(--text);letter-spacing:.44em;text-indent:.44em;text-transform:uppercase;color:rgba(214,184,119,.78)}
 .card-back::after{content:"";position:absolute;inset:0;pointer-events:none;mix-blend-mode:screen;
   background:linear-gradient(112deg,rgba(255,255,255,0) 40%,rgba(255,236,190,.3) 50%,rgba(255,255,255,0) 60%) 130% 0/270% 100% no-repeat}
@@ -268,7 +274,7 @@ body.fx .card-back::after{animation:sheen 5.5s ease-in-out infinite}
 /* le halo d'une édition rare, autour de sa silhouette (jamais sur une carte encore retournée : il la trahirait) */
 .card.v-kc,.card.v-legend{transition:filter 0s calc(var(--flip) / 2)}
 .card.v-kc:not(.is-back):not(.missing){filter:drop-shadow(0 0 2.2cqw rgba(36,140,255,.6))}
-.card.v-legend:not(.is-back):not(.missing){filter:drop-shadow(0 0 2.4cqw rgba(170,225,255,.6))}
+
 /* le nom d'une version, là où on la cite (progression, fiche, chances) */
 .tiers .v-holo i{background:linear-gradient(135deg,#ff9cc6,#ffd88a,#a8ffdc,#9ccfff);box-shadow:0 0 8px #9ccfff}
 .tiers .v-full i{background:linear-gradient(135deg,#fff3d6,#d6b877,#9a7634);box-shadow:0 0 8px #d6b877}
@@ -394,49 +400,90 @@ body.fx .card.v-kc .card-front .card-frame::after{animation:spin 4.5s linear inf
 .card.missing .card-era,.card.missing .card-glint{display:none}
 .card.missing.v-kc .card-wall,.card.missing.v-kc .card-foil{opacity:.35}
 
-/* édition légendaire : un full art « diamant », la carte la plus rare du jeu. Fond nuit, facettes taillées qui s'allument là où passe
-   la lumière, éclats blancs et bleu glacier, cadre de platine ; au-dessus du nom, un trophée doré par titre mondial, avec son année.
+/* Édition légendaire : la pièce d'exception du jeu. Elle est faite de plusieurs plans posés les uns derrière les autres, qui glissent à des
+   vitesses différentes quand la lumière se déplace (--hx, --hy : sous le doigt, dans la vue d'examen, ou d'elle-même sur une grande carte) :
+   une nuit pourpre et bleu roi ; l'illustration de son champion, au loin ; une aurore aux couleurs du prisme qui tourne lentement ; une
+   couronne de rayons derrière sa tête ; les facettes d'un diamant ; lui, cerné d'or ; une pluie d'éclats devant lui ; et par-dessus, la
+   feuille irisée : deux trames de couleurs qui se croisent et défilent au moindre mouvement. Cadre de platine et d'or, trophées au-dessus du nom.
    Ses couleurs remplacent celles du rang sur toute la face. */
-.card.v-legend .card-front{--tc:#bfe7ff;--hi:#ffffff;--lo:#6c8cc4}
+.card.v-legend .card-front{--tc:#f3e2ae;--hi:#ffffff;--lo:#8a7440}
 .card.v-legend .card-bg{background:
-  radial-gradient(64% 42% at 52% 22%,rgba(240,250,255,.95) 0,rgba(150,205,255,.72) 26%,rgba(64,100,200,.36) 58%,rgba(8,12,44,0) 84%),
-  linear-gradient(180deg,#151d4c 0%,#090d2a 54%,#02030c 100%)}
-.card-facets{position:absolute;inset:0;pointer-events:none;mix-blend-mode:screen;
+  radial-gradient(72% 50% at 16% 88%,rgba(214,30,58,.62) 0,rgba(120,12,40,.3) 44%,rgba(10,4,20,0) 78%),
+  radial-gradient(66% 46% at 88% 12%,rgba(64,110,255,.6) 0,rgba(30,50,150,.28) 46%,rgba(10,4,20,0) 80%),
+  radial-gradient(60% 40% at 52% 26%,rgba(255,236,190,.42) 0,rgba(255,236,190,0) 70%),
+  linear-gradient(180deg,#0d0820 0%,#07041a 52%,#030108 100%)}
+/* son champion, au loin : il bouge à l'opposé de la lumière */
+.card.v-legend .card-art{top:-6%;left:-9%;width:118%;height:84%;opacity:.5;filter:grayscale(.3) contrast(1.2) brightness(1.05);mix-blend-mode:screen;
+  transform:translate(calc((var(--hx) - 50%) * -.13),calc((var(--hy) - 50%) * -.09));
+  -webkit-mask-image:radial-gradient(86% 72% at 50% 38%,#000 32%,rgba(0,0,0,.5) 66%,transparent 100%);mask-image:radial-gradient(86% 72% at 50% 38%,#000 32%,rgba(0,0,0,.5) 66%,transparent 100%)}
+.card.v-legend.tilting .card-art{transform:translate(calc((var(--hx) - 50%) * -.13),calc((var(--hy) - 50%) * -.09))}
+/* l'aurore : les couleurs du prisme tournent lentement derrière lui */
+.card-aurora{position:absolute;inset:-12%;pointer-events:none;mix-blend-mode:screen;opacity:.38;filter:blur(6cqw);
+  background:conic-gradient(from var(--spin) at 50% 34%,#ff3d6e,#ffb347,#fff3a8,#6dffd0,#5aa8ff,#b36bff,#ff3d6e);
+  -webkit-mask-image:radial-gradient(52% 40% at 50% 34%,#000 0,rgba(0,0,0,.6) 46%,transparent 100%);mask-image:radial-gradient(52% 40% at 50% 34%,#000 0,rgba(0,0,0,.6) 46%,transparent 100%);
+  transform:translate(calc((var(--hx) - 50%) * -.07),calc((var(--hy) - 50%) * -.05))}
+body.fx .card-aurora{animation:spin 16s linear infinite}
+/* la couronne : de fins rayons d'or partent de derrière sa tête et tournent à contresens */
+.card-crown{position:absolute;left:-30%;top:-34%;width:164%;aspect-ratio:1;pointer-events:none;mix-blend-mode:screen;opacity:.34;
+  background:repeating-conic-gradient(from 0deg,rgba(255,236,180,.9) 0 .7deg,rgba(255,236,180,0) 1.6deg 7deg,rgba(255,255,255,.75) 7.6deg 8.2deg,rgba(255,255,255,0) 9.4deg 18deg);
+  -webkit-mask-image:radial-gradient(circle,transparent 0 14%,#000 22%,rgba(0,0,0,.4) 44%,transparent 62%);mask-image:radial-gradient(circle,transparent 0 14%,#000 22%,rgba(0,0,0,.4) 44%,transparent 62%)}
+body.fx .card-crown{animation:turn 70s linear infinite reverse}
+/* les facettes : elles s'allument là où passe la lumière, et glissent un peu avec elle */
+.card-facets{position:absolute;inset:-6%;pointer-events:none;mix-blend-mode:screen;
   background:
-    conic-gradient(from 12deg at 52% 24%,rgba(255,255,255,.34) 0 14deg,rgba(255,255,255,0) 14deg 31deg,rgba(175,220,255,.26) 31deg 52deg,rgba(255,255,255,0) 52deg 77deg,rgba(255,255,255,.2) 77deg 96deg,rgba(255,255,255,0) 96deg 128deg,rgba(190,215,255,.24) 128deg 151deg,rgba(255,255,255,0) 151deg 186deg,rgba(255,255,255,.3) 186deg 204deg,rgba(255,255,255,0) 204deg 233deg,rgba(170,215,255,.24) 233deg 258deg,rgba(255,255,255,0) 258deg 287deg,rgba(255,255,255,.22) 287deg 309deg,rgba(255,255,255,0) 309deg 338deg,rgba(200,230,255,.2) 338deg 360deg),
-    conic-gradient(from 200deg at 22% 64%,rgba(255,255,255,.17) 0 22deg,rgba(255,255,255,0) 22deg 58deg,rgba(180,220,255,.15) 58deg 84deg,rgba(255,255,255,0) 84deg 360deg),
-    conic-gradient(from 20deg at 84% 60%,rgba(255,255,255,0) 0 190deg,rgba(255,255,255,.16) 190deg 214deg,rgba(255,255,255,0) 214deg 250deg,rgba(180,220,255,.15) 250deg 276deg,rgba(255,255,255,0) 276deg 360deg);
-  -webkit-mask-image:radial-gradient(120% 90% at var(--hx) var(--hy),#000 0,rgba(0,0,0,.66) 30%,rgba(0,0,0,.28) 62%,rgba(0,0,0,.14) 100%);
-  mask-image:radial-gradient(120% 90% at var(--hx) var(--hy),#000 0,rgba(0,0,0,.66) 30%,rgba(0,0,0,.28) 62%,rgba(0,0,0,.14) 100%)}
+    conic-gradient(from 12deg at 52% 26%,rgba(255,255,255,.2) 0 14deg,rgba(255,255,255,0) 14deg 31deg,rgba(255,214,150,.17) 31deg 52deg,rgba(255,255,255,0) 52deg 77deg,rgba(255,255,255,.13) 77deg 96deg,rgba(255,255,255,0) 96deg 128deg,rgba(150,190,255,.17) 128deg 151deg,rgba(255,255,255,0) 151deg 186deg,rgba(255,255,255,.18) 186deg 204deg,rgba(255,255,255,0) 204deg 233deg,rgba(255,150,170,.15) 233deg 258deg,rgba(255,255,255,0) 258deg 287deg,rgba(255,255,255,.14) 287deg 309deg,rgba(255,255,255,0) 309deg 338deg,rgba(190,255,236,.13) 338deg 360deg),
+    conic-gradient(from 200deg at 20% 66%,rgba(255,255,255,.2) 0 22deg,rgba(255,255,255,0) 22deg 58deg,rgba(255,170,190,.18) 58deg 84deg,rgba(255,255,255,0) 84deg 360deg),
+    conic-gradient(from 20deg at 86% 60%,rgba(255,255,255,0) 0 190deg,rgba(255,255,255,.2) 190deg 214deg,rgba(255,255,255,0) 214deg 250deg,rgba(150,200,255,.2) 250deg 276deg,rgba(255,255,255,0) 276deg 360deg);
+  -webkit-mask-image:radial-gradient(110% 84% at var(--hx) var(--hy),#000 0,rgba(0,0,0,.6) 28%,rgba(0,0,0,.22) 60%,rgba(0,0,0,.1) 100%);
+  mask-image:radial-gradient(110% 84% at var(--hx) var(--hy),#000 0,rgba(0,0,0,.6) 28%,rgba(0,0,0,.22) 60%,rgba(0,0,0,.1) 100%);
+  transform:translate(calc((var(--hx) - 50%) * .05),calc((var(--hy) - 50%) * .035))}
 .card.v-legend .card-wm{display:none}
-.card.v-legend .card-photo{top:2.6%;left:-13%;width:126%;height:86%;filter:drop-shadow(0 0 2.2cqw rgba(205,236,255,.72));
-  -webkit-mask-image:linear-gradient(to bottom,#000 64%,transparent 95%);mask-image:linear-gradient(to bottom,#000 64%,transparent 95%)}
+/* lui : au premier plan, cerné d'or et d'une lueur pourpre ; il avance vers la lumière */
+.card.v-legend .card-photo{top:5.4%;left:-5%;width:110%;height:65%;filter:drop-shadow(0 0 1.1cqw rgba(255,232,170,.7)) drop-shadow(0 0 4.4cqw rgba(255,70,110,.34));
+  transform:translate(calc((50% - var(--hx)) * .06),calc((50% - var(--hy)) * .035));
+  -webkit-mask-image:linear-gradient(to bottom,#000 72%,transparent 98%);mask-image:linear-gradient(to bottom,#000 72%,transparent 98%)}
+.card.v-legend.tilting .card-photo{transform:translate(calc((50% - var(--hx)) * .09),calc((50% - var(--hy)) * .05))}
 .card.v-legend .card-shade{background:
-  linear-gradient(to top,#02030c 0,rgba(2,3,12,.97) 27%,rgba(2,3,12,.8) 40%,rgba(2,3,12,.3) 53%,transparent 62%),
-  linear-gradient(100deg,rgba(2,3,12,.66) 0,rgba(2,3,12,.16) 22%,transparent 36%)}
-.card.v-legend .card-name{color:#fff;text-shadow:0 0 2.8cqw rgba(170,222,255,.95),0 .5cqw 2cqw #000}
-.card.v-legend .card-stats span{color:#a9c3e6}
+  linear-gradient(to top,#030108 0,rgba(3,1,8,.97) 27%,rgba(3,1,8,.8) 40%,rgba(3,1,8,.3) 53%,transparent 62%),
+  linear-gradient(100deg,rgba(3,1,8,.6) 0,rgba(3,1,8,.14) 22%,transparent 36%)}
+.card.v-legend .card-name{background:linear-gradient(180deg,#ffffff 20%,#fff4d2 52%,#e6c878 86%,#fff6dc 100%);-webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 .4cqw .5cqw rgba(0,0,0,.95)) drop-shadow(0 0 1.8cqw rgba(255,214,130,.6))}
+.card.v-legend .card-stats span{color:#cdbb8e}
 /* la rangée des trophées */
 .card-cups{display:flex;justify-content:center;gap:1.7cqw;margin-bottom:2cqw}
 .card-cups span{display:flex;flex-direction:column;align-items:center;gap:.7cqw}
 .card-cups svg{width:7cqw;height:7cqw;color:#ffd978;filter:drop-shadow(0 0 1.1cqw rgba(255,206,104,.85)) drop-shadow(0 .3cqw .5cqw rgba(0,0,0,.7))}
 .card-cups b{font:700 2.9cqw/1 var(--text);letter-spacing:.05em;color:#fff1c9;text-shadow:0 .2cqw .8cqw #000}
-/* les éclats du diamant : des étoiles à quatre branches derrière le joueur, d'autres par-dessus, qui scintillent à contretemps */
-.card.v-legend .card-spark{-webkit-mask-image:none;mask-image:none;mix-blend-mode:screen;
-  background:var(--st) 12% 15%/7cqw 7cqw no-repeat,var(--st) 86% 27%/5cqw 5cqw no-repeat,var(--st) 76% 7%/3.4cqw 3.4cqw no-repeat,var(--st) 27% 40%/3cqw 3cqw no-repeat,
-    radial-gradient(circle,#fff 0,#fff .28cqw,rgba(255,255,255,0) .62cqw) 0 0/9.7cqw 11.3cqw,
-    radial-gradient(circle,#e8f6ff 0,#e8f6ff .36cqw,rgba(255,255,255,0) .76cqw) 5cqw 3cqw/16.1cqw 18.7cqw}
+/* pendant l'apothéose (ouverture d'un pack), les trophées attendent dans l'ombre et s'allument un à un */
+.card.apo .card-cups span{opacity:.22;filter:grayscale(1);transition:opacity .5s,filter .5s,transform .5s cubic-bezier(.2,1.6,.4,1)}
+.card.apo .card-cups span.lit{opacity:1;filter:none;transform:scale(1.22)}
+/* les éclats, devant lui : quelques étoiles à quatre branches, sur les bords (jamais sur son visage), qui scintillent et glissent plus vite que tout le reste */
+.card.v-legend .card-spark{inset:-8%;-webkit-mask-image:none;mask-image:none;mix-blend-mode:screen;
+  background:var(--st) 10% 17%/6.4cqw 6.4cqw no-repeat,var(--st) 90% 25%/4.6cqw 4.6cqw no-repeat,var(--st) 79% 9%/3.2cqw 3.2cqw no-repeat,var(--st) 14% 47%/2.8cqw 2.8cqw no-repeat,
+    var(--st) 91% 51%/2.4cqw 2.4cqw no-repeat,var(--st) 31% 7%/2cqw 2cqw no-repeat,var(--st) 6% 68%/2.2cqw 2.2cqw no-repeat;
+  transform:translate(calc((50% - var(--hx)) * .2),calc((50% - var(--hy)) * .13))}
 body.fx .card.v-legend .card-spark{animation:twinkle 2.1s ease-in-out infinite alternate}
+/* la feuille irisée : deux trames de couleurs, à des angles différents, qui défilent quand la lumière bouge — là où elles se croisent, les
+   couleurs s'additionnent. On ne la voit bien qu'autour du point de lumière. */
+.card-prism{position:absolute;inset:0;pointer-events:none;mix-blend-mode:color-dodge;opacity:.85;
+  background:
+    repeating-linear-gradient(118deg,rgba(255,60,120,.3) 0,rgba(255,170,60,.3) 1.5%,rgba(255,240,120,.3) 3%,rgba(90,255,190,.3) 4.5%,rgba(80,170,255,.3) 6%,rgba(170,110,255,.3) 7.5%,rgba(255,60,120,.3) 9%) calc(var(--hx) * 2.6) calc(var(--hy) * 1.8)/180% 180%,
+    repeating-linear-gradient(64deg,rgba(255,255,255,0) 0,rgba(255,255,255,.22) .6%,rgba(255,255,255,0) 1.2%,rgba(255,255,255,0) 5%) calc(var(--hx) * -3.4) calc(var(--hy) * 2.2)/220% 220%;
+  /* seulement autour du point de lumière (elle est derrière lui : ses couleurs ne passent jamais sur son visage) */
+  -webkit-mask-image:radial-gradient(84% 58% at var(--hx) var(--hy),#000 0,rgba(0,0,0,.6) 36%,rgba(0,0,0,.16) 72%,transparent 100%);
+  mask-image:radial-gradient(84% 58% at var(--hx) var(--hy),#000 0,rgba(0,0,0,.6) 36%,rgba(0,0,0,.16) 72%,transparent 100%)}
 /* une lumière blanche suit le mouvement, cernée d'un fin liseré de couleurs (la dispersion d'un diamant) ; un trait de lumière traverse la carte */
 body.fx .card.v-legend .card-holo,.card.v-legend .card-holo{opacity:.9;mix-blend-mode:screen;animation:none;
   background:
-    linear-gradient(112deg,rgba(255,255,255,0) 42%,rgba(190,228,255,.34) 47.5%,rgba(255,255,255,.8) 50%,rgba(190,228,255,.34) 52.5%,rgba(255,255,255,0) 58%) 130% 0/270% 100% no-repeat,
-    radial-gradient(circle at var(--hx) var(--hy),rgba(255,255,255,.5) 0,rgba(210,236,255,.16) 20%,rgba(255,196,224,.1) 27%,rgba(190,255,236,.1) 32%,rgba(170,206,255,.08) 38%,rgba(255,255,255,0) 52%)}
+    linear-gradient(112deg,rgba(255,255,255,0) 42%,rgba(255,232,180,.34) 47.5%,rgba(255,255,255,.85) 50%,rgba(255,232,180,.34) 52.5%,rgba(255,255,255,0) 58%) 130% 0/270% 100% no-repeat,
+    radial-gradient(circle at var(--hx) var(--hy),rgba(255,255,255,.3) 0,rgba(255,236,200,.12) 20%,rgba(255,150,190,.1) 27%,rgba(150,255,226,.1) 32%,rgba(150,196,255,.08) 38%,rgba(255,255,255,0) 52%)}
 body.fx .card.v-legend .card-holo{animation:kcsweep 4.6s cubic-bezier(.45,0,.2,1) infinite}
-body.fx .card.v-legend .card-front .card-frame::after,.card.v-legend .card-front .card-frame::after{background:conic-gradient(from var(--spin),#ffffff,#bfe7ff,#7d9fe6,#ffffff,#ffe6f3,#d6fff3,#bfe7ff,#ffffff)}
+body.fx .card.v-legend .card-front .card-frame::after,.card.v-legend .card-front .card-frame::after{background:conic-gradient(from var(--spin),#ffffff,#ffe9b0,#c9a54e,#ffffff,#ffb3c8,#b9fff0,#a9c8ff,#fff3cf,#ffffff)}
 body.fx .card.v-legend .card-front .card-frame::after{animation:spin 6s linear infinite}
-.card.v-legend .card-mark{padding:1.3cqw 2.8cqw 1.2cqw;font-weight:800;font-size:3.5cqw;color:#0a1238;background:linear-gradient(105deg,#fff,#cfeeff 30%,#8fb0f5 62%,#ffffff 100%) var(--hx) 0/220% 100%;box-shadow:0 0 2.6cqw rgba(190,230,255,.85)}
-.card.missing.v-legend .card-facets{opacity:.3}
+.card.v-legend .card-mark{padding:1.3cqw 2.8cqw 1.2cqw;font-weight:800;font-size:3.5cqw;color:#1a0a12;background:linear-gradient(105deg,#fff,#ffe9b0 30%,#d9a94a 62%,#ffffff 100%) var(--hx) 0/220% 100%;box-shadow:0 0 2.6cqw rgba(255,224,150,.85)}
+.card.v-legend:not(.is-back):not(.missing){filter:drop-shadow(0 0 2.2cqw rgba(255,222,150,.6)) drop-shadow(0 0 5cqw rgba(255,70,110,.3))}
+.card.missing.v-legend .card-facets,.card.missing.v-legend .card-aurora,.card.missing.v-legend .card-crown,.card.missing.v-legend .card-prism{opacity:.2}
+.card.missing.v-legend .card-art{display:none}
 .card.missing .card-cups svg{filter:none}
 
 /* « MY CEO » : Kameto, en édition limitée à 200 exemplaires numérotés — la plus belle carte du jeu. Bleu roi et or. Son portrait remplit
@@ -538,7 +585,7 @@ body.fx .card.e-ceo .card-front .card-frame::after{animation:spin 5s linear infi
 .ms-ok{flex:none;color:var(--ok);font:600 13px/1 var(--text);white-space:nowrap}
 /* le menu des boosters, au-dessus du pack choisi ; le booster à crédits a son propre sachet, bleu hextech */
 .pack-menu{width:100%;max-width:440px;margin-bottom:4px}
-.home-pack.credits .pack{filter:hue-rotate(150deg) saturate(1.15)}
+/* (le booster à crédits a ses propres couleurs : voir pack.css) */
 .reserve{margin-top:14px;color:var(--mut);font-size:15.5px}
 .reserve b{color:var(--gold-hi);font-weight:600;font-variant-numeric:tabular-nums}
 .bar{height:6px;background:rgba(200,170,110,.14);overflow:hidden}
@@ -611,6 +658,30 @@ body.fx .card.e-ceo .card-front .card-frame::after{animation:spin 5s linear infi
 .sheet-card{display:grid;place-items:center;align-content:start;gap:22px}
 .sheet-card .card{--w:310px}
 .sheet-card .card .card-in{transition:transform .12s ease-out}
+.sheet-look{margin-top:12px;height:38px;padding:0 16px;font-size:13px}
+
+/* ---------- l'examen d'une carte : seule sous la lumière, on la tourne et on la retourne du doigt ---------- */
+.insp{position:fixed;inset:0;z-index:80;display:flex;flex-direction:column;overflow:hidden;animation:fade .25s;-webkit-user-select:none;user-select:none;touch-action:none;
+  background:radial-gradient(72% 56% at 50% 42%,#12304e 0,#061525 55%,#01080f 100%)}
+.insp.out{opacity:0;transition:opacity .2s}
+/* un faisceau tombe d'en haut à gauche */
+.insp-light{position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(44% 32% at 50% 40%,rgba(200,230,255,.13),rgba(0,0,0,0) 70%),conic-gradient(from 196deg at 30% -12%,rgba(0,0,0,0) 0 34deg,rgba(240,230,210,.07) 46deg,rgba(0,0,0,0) 60deg)}
+.insp-head{position:relative;display:flex;align-items:center;gap:12px;height:64px;padding:0 max(18px,env(safe-area-inset-left));flex:none}
+.insp-head span{flex:1;min-width:0;font:400 17px/1 var(--title);letter-spacing:.2em;text-transform:uppercase;color:var(--gold);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.insp-stage{position:relative;flex:1;min-height:0;display:grid;place-items:center;cursor:grab}
+.insp.held .insp-stage{cursor:grabbing}
+.insp-card{position:relative;width:min(74vw,calc((100dvh - 250px) / 1.4),430px)}
+.insp-card .card{--w:100%;--flip:0s;perspective:1500px}
+.insp-card .card-in{transition:none}
+/* les deux faces existent en même temps : c'est l'orientation de la carte qui décide de celle qu'on voit */
+.card.is-free .card-front,.card.is-free .card-back{visibility:visible!important;transition:none!important}
+.card.is-free .card-in .card-gem{transition:none}
+.card.is-free.turned .card-gem{background:linear-gradient(135deg,#f0e6d2,#c8aa6e 55%,#785a28);box-shadow:0 0 0 .55cqw #060d18}
+.insp-floor{position:absolute;left:10%;right:10%;bottom:-9%;height:7%;border-radius:50%;background:radial-gradient(closest-side,rgba(0,0,0,.62),rgba(0,0,0,0));filter:blur(6px);pointer-events:none}
+.insp-foot{position:relative;flex:none;padding:8px 16px calc(18px + env(safe-area-inset-bottom));text-align:center}
+.insp-foot p{margin:0 0 12px;color:var(--faint);font-size:13.5px;letter-spacing:.06em}
+.insp-foot .actions{justify-content:center;flex-wrap:wrap}
 .sheet-card>span{color:var(--mut);font-size:14.5px}
 .sheet-info{display:flex;flex-direction:column;gap:22px;min-width:0}
 .sheet-title{display:flex;align-items:flex-start;gap:12px}

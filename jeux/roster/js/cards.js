@@ -1,5 +1,5 @@
 /* Fabrication d'une carte à l'écran. La même carte sert partout : collection, ouverture de pack, fiche détaillée, équipe. */
-import { COACH_STATS, DDRAGON, GAME_NAME, PHOTOS, PLAYER_STATS, PRESTIGE_TEAMS, ROLE_LABEL } from './config.js';
+import { COACH_STATS, DDRAGON, GAME_NAME, LEGEND_PHOTOS, PHOTOS, PLAYER_STATS, PRESTIGE_TEAMS, ROLE_LABEL } from './config.js';
 
 const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 /** Rend un texte inoffensif avant de l'insérer dans la page (les pseudos viennent des joueurs). */
@@ -45,6 +45,8 @@ export function prepare(raw) {
       /* sur sa carte KC, le joueur porte le maillot de la Karmine : sa photo de l'époque, quand il y en a une */
       const era = id === 'kc' && raw.karmine ? raw.karmine[c.id] : null;
       if (era && era[3]) card.photo = era[3];
+      /* la carte légendaire a sa propre photo (celle que donne le serveur ; à défaut, celle que le jeu connaît) */
+      if (legend) { const own = legend.photo || LEGEND_PHOTOS[c.id]; if (own) card.photo = own; }
       raw.cardById.set(card.id, card);
       if (listed.has(c.id)) special.push(card);
     }
@@ -63,19 +65,50 @@ export const iconUrl = (cat, champId) => DDRAGON + '/' + cat.ddragon + '/img/cha
 export const flagUrl = (code) => 'drapeaux/' + code.toLowerCase() + '.svg';
 export const statsOf = (card) => (card.kind === 'c' ? COACH_STATS : PLAYER_STATS);
 
-/* Le dos, le même pour toutes les cartes : un médaillon gravé autour de la marque du jeu (deux cercles et leurs soixante graduations,
-   deux losanges, un cœur plein), des axes, deux filets qui suivent la silhouette. Le tout en dorure, sur un fond guilloché. */
-const BACK = '<div class="card-face card-back"><svg class="back-art" viewBox="0 0 100 140" preserveAspectRatio="none" aria-hidden="true">'
-  + '<g fill="none" stroke="url(#cardGold)">'
-  + '<path stroke-width=".42" d="M10.9 7H89.1L93 10.9V125.15L50 132.9 7 125.15V10.9Z"/><path stroke-width=".2" d="M12.3 9.3H87.7L90.7 12.3V123.4L50 130.7 9.3 123.4V12.3Z"/>'
-  + '<circle cx="50" cy="62" r="27.5" stroke-width=".5"/><circle cx="50" cy="62" r="24.2" stroke-width=".22"/><circle cx="50" cy="62" r="25.85" stroke-width="1.5" stroke-dasharray=".32 2.387"/>'
-  + '<path stroke-width=".62" d="M50 41 71 62 50 83 29 62Z"/><path stroke-width=".28" d="M50 46.5 65.5 62 50 77.5 34.5 62Z"/><path stroke-width=".22" d="M35.2 47.2H64.8V76.8H35.2Z"/>'
-  + '<path stroke-width=".28" d="M50 9.3V34.5M50 89.5V96.6M9.3 62H22.5M77.5 62H90.7"/>'
-  + '<path stroke-width=".28" d="M30 100H47M53 100H70"/></g>'
-  + '<g fill="url(#cardGold)" stroke="none"><path d="M50 55.5 56.5 62 50 68.5 43.5 62Z"/>'
-  + '<path d="M50 19 52.6 21.6 50 24.2 47.4 21.6ZM50 32.9 51.6 34.5 50 36.1 48.4 34.5ZM50 87.9 51.6 89.5 50 91.1 48.4 89.5ZM20.9 62 22.5 60.4 24.1 62 22.5 63.6ZM75.9 62 77.5 60.4 79.1 62 77.5 63.6Z'
-  + 'M50 98.3 51.7 100 50 101.7 48.3 100ZM50 122.3 51.9 124.2 50 126.1 48.1 124.2Z"/></g></svg>'
-  + '<span class="back-word">' + GAME_NAME + '</span><span class="back-sub">Cartes e-sport</span><div class="card-frame"></div></div>';
+/* Le dos, le même pour toutes les cartes : un cristal taillé, serti dans un double anneau d'or et ses soixante graduations ; derrière lui
+   une étoile à huit branches et un halo ; autour, deux rameaux de laurier ; aux angles, des écoinçons ; dessous, le nom du jeu.
+   Le tout en dorure sur un émail bleu nuit guilloché (les dégradés « cardGold », « backGem » et « backHalo » sont dans index.html). */
+const BACK = (() => {
+  const GOLD = ' fill="none" stroke="url(#cardGold)"', FILL = ' fill="url(#cardGold)" stroke="none"';
+  /* les deux rameaux : onze feuilles de chaque côté, qui montent du bas du médaillon en s'amenuisant */
+  let leaves = '';
+  for (let k = 0; k < 11; k++) {
+    const deg = 106 + k * 10.4, a = (deg * Math.PI) / 180, x = 50 + 31.6 * Math.cos(a), y = 62 + 31.6 * Math.sin(a), size = 3.3 - k * 0.13, rot = deg + (k % 2 ? 40 : -34);
+    for (const m of [1, -1]) {
+      const px = m > 0 ? x : 100 - x;
+      leaves += '<ellipse cx="' + px.toFixed(2) + '" cy="' + y.toFixed(2) + '" rx="' + (size * 0.33).toFixed(2) + '" ry="' + size.toFixed(2) + '" transform="rotate(' + (m * rot).toFixed(1) + ' ' + px.toFixed(2) + ' ' + y.toFixed(2) + ')"/>';
+    }
+  }
+  /* l'étoile : huit longues branches fines, seize sommets */
+  let star = '';
+  for (let k = 0; k < 16; k++) {
+    const a = (k * Math.PI) / 8 - Math.PI / 2, r = k % 4 === 0 ? 40 : k % 2 === 0 ? 31 : 9.5;
+    star += (k ? 'L' : 'M') + (50 + r * Math.cos(a)).toFixed(2) + ' ' + (62 + r * Math.sin(a)).toFixed(2);
+  }
+  return '<div class="card-face card-back"><svg class="back-art" viewBox="0 0 100 140" preserveAspectRatio="none" aria-hidden="true">'
+    + '<circle cx="50" cy="62" r="40" fill="url(#backHalo)" stroke="none"/>'
+    + '<g' + GOLD + '>'
+    /* deux filets qui suivent la silhouette, et les écoinçons du haut */
+    + '<path stroke-width=".42" d="M10.9 7H89.1L93 10.9V125.15L50 132.9 7 125.15V10.9Z"/><path stroke-width=".2" d="M12.3 9.3H87.7L90.7 12.3V123.4L50 130.7 9.3 123.4V12.3Z"/>'
+    + '<path stroke-width=".3" d="M14.6 22V15.4L18.4 11.6H25M14.6 17.800 20.800 11.600M85.400 22V15.4L81.600 11.6H75M85.400 17.800 79.200 11.600"/>'
+    + '<path stroke-width=".3" d="M14.6 104V113.500L20 118.400M85.400 104V113.500L80 118.400"/>'
+    + '<path class="back-star" stroke-width=".2" d="' + star + 'Z"/>'
+    /* le double anneau et ses graduations */
+    + '<circle cx="50" cy="62" r="24.6" stroke-width=".6"/><circle cx="50" cy="62" r="22.1" stroke-width=".22"/><circle cx="50" cy="62" r="27.3" stroke-width="1.3" stroke-dasharray=".3 2.559"/>'
+    + '<path stroke-width=".28" d="M50 9.3V19.500M9.3 62H16M84 62H90.7M30 100H47M53 100H70"/></g>'
+    + '<g class="back-laurel"' + FILL + '>' + leaves + '</g>'
+    /* le cristal : quatre facettes autour d'une table claire, un liseré d'or, un éclat */
+    + '<g class="back-gem"><path fill="#8fe6ff" d="M50 43 61.500 62 55.400 62 50 54.200Z"/><path fill="#49bfee" d="M50 43 38.500 62 44.600 62 50 54.200Z"/>'
+    + '<path fill="#0f5f95" d="M50 81 61.500 62 55.400 62 50 69.800Z"/><path fill="#0a4370" d="M50 81 38.500 62 44.600 62 50 69.800Z"/>'
+    + '<path fill="url(#backGem)" d="M50 54.200 55.400 62 50 69.800 44.600 62Z"/>'
+    + '<path fill="none" stroke="#f4feff" stroke-width=".3" stroke-linecap="round" opacity=".85" d="M50.700 44.600 60 60.300"/>'
+    + '<path fill="#fff" d="M53.600 50.200 54.200 52.200 56.200 52.800 54.200 53.400 53.600 55.400 53 53.400 51 52.800 53 52.200Z"/>'
+    + '<path' + GOLD + ' stroke-width=".55" stroke-linejoin="round" d="M50 43 61.500 62 50 81 38.500 62Z"/></g>'
+    /* les griffes de la monture, et les losanges des axes */
+    + '<g' + FILL + '><path d="M50 39.400 52.400 43 50 46 47.600 43ZM50 84.600 52.400 81 50 78 47.600 81ZM64.800 62 61.500 59.800 58.800 62 61.500 64.200ZM35.200 62 38.500 59.800 41.200 62 38.500 64.200Z"/>'
+    + '<path d="M50 19 52.600 21.600 50 24.200 47.400 21.600ZM50 98.300 51.700 100 50 101.700 48.300 100ZM50 122.300 51.900 124.200 50 126.100 48.100 124.200ZM16 62 17.600 60.400 19.200 62 17.600 63.600ZM80.800 62 82.400 60.400 84 62 82.400 63.600Z"/></g></svg>'
+    + '<span class="back-word">' + GAME_NAME + '</span><span class="back-sub">Cartes e-sport</span><div class="card-frame"></div></div>';
+})();
 /* silhouette affichée quand une carte n'a pas de photo, ou que la photo ne se charge pas */
 const SILHOUETTE = '<svg class="card-ph" viewBox="0 0 100 100" aria-hidden="true"><use href="#silhouette"/></svg>';
 
@@ -105,16 +138,20 @@ export function cardHTML(card, cat, opts = {}) {
     + '<div class="card-bg"></div>'
     + (pr > 1 ? '<div class="card-rays"></div>' : '')
     /* derrière le joueur, l'illustration de son champion fétiche (les full art n'en ont pas : le portrait remplit la carte) */
-    + (card.art && !ed && (!v || v === 'holo') ? '<img class="card-art" src="' + DDRAGON + '/img/champion/loading/' + esc(card.art) + '.jpg" alt="" ' + load + '>' : '')
+    + (card.art && !ed && (!v || v === 'holo' || v === 'legend') ? '<img class="card-art" src="' + DDRAGON + '/img/champion/loading/' + esc(card.art) + '.jpg" alt="" ' + load + '>' : '')
     /* édition KC : le « mur bleu » ; holographique et édition KC : une feuille de métal irisée derrière le joueur, et ses paillettes */
     + (v === 'kc' ? '<div class="card-wall"></div>' : '')
     + (v === 'holo' || v === 'kc' ? '<div class="card-foil"></div><div class="card-spark"></div>' : '')
-    /* édition légendaire : les facettes d'un diamant, et ses éclats */
-    + (v === 'legend' ? '<div class="card-facets"></div><div class="card-spark"></div>' : '')
+    /* édition légendaire : derrière le joueur, l'aurore, la couronne de rayons et les facettes d'un diamant */
+    + (v === 'legend' ? '<div class="card-aurora"></div><div class="card-crown"></div><div class="card-facets"></div>' : '')
     /* MY CEO : « CEO » en très grand derrière lui, et une pluie d'étoiles d'or */
     + (ed === 'ceo' ? '<div class="card-ceo">CEO</div><div class="card-spark"></div>' : '')
     + '<span class="card-wm">' + esc(v === 'kc' ? 'KC' : team ? team.short : '') + '</span>'
+    /* édition légendaire : la feuille irisée, derrière lui (ses couleurs ne passent jamais sur son visage) */
+    + (v === 'legend' ? '<div class="card-prism"></div>' : '')
     + picture
+    /* édition légendaire : devant lui, quelques éclats */
+    + (v === 'legend' ? '<div class="card-spark"></div>' : '')
     + '<div class="card-shade"></div>'
     + '<div class="card-side"><span class="card-ovr">' + card.ovr + '</span><span class="card-role">' + esc(card.label || ROLE_LABEL[card.role]) + '</span><i></i>'
     + flag + '<span class="card-league">' + esc(card.league) + '</span></div>'

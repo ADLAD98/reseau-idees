@@ -9,6 +9,7 @@ import { packHTML, runOpening } from './opening.js';
 import { viewPlay } from './play.js';
 import { viewSocial } from './social.js';
 import { setSound, sfx, soundOn } from './sound.js';
+import { inspectCard } from './inspect.js';
 import { confirmSheet, num } from './ui.js';
 import { viewWorlds } from './worlds.js';
 
@@ -343,6 +344,15 @@ document.addEventListener('click', (e) => {
   if (t && S.cat) showSheet(t.dataset.card);
 });
 /* ---------- écran Packs ---------- */
+/** L'habillage d'un sachet : sa sorte (ses couleurs), et l'illustration de son champion vedette — le plus joué par les pros cette saison pour
+    le pack gratuit, le plus banni pour le booster à crédits (jamais le même). */
+function packLook(kind) {
+  const list = Object.entries(S.cat.champions || {});
+  const top = (key, skip) => list.reduce((best, c) => (c[0] !== skip && (c[1][key] || 0) > (best ? best[1][key] || 0 : 0) ? c : best), null);
+  const played = top('g'), banned = top('b', played ? played[0] : '');
+  const star = kind === 'credits' ? banned || played : played;
+  return { kind, art: star ? star[0] + '_0' : null };
+}
 /* le booster choisi : le pack gratuit, ou le booster à crédits (quand le serveur le propose) */
 const packKind = () => (S.pack === 'credits' && S.shop ? 'credits' : 'free');
 const packWait = () => (packKind() === 'credits' ? S.shop.credits.cooldownMs : S.free.cooldownMs);
@@ -386,7 +396,7 @@ function viewPacks(main) {
   /* le menu des boosters : le pack gratuit, ou celui qui se paie en crédits */
   const menu = S.shop ? '<div class="seg pack-menu" id="packMenu"><button type="button" data-pack="free"' + (credits ? '' : ' class="on"') + '>Pack gratuit</button>'
     + '<button type="button" data-pack="credits"' + (credits ? ' class="on"' : '') + '>Booster · ' + S.shop.credits.price + ' crédits</button></div>' : '';
-  main.innerHTML = '<section class="home"><div class="home-pack' + (credits ? ' credits' : '') + '" id="packBox">' + packHTML(packReady() ? 'ready' : 'waiting', S.cat.season, S.free.size) + '</div>'
+  main.innerHTML = '<section class="home"><div class="home-pack' + (credits ? ' credits' : '') + '" id="packBox">' + packHTML(packReady() ? 'ready' : 'waiting', S.cat.season, S.free.size, packLook(kind)) + '</div>'
     + '<div class="home-side">' + menu + '<div class="eyebrow">' + (credits ? 'Booster à crédits · un toutes les ' + Math.round(S.shop.credits.cooldownMs / 60000) + ' minutes' : 'Pack gratuit · toutes les ' + Math.round(S.free.cooldownMs / 60000) + ' minutes') + '</div>'
     + '<h1 class="h1">' + S.free.size + ' cartes ' + (credits ? 'de plus' : 'à découvrir') + '</h1>'
     + '<p class="lead">' + (credits ? 'Un booster en plus du pack gratuit, payé avec tes crédits. Ses chances sont un peu plus faibles que celles du pack gratuit (le détail est dans ton profil).'
@@ -437,7 +447,7 @@ setInterval(() => {
     box.dataset.sig = packSig();
     box.innerHTML = packActionHTML();
     const pack = $('#packBox .pack');
-    if (pack) pack.className = 'pack ' + (packReady() ? 'ready' : 'waiting');
+    if (pack) pack.className = 'pack ' + (packReady() ? 'ready' : 'waiting') + ' k-' + packKind();
     return;
   }
   const left = timeLeft(), count = document.getElementById('count'), bar = document.getElementById('countBar');
@@ -462,16 +472,33 @@ document.addEventListener('click', async (e) => {
         const data = await call('POST', kind === 'credits' ? '/api/packs/credits' : '/api/packs/free');
         /* le serveur vient d'être mis à jour avec de nouvelles cartes : on recharge le catalogue avant de les montrer */
         if (data.catalogVersion && data.catalogVersion !== S.cat.version) await loadCatalogue(data.catalogVersion);
+        /* le pack est ouvert : les cartes sont à moi dès maintenant (une revente au bilan part de cet état) */
+        applyState(data);
+        for (const p of data.pack.cards) {
+          const had = S.owned.get(p.id);
+          S.owned.set(p.id, { qty: p.qty, at: had ? had.at : now() });
+          if (p.serial) S.prints.set(p.id, [...(S.prints.get(p.id) || []), p.serial].sort((a, b) => a - b));
+        }
         return data;
       },
-      getCat: () => S.cat, fx: S.fx, size: S.free.size, from: $('#packBox .pack'),
+      getCat: () => S.cat, fx: S.fx, size: S.free.size, from: $('#packBox .pack'), look: packLook(kind),
+      /* au bilan, un doublon se revend sur-le-champ (si le serveur sait racheter les doublons) */
+      quick: S.shop && S.shop.quick ? {
+        price: (card) => quickPrice(card),
+        sell: async (card) => {
+          try {
+            const res = await call('POST', '/api/market/quick', { card: card.id, qty: 1 });
+            applyState(res);
+            for (const [id, left] of res.cards) PLAY.owned(id, left);
+            return { coins: res.coins, left: (S.owned.get(card.id) || { qty: 1 }).qty };
+          } catch (err) {
+            toast(err instanceof ApiError ? err.message : 'La vente n\'a pas pu se faire.', true);
+            if (!(err instanceof ApiError)) console.error(err);
+            return null;
+          }
+        },
+      } : null,
     });
-    applyState(result.data);
-    for (const p of result.data.pack.cards) {
-      const had = S.owned.get(p.id);
-      S.owned.set(p.id, { qty: p.qty, at: had ? had.at : now() });
-      if (p.serial) S.prints.set(p.id, [...(S.prints.get(p.id) || []), p.serial].sort((a, b) => a - b));
-    }
     S.opening = false;
     if (result.goTo === 'collection') { S.filters.sort = 'recent'; S.filters.own = 'owned'; location.hash = '#/collection'; }
     else route();
@@ -713,7 +740,9 @@ function showSheet(id) {
   sheet.className = 'sheet';
   sheet.innerHTML = '<div class="sheet-box panel" role="dialog" aria-modal="true" aria-label="' + esc(card.name) + '" style="--tc:var(--t' + card.tier + ')">'
     + '<div class="sheet-card">' + cardHTML(card, cat, { eager: true, cls: own ? '' : 'missing', qty: own ? own.qty : 0, serial: own ? serialOf(card.id) : 0 })
-    + '<span>' + (own ? (own.qty > 1 ? own.qty + ' exemplaires' : '1 exemplaire') + ' · depuis le ' + frDate(own.at) : 'Carte manquante') + '</span></div>'
+    + '<span>' + (own ? (own.qty > 1 ? own.qty + ' exemplaires' : '1 exemplaire') + ' · depuis le ' + frDate(own.at) : 'Carte manquante') + '</span>'
+    /* l'examiner : seule, en grand, on la tourne et on la retourne du doigt */
+    + (own ? '<button class="btn sheet-look" type="button" data-sheet="look">Examiner la carte</button>' : '') + '</div>'
     + '<div class="sheet-info"><div class="sheet-title"><div><h2>' + esc(card.name) + '</h2>'
     + '<p>' + (card.country ? '<img src="' + flagUrl(card.country) + '" alt="">' + esc(cat.countries[card.country]) + ' · ' : '') + esc(card.title || ROLE_NAME[card.role]) + ' · ' + esc(team ? team.name : card.team) + '</p></div>'
     + '<span class="spacer"></span><button class="close" type="button" aria-label="Fermer">' + icon('i-close') + '</button></div>'
@@ -738,11 +767,12 @@ function showSheet(id) {
       + '</div>' : '')
     + '</div></div>';
   const close = () => { sheet.remove(); document.removeEventListener('keydown', onKey); document.body.style.overflow = ''; };
-  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  const onKey = (e) => { if (e.key === 'Escape' && !document.querySelector('.insp')) close(); };
   sheet.addEventListener('click', (e) => {
     if (e.target === sheet || e.target.closest('.close')) { close(); return; }
     const act = e.target.closest('[data-sheet]');
     if (!act) return;
+    if (act.dataset.sheet === 'look') { inspectCard(card, cat, { serial: own ? serialOf(card.id) : 0 }); return; }
     if (act.dataset.sheet === 'quick' || act.dataset.sheet === 'quickall') { close(); quickSell(card, act.dataset.sheet === 'quickall' ? S.owned.get(id).qty - 1 : 1); return; }
     close();
     /* les fenêtres ouvertes derrière (échange, marché) se referment : on change d'écran */

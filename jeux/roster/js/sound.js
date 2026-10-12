@@ -118,6 +118,14 @@ export const sfx = {
       [G5, C6, G6].forEach((f) => tone(f, { t: 0.75, dur: 2.2, vol: 0.05, attack: 0.08 }));
     }
   },
+  /** Un gros tirage s'annonce : un scintillement qui monte (plus long pour une carte très rare). */
+  shimmer(tier = 4) {
+    (tier >= 5 ? [E6, G6, B6, E7, G6, B6, E7] : [E6, G6, B6, E7]).forEach((f, k) => bell(f, k * 0.07, 0.04, 0.8));
+    noise({ dur: tier >= 5 ? 1.1 : 0.7, vol: 0.03, type: 'highpass', freq: 7000 });
+    tone(196, { dur: tier >= 5 ? 1.1 : 0.7, to: 392, vol: 0.05, type: 'triangle', swell: true });
+  },
+  /** Un battement de cœur, avant une carte très rare : deux coups sourds. */
+  heart() { tone(64, { dur: 0.17, to: 44, vol: 0.34 }); tone(56, { t: 0.18, dur: 0.22, to: 38, vol: 0.24 }); },
   /** La carte glisse (mise en valeur, retour à sa place). */
   whoosh() { noise({ dur: 0.32, vol: 0.1, freq: 500, to: 2600, q: 0.7 }); },
   /** Toutes les cartes sont retournées. */

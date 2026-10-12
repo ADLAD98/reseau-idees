@@ -1,20 +1,25 @@
-/* L'ouverture d'un sachet.
+/* L'ouverture d'un sachet, comme on ouvre un vrai paquet.
    1. Le sachet quitte l'accueil et vient au centre de l'écran.
    2. Le joueur déchire la bande du haut : en glissant le doigt d'une encoche à l'autre, ou d'un simple toucher.
-   3. Le sachet bâille, les cinq cartes en sortent en éventail, le sachet tombe, les cartes se rassemblent.
-   4. Il découvre les cartes une à une, en grand ; chacune va ensuite se ranger sur le présentoir du bas.
-      Une très belle carte (All-Pro, MVP, ou version holographique ou full art d'une carte rare) se fait attendre :
-      la lumière baisse, son pays, son poste et sa ligue s'annoncent, puis elle se retourne.
-   5. Bilan : les cinq cartes côte à côte.
+   3. Le sachet bâille, les cinq cartes en sortent d'un bloc, de dos ; le sachet tombe, le paquet vient au centre.
+      S'il contient une très belle carte, une lueur s'échappe du sachet dès qu'il s'ouvre : on sait qu'il y a quelque chose, pas quoi.
+   4. Il découvre les cartes une à une : celle du dessus quitte le paquet, de dos, et revient se poser en se retournant ; elle va ensuite
+      se ranger sur le présentoir du bas. Une belle carte brille avant même qu'on la touche. Une All-Pro se fait attendre : la lumière
+      baisse, son pays, son poste et sa ligue s'annoncent, puis elle se retourne. Une carte très rare (MVP, légendaire, édition limitée…)
+      prend tout son temps : le noir se fait, un cœur bat, les indices tombent un à un, et elle se retourne lentement.
+   5. Bilan : les cinq cartes côte à côte. Un doublon peut se revendre aussitôt ; une carte se touche pour l'examiner sous toutes ses faces.
    Le serveur a déjà tout décidé quand l'animation commence : ici, on ne fait que mettre en scène. */
-import { ROLE_LABEL, TIER_COLOR } from './config.js';
+import { LEGEND_SONGS, ROLE_LABEL, TIER_COLOR } from './config.js';
 import { VARIANTS, cardHTML, esc, flagUrl, photoUrl, tiltCard, variantRank } from './cards.js';
 import { createFx } from './fx.js';
+import { inspectCard } from './inspect.js';
 import { TEAR_Y, packBackHTML, packSplitHTML, shapeBack, shapeBody, tearPoints } from './pack.js';
 import { setSound, sfx, soundOn } from './sound.js';
 
 export { packHTML } from './pack.js';
 
+/* le lecteur de YouTube, dans sa version sans cookies de suivi */
+const YT = 'https://www.youtube-nocookie.com';
 const PRISM = ['#ffe7a8', '#9fe8ff', '#ffffff'];
 const RAINBOW = ['#ff9cc6', '#ffd88a', '#a8ffdc', '#9ccfff', '#d3b4ff', '#ffffff'];
 const KC_BLUE = ['#39b8ff', '#ffffff', '#0b47ff', '#9be7ff'];
@@ -54,9 +59,11 @@ function preload(url) {
 
 /** Joue l'ouverture. request() appelle le serveur ; renvoie { data, goTo } une fois le bilan fermé.
     getCat() donne le catalogue : il est relu après la réponse du serveur, au cas où il viendrait d'être mis à jour.
-    from : le sachet de l'accueil, d'où part celui de l'ouverture.
-    Si le serveur refuse, l'écran se referme et l'erreur est relancée telle quelle. */
-export async function runOpening({ request, getCat, fx, size, from }) {
+    from : le sachet de l'accueil, d'où part celui de l'ouverture ; look : ses couleurs et son illustration ({ kind, art }).
+    quick : la revente d'un doublon au bilan, si le serveur la propose — { price(carte) : ce qu'elle rapporte, sell(carte) : la vend et
+    renvoie { coins, left } (crédits gagnés, exemplaires restants) ou null si la vente est refusée }.
+    Si le serveur refuse l'ouverture, l'écran se referme et l'erreur est relancée telle quelle. */
+export async function runOpening({ request, getCat, fx, size, from, look, quick }) {
   let cat = getCat();
   const op = document.createElement('div');
   op.className = 'op';
@@ -66,14 +73,16 @@ export async function runOpening({ request, getCat, fx, size, from }) {
     + '<button class="op-icon" type="button" data-act="sound" aria-label="Couper ou remettre le son"></button>'
     + '<button class="btn" type="button" data-act="skip">Passer</button></header>'
     + '<div class="op-stage"><div class="op-tray" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>'
-    + '<div class="op-item op-back">' + packBackHTML() + '</div>'
-    + '<div class="op-item op-front">' + packSplitHTML(cat.season, size) + '</div>'
-    + '<div class="op-dim"></div><div class="op-rays"></div><div class="op-bloom"></div>'
+    + '<div class="op-item op-back">' + packBackHTML(look) + '</div>'
+    + '<div class="op-item op-front">' + packSplitHTML(cat.season, size, look) + '</div>'
+    + '<div class="op-dim"></div><div class="op-spot"></div><div class="op-rays"></div><div class="op-bloom"></div><div class="op-ring"></div><div class="op-flash"></div>'
     + '<div class="op-clues"></div><div class="op-label"></div></div>'
     + '<footer class="op-foot"><p class="op-info" aria-live="polite"></p><div class="actions">'
     + '<button class="btn primary big" type="button" data-go="">Continuer</button><button class="btn big" type="button" data-go="collection">Ma collection</button></div></footer>';
   const $ = (sel) => op.querySelector(sel);
   const stage = $('.op-stage'), front = $('.op-front'), back = $('.op-back'), info = $('.op-info'), clues = $('.op-clues'), label = $('.op-label'), bloom = $('.op-bloom');
+  const ring = $('.op-ring'), flashEl = $('.op-flash');
+  op.dataset.kind = (look && look.kind) || 'free';
   const rig = $('.op-front .pk-rig'), packEl = $('.op-front .pack'), tearBox = $('.pk-tearbox'), torn = $('.pk-torn'), body = $('.pk-body'), inner = $('.pk-inner');
   const hold = $('.pk-win.hold'), gone = $('.pk-win.gone'), fib = $('.pk-win.fib'), fiberLine = $('.pk-fiber.body polyline');
   const scroll = document.body.style.overflow;
@@ -111,11 +120,10 @@ export async function runOpening({ request, getCat, fx, size, from }) {
     pack: () => ({ x: 0, y: 0, s: 1, r: 0 }),
     /* dans le sachet, juste sous la déchirure */
     inside: (i) => ({ x: 0, y: -M.ph / 2 + (TEAR_Y / 100 + 0.018) * M.ph + (M.ch * M.is) / 2 + i * 0.7, s: M.is, r: 0 }),
-    /* sorties aux deux tiers, en éventail : elles tournent autour d'un point resté dans le sachet */
-    fan: (i) => {
-      const a = ((i - 2) * 6 * Math.PI) / 180, h = M.ch * M.is, R = 0.8 * h;
-      return { x: R * Math.sin(a), y: M.fanY + R * (1 - Math.cos(a)), s: M.is, r: (i - 2) * 6 };
-    },
+    /* sorties aux deux tiers, d'un seul bloc à peine décalé : on devine la tranche de chacune, comme un paquet qu'on tire du sachet */
+    fan: (i) => ({ x: (i - 2) * M.cw * M.is * 0.014, y: M.fanY + i * M.ch * M.is * 0.007, s: M.is, r: -2.2 + i * 0.55 }),
+    /* la carte du dessus, prise à la main : elle s'écarte du paquet avant de se retourner */
+    peel: () => ({ x: Math.min(M.cw * 0.6, M.w / 2 - M.cw * 0.42), y: M.heroY - M.ch * 0.05, s: 1.02, r: 7 }),
     /* le paquet au centre : d = 0 pour la carte du dessus */
     stack: (d) => ({ x: d * M.cw * 0.004, y: M.heroY + d * M.cw * 0.017, s: 1 - d * 0.012, r: [0, -1.3, 1, -0.7, 1.4][d] || 0 }),
     lifted: () => ({ x: 0, y: M.heroY - M.ch * 0.03, s: 1.045, r: 0 }),
@@ -176,7 +184,7 @@ export async function runOpening({ request, getCat, fx, size, from }) {
 
   /* ---------- état ---------- */
   let data = null, pulls = [], boxes = [], imgs = [], ready = false;
-  let k = 0, shown = false, busy = true, zoomed = null, goTo = null, leave = null, closed = false;
+  let k = 0, shown = false, busy = true, goTo = null, leave = null, closed = false;
   let gen = 0;                 // change quand le joueur passe l'animation : ce qui était en cours s'arrête
   let hints = 2;               // nombre de fois où l'on rappelle « touche pour continuer »
   let tearP = 0, tearDir = 1, drag = null;   // part de la bande déjà déchirée (0 à 1), sens du geste, geste en cours
@@ -187,13 +195,35 @@ export async function runOpening({ request, getCat, fx, size, from }) {
     op.style.setProperty('--beam', card.limited && !card.variant ? '#ffd978' : card.variant === 'legend' ? '#dff3ff' : card.variant === 'kc' ? '#39b8ff' : card.tier >= 3 ? TIER_COLOR[card.tier] : '#c8aa6e');
     op.dataset.tier = card.tier; op.dataset.variant = card.variant || '';
   };
-  let untilt = null;
+  let untilt = null, omenTimer = 0, endApo = null, song = null;
   const cardEl = (i) => boxes[i].querySelector('.card');
+  /* une belle carte brille avant même d'être retournée : son dos s'illumine, quelques éclats montent autour d'elle.
+     On sait qu'elle vaut le coup d'œil — pas qui elle est. */
+  function omen(i) {
+    clearInterval(omenTimer);
+    boxes.forEach((b) => b.classList.remove('omen', 'omen5'));
+    if (i === null || i >= pulls.length || !fx) return;
+    const tier = shineOf(pulls[i].card);
+    if (tier < 4) return;
+    setBeam(pulls[i].card);
+    boxes[i].classList.add('omen');
+    if (tier >= 5) boxes[i].classList.add('omen5');
+    const sparkle = () => {
+      if (closed || !boxes[i].classList.contains('omen')) return;
+      const c = clientOf(poses.get(boxes[i]) || POSE.stack(0));
+      particles.burst(c[0] + (Math.random() - 0.5) * M.cw * 0.9, c[1] + M.ch * (0.1 + Math.random() * 0.35), { count: tier >= 5 ? 4 : 2, colors: dustOf(pulls[i].card), shapes: ['dot'], speed: [20, 70], life: [0.9, 1.7], size: [1, 2.2], gravity: -46, spread: 0.9, angle: -Math.PI / 2, drag: 0.97 });
+    };
+    sparkle();
+    omenTimer = setInterval(sparkle, tier >= 5 ? 300 : 460);
+  }
   const clientOf = (pose) => [M.x + pose.x, M.y + pose.y];
 
   function close() {
     closed = true;
     gen++;
+    clearInterval(omenTimer);
+    if (endApo) endApo();
+    stopSong(true);
     document.removeEventListener('keydown', onKey);
     window.removeEventListener('resize', onResize);
     particles.destroy();
@@ -383,30 +413,43 @@ export async function runOpening({ request, getCat, fx, size, from }) {
       fiberLine.setAttribute('points', tearPoints(b));
     });
     if (mine !== gen) return;
-    await wait(70);
+    /* une très belle carte dans le sachet : une lueur s'en échappe, à sa couleur, et quelques éclats montent de la bouche */
+    const hit = shineOf(best);
+    if (hit >= 4) {
+      setBeam(best);
+      op.classList.add('glow');
+      if (hit >= 5) op.classList.add('glow5');
+      sfx.shimmer(hit);
+      buzz(hit >= 5 ? [14, 50, 14, 50, 40] : [12, 60, 24]);
+      particles.burst(top[0], top[1] + M.ph * 0.02, { count: hit >= 5 ? 34 : 18, colors: dustOf(best), shapes: ['dot'], speed: [60, 300], life: [0.8, 1.8], size: [1, 2.8], gravity: -30, spread: 1.5, angle: -Math.PI / 2, drag: 0.96 });
+      await wait(hit >= 5 ? 620 : 380);
+      if (mine !== gen) return;
+    } else await wait(70);
     if (mine !== gen) return;
-    /* les cartes montent en éventail ; le sachet recule un peu sous l'effort, puis tombe */
+    /* les cartes montent d'un seul bloc, celle du dessus en tête ; le sachet recule un peu sous l'effort, puis tombe */
     sfx.slideOut();
-    const risen = Promise.all(boxes.map((b, i) => place(b, 'fan', i, { dur: 700, ease: EASE.out, delay: (4 - i) * 38 })));
-    for (const el of [front, back]) move(el, { x: 0, y: M.drop, s: 1, r: 0 }, { dur: 620, ease: EASE.inOut });
-    await wait(430);
+    const risen = Promise.all(boxes.map((b, i) => place(b, 'fan', i, { dur: 860, ease: EASE.out, delay: i * 30 })));
+    for (const el of [front, back]) move(el, { x: 0, y: M.drop, s: 1, r: 0 }, { dur: 700, ease: EASE.inOut });
+    await wait(540);
     if (mine !== gen) return;
+    op.classList.remove('glow', 'glow5');
     boxes.forEach((b) => b.classList.add('out'));
     for (const el of [front, back]) {
       move(el, { x: -tearDir * M.pw * 0.12, y: M.h * 0.5 + M.ph * 0.7, s: 0.96, r: -tearDir * 7 }, { dur: 620, ease: EASE.in });
       el.animate([{ opacity: 1 }, { opacity: 1, offset: 0.55 }, { opacity: 0 }], { duration: 620 * slow(), fill: 'forwards' });
     }
     await risen;
-    await wait(110);
+    await wait(160);
     if (mine !== gen) return;
-    /* elles se rassemblent en un paquet, au centre */
+    /* le paquet vient se poser au centre, en grand */
     sfx.whoosh();
-    await Promise.all(boxes.map((b, i) => place(b, 'stack', i, { dur: 760, ease: EASE.soft, delay: i * 34 })));
+    await Promise.all(boxes.map((b, i) => place(b, 'stack', i, { dur: 820, ease: EASE.soft, delay: i * 22, arc: M.ch * 0.03 })));
     if (mine !== gen) return;
     front.remove(); back.remove();
     setBeam(best);
     setStage('stack');
-    setInfo('Touche la carte pour la retourner', true);
+    setInfo('Touche le paquet pour retourner la première carte', true);
+    omen(0);
     busy = false;
   }
 
@@ -424,26 +467,43 @@ export async function runOpening({ request, getCat, fx, size, from }) {
     /* la photo du joueur doit être là avant que la carte se montre */
     await Promise.race([imgs[i], wait(700)]);
     if (mine !== gen) return;
-    if (tier >= 4) await prelude(i);
+    if (tier >= 4) await prelude(i, tier);
     if (mine !== gen) return;
+    clearInterval(omenTimer);
     box.style.zIndex = tier >= 4 ? 30 : 16;
-    move(box, POSE.lifted(), { dur: 260, ease: EASE.out });
-    await wait(110);
+    /* la carte quitte le dessus du paquet, de dos… */
+    sfx.slide();
+    await move(box, POSE.peel(), { dur: tier >= 5 ? 620 : tier >= 4 ? 420 : 250, ease: EASE.inOut, arc: M.ch * 0.035 });
     if (mine !== gen) return;
-    if (tier >= 4) el.classList.add('slow');
+    if (tier >= 5) {
+      /* …une très rare reste un instant en suspens : un dernier battement, un éclair */
+      sfx.heart(); buzz([40, 60, 60]);
+      await wait(520);
+      if (mine !== gen) return;
+      flash();
+    }
+    /* …et revient se poser en se retournant */
+    box.classList.remove('omen', 'omen5');
+    if (tier >= 5) el.classList.add('epic'); else if (tier >= 4) el.classList.add('slow');
     el.classList.remove('is-back');
     sfx.flip(tier);
     buzz(tier >= 4 ? [30, 50, 40] : tier === 3 ? [15, 30, 20] : 8);
-    await wait(tier >= 4 ? 520 : 300);
+    move(box, POSE.lifted(), { dur: tier >= 5 ? 1500 : tier >= 4 ? 900 : 480, ease: EASE.soft });
+    await wait(tier >= 5 ? 1180 : tier >= 4 ? 640 : 330);
     if (mine !== gen) return;
     /* la carte se repose ; les belles cartes s'accompagnent d'un halo, d'un peu de poussière et de leur rang */
     box.classList.add('lit');
     move(box, POSE.stack(0), { dur: 620, ease: EASE.spring });
     if (tier >= 3) {
       bloom.animate([{ opacity: 0, transform: 'scale(.6)' }, { opacity: tier >= 4 ? 0.85 : 0.5, transform: 'scale(1.5)', offset: 0.3 }, { opacity: 0, transform: 'scale(2.3)' }],
-        { duration: (tier >= 4 ? 1500 : 1000) * slow(), easing: 'cubic-bezier(.2,.6,.3,1)' });
+        { duration: (tier >= 5 ? 2100 : tier >= 4 ? 1500 : 1000) * slow(), easing: 'cubic-bezier(.2,.6,.3,1)' });
       const c = clientOf(POSE.stack(0));
-      particles.burst(c[0], c[1], { count: tier === 5 ? 46 : tier === 4 ? 32 : 14, colors: dustOf(card), shapes: ['dot'], speed: [40, tier >= 4 ? 300 : 190], life: [0.9, 2.2], size: [1, 2.6], gravity: -18, drag: 0.955 });
+      particles.burst(c[0], c[1], { count: tier === 5 ? 60 : tier === 4 ? 32 : 14, colors: dustOf(card), shapes: ['dot'], speed: [40, tier >= 4 ? 300 : 190], life: [0.9, 2.2], size: [1, 2.6], gravity: -18, drag: 0.955 });
+      if (tier >= 5) {
+        /* une onde part de la carte, et une gerbe d'éclats retombe */
+        ring.animate([{ opacity: 0.9, transform: 'scale(.3)' }, { opacity: 0, transform: 'scale(2.6)' }], { duration: 1300 * slow(), easing: 'cubic-bezier(.15,.7,.3,1)' });
+        particles.fountain(c[0], c[1] + M.ch * 0.2, { colors: dustOf(card), waves: 5 });
+      }
       label.textContent = card.limited && !card.variant ? 'Édition limitée' + (serials.get(card.id) ? ' · n° ' + serials.get(card.id) + ' / ' + card.limited : '')
         : cat.tierById.get(card.tier).name + (card.variant ? ' · ' + VARIANTS[card.variant].name : '');
       label.style.setProperty('--n', label.textContent.length);
@@ -451,8 +511,10 @@ export async function runOpening({ request, getCat, fx, size, from }) {
       op.classList.add('named');
     }
     clues.classList.remove('on');
-    await wait(tier >= 4 ? 620 : 240);
+    await wait(tier >= 5 ? 1100 : tier >= 4 ? 620 : 240);
     if (mine !== gen) return;
+    if (card.variant === 'legend') { await apotheosis(i); if (mine !== gen) return; }
+    op.classList.remove('epic');
     box.classList.add('tagged');
     /* la carte découverte s'incline sous la souris : de quoi faire jouer ses reflets */
     if (!untilt) untilt = tiltCard(el, 13);
@@ -461,12 +523,116 @@ export async function runOpening({ request, getCat, fx, size, from }) {
     const left = pulls.length - i - 1;
     setInfo('<b>' + (i + 1) + '</b> / ' + pulls.length + (hints-- > 0 ? ' · touche pour ' + (left ? 'voir la suivante' : 'terminer') : ''), false);
   }
-  /* une All-Pro ou une MVP : la lumière baisse, trois indices s'annoncent, la carte attend */
-  async function prelude(i) {
-    const mine = gen, card = pulls[i].card;
+  /* ---------- l'apothéose d'une carte légendaire ---------- */
+  /* La musique : le lecteur officiel de YouTube, dans une petite vignette qui reste visible ; il démarre muet, puis on règle son volume et on
+     lui rend le son (les navigateurs laissent toujours démarrer un lecteur muet). Le jeu ne lui parle que par messages, sans charger de script. */
+  function startSong(card) {
+    const def = LEGEND_SONGS[card.base || card.id];
+    if (!def || !soundOn() || song) return;
+    const tile = document.createElement('div');
+    tile.className = 'op-song';
+    tile.innerHTML = '<iframe title="' + esc(def.title) + '" allow="autoplay; encrypted-media" referrerpolicy="strict-origin-when-cross-origin" src="' + YT + '/embed/' + encodeURIComponent(def.video)
+      + '?autoplay=1&mute=1&start=' + def.start + '&end=' + def.end + '&controls=0&rel=0&playsinline=1&iv_load_policy=3&enablejsapi=1&origin=' + encodeURIComponent(location.origin) + '"></iframe>'
+      + '<span>' + icon('i-sound') + esc(def.title) + '</span>';
+    op.appendChild(tile);
+    const frame = tile.firstChild;
+    const tell = (func, args) => { try { frame.contentWindow.postMessage(JSON.stringify({ event: 'command', func, args: args || [], id: 'song', channel: 'widget' }), YT); } catch (e) { /* lecteur pas encore prêt */ } };
+    const wake = () => { try { frame.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 'song', channel: 'widget' }), YT); } catch (e) { /* idem */ } tell('setVolume', [def.volume]); tell('unMute'); tell('playVideo'); };
+    frame.addEventListener('load', () => { wake(); [500, 1200, 2400].forEach((ms) => setTimeout(() => { if (song && song.tile === tile) wake(); }, ms)); });
+    song = { tile, tell, volume: def.volume, timer: setTimeout(() => stopSong(), (def.end - def.start + 4) * 1000) };
+  }
+  /** Coupe la musique : en fondu, ou tout de suite. */
+  function stopSong(now) {
+    if (!song) return;
+    const s = song;
+    song = null;
+    clearTimeout(s.timer);
+    if (now) { s.tile.remove(); return; }
+    let v = s.volume;
+    const fade = setInterval(() => { v -= Math.max(2, s.volume / 8); if (v <= 0) { clearInterval(fade); s.tile.remove(); } else s.tell('setVolume', [Math.round(v)]); }, 110);
+    s.tile.classList.add('out');
+  }
+  /** La carte légendaire vient d'être retournée : elle s'élève et fait lentement un tour complet sur elle-même sous une pluie d'or, la lumière
+      court sur ses reflets, ses titres mondiaux s'allument un à un. Une vingtaine de secondes ; un toucher l'abrège. */
+  async function apotheosis(i) {
+    const mine = gen, box = boxes[i], el = cardEl(i), inner = el.querySelector('.card-in'), card = pulls[i].card;
+    const cups = [...el.querySelectorAll('.card-cups span')], gold = ['#ffd978', '#fff6d6', '#ffffff', '#f0cd72'];
+    let over = false, raf = 0, skipped = null;
+    startSong(card);
+    op.classList.add('apo');
+    el.classList.add('apo');
+    box.style.zIndex = 34;
+    box.classList.remove('omen', 'omen5');
+    setInfo('', false);
+    move(box, { x: 0, y: M.heroY + M.ch * 0.04, s: Math.min(1.14, (M.h - 30) / M.ch), r: 0 }, { dur: 2400, ease: EASE.inOut });
+    /* un tour complet : les deux faces existent le temps du tour, et la lumière de la carte suit une lente ronde */
+    el.classList.add('is-free', 'tilting');
+    const spin = inner.animate([{ transform: 'rotateX(5deg) rotateY(0deg)' }, { transform: 'rotateX(-4deg) rotateY(180deg)', offset: 0.5 }, { transform: 'rotateX(5deg) rotateY(360deg)' }],
+      { duration: 8200 * slow(), delay: 2200 * slow(), easing: 'cubic-bezier(.5,0,.3,1)' });
+    const t0 = performance.now();
+    const light = (now) => {
+      if (over) return;
+      const t = (now - t0) / 1000;
+      el.style.setProperty('--hx', (50 + 44 * Math.sin(t * 0.9)).toFixed(1) + '%');
+      el.style.setProperty('--hy', (34 + 26 * Math.cos(t * 0.65)).toFixed(1) + '%');
+      raf = requestAnimationFrame(light);
+    };
+    raf = requestAnimationFrame(light);
+    /* la pluie d'or tombe du haut de l'écran */
+    const rain = setInterval(() => {
+      for (let k = 0; k < 2; k++) particles.burst(M.x + (Math.random() - 0.5) * M.w * 0.9, M.y - M.h / 2 - 10, { count: 2, colors: gold, shapes: ['dot'], speed: [20, 90], life: [2.6, 4.4], size: [1, 2.8], gravity: 70, spread: 0.5, angle: Math.PI / 2, drag: 0.992 });
+    }, 110);
+    endApo = () => {
+      if (over) return;
+      over = true;
+      endApo = null;
+      clearInterval(rain);
+      cancelAnimationFrame(raf);
+      spin.cancel();
+      el.classList.remove('is-free', 'tilting', 'apo');
+      el.style.removeProperty('--hx'); el.style.removeProperty('--hy');
+      cups.forEach((c) => c.classList.remove('lit'));
+      op.classList.remove('apo');
+      if (skipped) skipped();
+    };
+    /* le temps passe par petites étapes, pour qu'un toucher puisse abréger */
+    const pause = (ms) => new Promise((resolve) => { const t = setTimeout(resolve, ms * slow()); skipped = () => { clearTimeout(t); resolve(); }; });
+    await pause(2600);
+    /* ses titres, un à un */
+    for (let n = 0; n < cups.length && !over && mine === gen; n++) {
+      cups[n].classList.add('lit');
+      sfx.clue(n);
+      label.textContent = 'Champion du monde ' + cups[n].textContent.trim();
+      label.style.setProperty('--n', label.textContent.length);
+      await pause(1250);
+    }
+    if (!over && mine === gen) {
+      label.textContent = cat.tierById.get(card.tier).name + ' · ' + VARIANTS[card.variant].name;
+      label.style.setProperty('--n', label.textContent.length);
+      const c = clientOf(POSE.stack(0));
+      particles.fountain(c[0], c[1] + M.ch * 0.25, { colors: gold, waves: 7 });
+      sfx.flip(5);
+      await pause(4200);
+    }
+    if (mine !== gen) { if (endApo) endApo(); return; }
+    if (endApo) endApo();
+    label.textContent = cat.tierById.get(card.tier).name + ' · ' + VARIANTS[card.variant].name;
+    label.style.setProperty('--n', label.textContent.length);
+    await move(box, POSE.stack(0), { dur: 900, ease: EASE.soft });
+  }
+  /** Un éclair blanc, très bref, sur tout l'écran. */
+  function flash() {
+    flashEl.animate([{ opacity: 0 }, { opacity: 0.85, offset: 0.12 }, { opacity: 0 }], { duration: 520 * slow(), easing: 'ease-out' });
+  }
+  /* Une All-Pro : la lumière baisse, trois indices s'annoncent, la carte attend.
+     Une carte très rare (rang 5 d'éclat : MVP, légendaire, édition limitée, belle carte en version spéciale) : le noir se fait presque
+     entièrement, un faisceau tombe sur elle, un cœur bat de plus en plus vite pendant que les indices tombent un à un. */
+  async function prelude(i, tier) {
+    const mine = gen, card = pulls[i].card, epic = tier >= 5;
     boxes[i].style.zIndex = 30;
     op.classList.add('rare', 'rays');
-    sfx.rise(1.75);
+    if (epic) op.classList.add('epic');
+    sfx.rise(epic ? 3.4 : 1.75);
     const parts = [
       card.country ? '<span><img src="' + flagUrl(card.country) + '" alt="">' + esc(cat.countries[card.country]) + '</span>' : '',
       '<span>' + esc(card.label || ROLE_LABEL[card.role]) + '</span>', '<span>' + esc(card.league) + '</span>',
@@ -476,15 +642,22 @@ export async function runOpening({ request, getCat, fx, size, from }) {
     /* longueur de la ligne d'indices une fois complète : le texte, plus la place du drapeau et des séparateurs */
     clues.style.setProperty('--n', parts.reduce((sum, html) => sum + html.replace(/<[^>]+>/g, '').length + 3, 0));
     clues.classList.add('on');
-    await wait(380);
+    /* le cœur : un battement sourd, et la lumière qui palpite avec lui */
+    const beat = () => {
+      sfx.heart(); buzz([34, 70, 46]);
+      bloom.animate([{ opacity: 0, transform: 'scale(.7)' }, { opacity: 0.4, transform: 'scale(1.05)', offset: 0.25 }, { opacity: 0, transform: 'scale(1.5)' }], { duration: 620 * slow(), easing: 'ease-out' });
+    };
+    await wait(epic ? 700 : 380);
     for (let n = 0; n < parts.length; n++) {
       if (mine !== gen) return;
+      if (epic) { beat(); await wait(Math.max(360, 640 - n * 90)); if (mine !== gen) return; }
       clues.insertAdjacentHTML('beforeend', parts[n]);
       sfx.clue(n);
       buzz(10);
-      await wait(460);
+      await wait(epic ? 620 : 460);
     }
-    await wait(260);
+    if (epic) { if (mine !== gen) return; beat(); await wait(430); if (mine !== gen) return; beat(); }
+    await wait(epic ? 520 : 260);
   }
   async function next() {
     const mine = gen, i = k, box = boxes[i];
@@ -495,16 +668,27 @@ export async function runOpening({ request, getCat, fx, size, from }) {
     box.style.zIndex = 40;
     label.classList.remove('on');
     op.classList.remove('named');
-    op.classList.remove('rare', 'rays');
+    op.classList.remove('rare', 'rays', 'epic');
+    stopSong();
     sfx.slide();
     const flown = place(box, 'tray', i, { dur: 520, ease: EASE.inOut, arc: M.ch * 0.07 }).then(() => { if (mine === gen) { box.style.zIndex = 4; op.querySelectorAll('.op-tray i')[i].classList.add('full'); } });
     k++;
     shown = false;
     for (let j = k; j < boxes.length; j++) place(boxes[j], 'stack', j - k, { dur: 460, ease: EASE.out, delay: 90 });
     if (k < boxes.length) {
-      await wait(210);
+      /* une carte ordinaire se retourne dans la foulée ; une belle carte attend sur le dessus du paquet : elle se met à briller,
+         et c'est au joueur de la retourner */
+      if (shineOf(pulls[k].card) < 4) {
+        await wait(210);
+        if (mine !== gen) return;
+        await flip(k);
+        return;
+      }
+      await wait(520);
       if (mine !== gen) return;
-      await flip(k);
+      omen(k);
+      busy = false;
+      setInfo('Quelque chose brille… touche la carte pour la retourner', true);
     } else {
       await flown;
       if (mine !== gen) return;
@@ -520,7 +704,10 @@ export async function runOpening({ request, getCat, fx, size, from }) {
     busy = true;
     drag = null;
     if (untilt) { untilt(); untilt = null; }
-    op.classList.remove('rare', 'rays');
+    omen(null);
+    if (endApo) endApo();
+    stopSong();
+    op.classList.remove('rare', 'rays', 'epic', 'glow', 'glow5');
     clues.classList.remove('on');
     label.classList.remove('on');
     op.classList.remove('named');
@@ -531,7 +718,7 @@ export async function runOpening({ request, getCat, fx, size, from }) {
       el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 220, fill: 'forwards' }).finished.then(() => el.remove()).catch(() => {});
     }
     setStage('stack');
-    boxes.forEach((b) => { b.getAnimations().forEach((a) => a.cancel()); b.classList.add('in', 'out'); b.classList.remove('tagged'); b.style.zIndex = 10; });
+    boxes.forEach((b) => { b.getAnimations().forEach((a) => a.cancel()); b.classList.add('in', 'out'); b.classList.remove('tagged', 'omen', 'omen5'); b.style.zIndex = 10; });
     sfx.whoosh();
     await Promise.all(boxes.map((b, i) => place(b, 'grid', i, { dur: 560, ease: EASE.soft, delay: i * 55 })));
     if (mine !== gen) return;
@@ -555,51 +742,68 @@ export async function runOpening({ request, getCat, fx, size, from }) {
     const fresh = pulls.filter((p) => p.isNew).length;
     setStage('done');
     setBeam(best);
-    op.classList.remove('rare', 'rays');
+    omen(null);
+    op.classList.remove('rare', 'rays', 'epic');
     label.classList.remove('on');
     op.classList.remove('named');
     const mine = gen;
     boxes.forEach((b) => b.classList.add('lit'));
     Promise.all(!placed && fx ? boxes.map((b, i) => { b.style.zIndex = 10; return place(b, 'grid', i, { dur: 640, ease: EASE.soft, delay: i * 60 }); }) : [])
       .then(() => { if (mine === gen) boxes.forEach((b) => b.classList.add('tagged')); });
-    setInfo('<b>' + (fresh ? fresh + (fresh > 1 ? ' nouvelles cartes' : ' nouvelle carte') : 'Aucune nouvelle carte') + '</b>', false);
+    /* un doublon se revend sur-le-champ : le bouton est sous sa carte (jamais pour une édition limitée ; il reste toujours un exemplaire) */
+    if (quick) pulls.forEach((p, i) => {
+      const gain = p.qty > 1 && !p.card.limited ? quick.price(p.card) : 0;
+      if (gain > 0) boxes[i].insertAdjacentHTML('beforeend', '<button class="op-sell" type="button" data-sell="' + i + '" data-say="Revendre · +' + gain + '">Revendre · +' + gain + '</button>');
+    });
+    setInfo('<b>' + (fresh ? fresh + (fresh > 1 ? ' nouvelles cartes' : ' nouvelle carte') : 'Aucune nouvelle carte') + '</b>'
+      + (matchMedia('(pointer: coarse)').matches ? '' : '<span class="op-hint">Clique une carte pour l\'examiner</span>'), false);
     if (fx) sfx.done();
     busy = false;
   }
-  /* revoir en grand une carte du bilan */
+  /* examiner une carte du bilan : seule, en grand, on la tourne et on la retourne du doigt */
   function inspect(i) {
-    if (busy) return;
-    if (zoomed !== null) {
-      const j = zoomed, b = boxes[j];
-      zoomed = null;
-      op.classList.remove('rare');
-      sfx.slide();
-      place(b, 'grid', j, { dur: 420, ease: EASE.out }).then(() => { b.style.zIndex = 10; b.classList.add('tagged'); });
+    if (busy || i === null) return;
+    const p = pulls[i];
+    sfx.slide();
+    inspectCard(p.card, cat, { serial: p.serial, title: p.card.name });
+  }
+  /** Revend un exemplaire du doublon n° i. Le premier clic arme le bouton, le second vend. */
+  async function sell(btn) {
+    const i = Number(btn.dataset.sell), p = pulls[i];
+    if (!btn.classList.contains('sure')) {
+      btn.classList.add('sure');
+      btn.textContent = 'Confirmer';
+      setTimeout(() => { if (btn.isConnected && btn.classList.contains('sure') && !btn.disabled) { btn.classList.remove('sure'); btn.textContent = btn.dataset.say; } }, 3500);
       return;
     }
-    if (i === null) return;
-    zoomed = i;
-    setBeam(pulls[i].card);
-    boxes[i].style.zIndex = 30;
-    boxes[i].classList.remove('tagged');
-    op.classList.add('rare');
-    sfx.slide();
-    where.set(boxes[i], ['zoom', 0]);
-    move(boxes[i], POSE.zoom(), { dur: 460, ease: EASE.soft });
+    btn.disabled = true;
+    const res = await quick.sell(p.card);
+    if (closed) return;
+    if (!res) { btn.disabled = false; btn.classList.remove('sure'); btn.textContent = btn.dataset.say; return; }
+    p.qty = res.left;
+    sfx.done();
+    const tag = boxes[i].querySelector('.op-tag');
+    if (tag) tag.textContent = '×' + res.left;
+    /* il ne reste qu'un exemplaire : plus rien à revendre */
+    if (res.left > 1) { btn.disabled = false; btn.classList.remove('sure'); btn.textContent = btn.dataset.say; }
+    else { btn.classList.remove('sure'); btn.classList.add('sold'); btn.textContent = '+' + res.coins + ' crédits'; }
   }
 
   /* ---------- gestes ---------- */
   function onClick(e) {
     const act = e.target.closest('[data-act]');
-    if (act && act.dataset.act === 'sound') { setSound(!soundOn()); drawSound(); sfx.click(); return; }
+    if (act && act.dataset.act === 'sound') { setSound(!soundOn()); drawSound(); sfx.click(); if (!soundOn()) stopSong(true); return; }
     if (act && act.dataset.act === 'skip') { skip(); return; }
     const go = e.target.closest('[data-go]');
     if (go) { if (leave && op.dataset.stage === 'done') { goTo = go.dataset.go; leave(); } return; }
-    if (e.target.closest('.op-head')) return;
+    if (e.target.closest('.op-head') || e.target.closest('.op-song')) return;
+    if (endApo) { endApo(); return; }
     if (op.dataset.stage === 'stack') { advance(); return; }
     if (op.dataset.stage === 'done') {
+      const btn = e.target.closest('[data-sell]');
+      if (btn) { if (!btn.disabled && !btn.classList.contains('sold')) sell(btn); return; }
       const box = e.target.closest('.op-cardbox');
-      inspect(zoomed !== null ? null : box ? Number(box.dataset.i) : null);
+      if (box) inspect(Number(box.dataset.i));
     }
   }
   function onKey(e) {
@@ -607,9 +811,11 @@ export async function runOpening({ request, getCat, fx, size, from }) {
     if (closed) return;
     e.preventDefault();
     const st = op.dataset.stage;
-    if (e.key === 'Escape') { if (zoomed !== null) inspect(null); else skip(); return; }
+    /* (pendant l'examen d'une carte, c'est lui qui écoute le clavier) */
+    if (document.querySelector('.insp')) return;
+    if (e.key === 'Escape') { skip(); return; }
     if (st === 'sealed') finishTear();
     else if (st === 'stack') advance();
-    else if (st === 'done') { if (zoomed !== null) inspect(null); else if (leave) leave(); }
+    else if (st === 'done') { if (leave) leave(); }
   }
 }

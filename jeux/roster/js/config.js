@@ -19,6 +19,15 @@ export const PHOTOS = 'https://static.wikia.nocookie.net/lolesports_gamepedia_en
    Les joueurs et les coachs : tous ceux qui ont gagné les Worlds ou le MSI, où qu'ils soient aujourd'hui (palmarès lu dans le catalogue). */
 export const PRESTIGE_TEAMS = ['T1', 'GEN', 'HLE', 'BLG', 'DK'];
 
+/* La photo propre à une carte légendaire, tant que le serveur ne la donne pas lui-même : Faker aux Worlds 2019, sous le maillot de SK Telecom T1
+   (photo officielle référencée par Leaguepedia). */
+export const LEGEND_PHOTOS = { faker: 'c/cb/SKT_Faker_2019_WC.png' };
+
+/* La musique qui accompagne l'arrivée d'une carte légendaire, par carte : une vidéo de YouTube jouée par son lecteur officiel (le jeu ne
+   contient aucun fichier de musique), de la seconde « start » à la seconde « end » — le refrain —, au volume donné (de 0 à 100).
+   Faker : « Legends Never Die », l'hymne des Worlds 2017, sur la chaîne officielle de League of Legends. */
+export const LEGEND_SONGS = { faker: { video: '4Q46xYqUwZQ', start: 59, end: 84, volume: 30, title: 'Legends Never Die — Worlds 2017' } };
+
 export const ROLE_LABEL = { TOP: 'TOP', JGL: 'JGL', MID: 'MID', BOT: 'ADC', SUP: 'SUP', COACH: 'COACH' };
 export const ROLE_NAME = { TOP: 'Toplaner', JGL: 'Jungler', MID: 'Midlaner', BOT: 'ADC', SUP: 'Support', COACH: 'Coach' };
 export const ROLE_ORDER = ['TOP', 'JGL', 'MID', 'BOT', 'SUP', 'COACH'];
