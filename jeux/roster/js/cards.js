@@ -1,5 +1,6 @@
 /* Fabrication d'une carte à l'écran. La même carte sert partout : collection, ouverture de pack, fiche détaillée, équipe. */
 import { COACH_STATS, DDRAGON, GAME_NAME, LEGEND_PHOTOS, PHOTOS, PLAYER_STATS, PRESTIGE_TEAMS, ROLE_LABEL } from './config.js';
+import { FRAMES } from './frames.js';
 import { LOGOS } from './logos.js';
 
 const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
@@ -117,6 +118,34 @@ const BACK = (() => {
 /* silhouette affichée quand une carte n'a pas de photo, ou que la photo ne se charge pas */
 const SILHOUETTE = '<svg class="card-ph" viewBox="0 0 100 100" aria-hidden="true"><use href="#silhouette"/></svg>';
 
+/* Le cadrage du portrait. Les photos officielles ne sont pas toutes cadrées pareil (plan poitrine ou plan serré, format carré ou paysage) :
+   dans un même cadre, certaines têtes deviendraient énormes. frames.js dit, pour chaque photo détourée, où est la tête et quelle largeur
+   elle prend : on pose alors la photo pour que la tête ait toujours la même taille, au même endroit. Par habillage : head, la largeur visée
+   de la tête et x, son milieu (parts de la largeur de la carte) ; top, le sommet du crâne et floor, jusqu'où la photo doit au moins
+   descendre (parts de la hauteur) ; fade, où le portrait se fond dans le bas de la carte. */
+const FRAME_LAYOUT = {
+  std: { head: 0.42, x: 0.588, top: 0.058, floor: 0.6, fade: [0.493, 0.666] },
+  full: { head: 0.5, x: 0.52, top: 0.07, floor: 0.66, fade: [0.628, 0.87] },
+  kc: { head: 0.47, x: 0.52, top: 0.085, floor: 0.66, fade: [0.628, 0.87] },
+};
+const pct = (x) => (x * 100).toFixed(2) + '%';
+function framing(card, key) {
+  const f = card.photo && FRAMES[card.photo], L = FRAME_LAYOUT[key];
+  if (!f || !L) return null;
+  const [ratio, top, cx, hw, sides] = f;
+  /* la largeur affichée de la photo, en largeurs de carte (une carte fait 5 sur 7) */
+  const w = Math.max(L.head / hw, ((L.floor - L.top) / (1 - top)) * ratio * 1.4);
+  const h = (w / ratio) * (5 / 7), x = L.x - cx * w, y = L.top - top * h;
+  /* le fondu du bas : là où l'habillage le prévoit, jamais plus bas que la photo */
+  const f1 = Math.min(L.fade[1], y + h - 0.004), f0 = Math.min(L.fade[0], f1 - 0.15);
+  return {
+    box: 'left:' + pct(x) + ';top:' + pct(y) + ';width:' + pct(w) + ';height:' + pct(h),
+    fade: '--f0:' + pct(f0) + ';--f1:' + pct(f1),
+    /* des épaules coupées par le bord de la photo, quand ce bord tombe dans la carte : il se fond */
+    cls: (sides & 1 && x > 0.004 ? ' fl' : '') + (sides & 2 && x + w < 0.996 ? ' fr' : ''),
+  };
+}
+
 /** opts : back (ajoute le dos, pour pouvoir la retourner), eager (image chargée tout de suite), cls (classes en plus),
     qty (nombre d'exemplaires possédés : à partir de deux, la carte est posée sur une pile et le nombre s'affiche en bas à droite),
     serial (numéro de l'exemplaire, pour une carte en édition limitée).
@@ -133,7 +162,14 @@ export function cardHTML(card, cat, opts = {}) {
   /* un nom long est écrit plus petit pour tenir sur la carte */
   const len = Math.max(7, Array.from(card.name).length);
   const load = 'loading="' + (opts.eager ? 'eager' : 'lazy') + '" decoding="async" draggable="false"';
-  const picture = photo ? '<img class="card-photo" src="' + photo + '" alt="" ' + load + '>' : SILHOUETTE;
+  /* (l'édition légendaire et les cartes hors série gardent leur cadre propre, réglé pour leur photo) */
+  const fr = v === 'legend' || ed ? null : framing(card, v === 'full' ? 'full' : v === 'kc' ? 'kc' : 'std');
+  const picture = photo
+    ? '<div class="card-pic' + (fr ? ' framed" style="' + fr.fade : '') + '"><img class="card-photo' + (fr ? fr.cls + '" style="' + fr.box : '') + '" src="' + photo + '" alt="" ' + load + '></div>'
+    : SILHOUETTE;
+  /* un blason en relief (la silhouette du logo, frappée dans le métal) : celui de la Karmine sur l'édition KC ; celui de son équipe sur le
+     full art d'un coach, qui n'a pas de champion fétiche */
+  const crestOf = (id) => (logoUrl(id) ? '<div class="card-crest" style="--logo:url(' + logoUrl(id, 300) + ')"></div>' : '');
   /* le logo de son club, sous le drapeau, comme sur une carte de foot ; sur une édition KC, celui de la Karmine, qu'il y joue encore ou non */
   const clubId = v === 'kc' ? 'KC' : card.team, club = logoUrl(clubId, 120);
   const flag = card.country
@@ -144,10 +180,10 @@ export function cardHTML(card, cat, opts = {}) {
     + '<div class="card-in"><div class="card-face card-front">'
     + '<div class="card-bg"></div>'
     + (pr > 1 ? '<div class="card-rays"></div>' : '')
-    /* derrière le joueur, l'illustration de son champion fétiche (les full art n'en ont pas : le portrait remplit la carte) */
-    + (card.art && !ed && (!v || v === 'holo' || v === 'legend') ? '<img class="card-art" src="' + DDRAGON + '/img/champion/loading/' + esc(card.art) + '.jpg" alt="" ' + load + '>' : '')
-    /* édition KC : le « mur bleu » ; holographique et édition KC : une feuille de métal irisée derrière le joueur, et ses paillettes */
-    + (v === 'kc' ? '<div class="card-wall"></div>' + (logoUrl('KC') ? '<img class="card-crest" src="' + logoUrl('KC', 300) + '" alt="" ' + load + '>' : '') : '')
+    /* derrière le joueur, l'illustration de son champion fétiche (sur un full art : sculptée en bas-relief ; à défaut, le blason de son équipe) */
+    + (card.art && !ed && v !== 'kc' ? '<img class="card-art" src="' + DDRAGON + '/img/champion/loading/' + esc(card.art) + '.jpg" alt="" ' + load + '>' : v === 'full' ? crestOf(card.team) : '')
+    /* édition KC : le « mur bleu » et le blason de la Karmine en relief ; holographique et édition KC : une feuille de métal irisée, et ses paillettes */
+    + (v === 'kc' ? '<div class="card-wall"></div>' + crestOf('KC') : '')
     + (v === 'holo' || v === 'kc' ? '<div class="card-foil"></div><div class="card-spark"></div>' : '')
     /* édition légendaire : derrière le joueur, l'aurore, la couronne de rayons et les facettes d'un diamant */
     + (v === 'legend' ? '<div class="card-aurora"></div><div class="card-crown"></div><div class="card-facets"></div>' : '')
@@ -201,7 +237,7 @@ export function tiltCard(el, max = 20) {
 /* une photo qui ne charge pas laisse place à la silhouette, sans icône d'image cassée */
 document.addEventListener('error', (e) => {
   const img = e.target;
-  if (img && img.classList && img.classList.contains('card-photo')) img.outerHTML = SILHOUETTE;
+  if (img && img.classList && img.classList.contains('card-photo')) (img.closest('.card-pic') || img).outerHTML = SILHOUETTE;
   /* un logo qui ne charge pas disparaît, tout simplement */
   else if (img && img.classList && (img.classList.contains('card-club') || img.classList.contains('card-crest') || img.classList.contains('logo'))) img.remove();
   /* une illustration qui ne charge pas : la carte garde son décor nu */

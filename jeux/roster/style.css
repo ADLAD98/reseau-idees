@@ -171,6 +171,15 @@ body.fx .main.page-in>*:nth-child(n+5){animation-delay:.2s}
   filter:drop-shadow(0 0 1.3cqw color-mix(in srgb,var(--tc) 42%,transparent)) drop-shadow(-1.4cqw 1.8cqw 2.2cqw rgba(0,0,0,.5));
   -webkit-mask-image:linear-gradient(to bottom,#000 72%,rgba(0,0,0,0) 99%);mask-image:linear-gradient(to bottom,#000 72%,rgba(0,0,0,0) 99%)}
 .card-ph{position:absolute;top:11%;left:21%;width:74%;height:54%;color:var(--tc);opacity:.34;stroke-width:1.2}
+/* Le portrait est posé dans un cadre qui couvre la carte. Quand on connaît son cadrage (frames.js), il y prend la place et la taille qui
+   donnent à toutes les têtes la même largeur, et se fond en bas là où l'habillage le prévoit (--f0, --f1 : parts de la hauteur). */
+.card-pic{position:absolute;inset:0;pointer-events:none}
+.card-pic.framed{overflow:hidden;-webkit-mask-image:linear-gradient(to bottom,#000 var(--f0),rgba(0,0,0,0) var(--f1));mask-image:linear-gradient(to bottom,#000 var(--f0),rgba(0,0,0,0) var(--f1))}
+.card .card-pic.framed .card-photo{object-fit:fill;-webkit-mask-image:none;mask-image:none}
+/* des épaules coupées net par le bord de la photo, quand ce bord tombe dans la carte : il se fond */
+.card .card-pic.framed .card-photo.fl{-webkit-mask-image:linear-gradient(to right,rgba(0,0,0,0) 0,#000 16%);mask-image:linear-gradient(to right,rgba(0,0,0,0) 0,#000 16%)}
+.card .card-pic.framed .card-photo.fr{-webkit-mask-image:linear-gradient(to left,rgba(0,0,0,0) 0,#000 16%);mask-image:linear-gradient(to left,rgba(0,0,0,0) 0,#000 16%)}
+.card .card-pic.framed .card-photo.fl.fr{-webkit-mask-image:linear-gradient(to right,rgba(0,0,0,0) 0,#000 16%,#000 84%,rgba(0,0,0,0) 100%);mask-image:linear-gradient(to right,rgba(0,0,0,0) 0,#000 16%,#000 84%,rgba(0,0,0,0) 100%)}
 /* le bas de la carte s'assombrit pour porter le nom ; les bords se referment en vignette */
 .card-shade{position:absolute;inset:0;background:
   linear-gradient(to top,#050b15 0,#050b15 31%,rgba(5,11,21,.88) 38%,rgba(5,11,21,.36) 47%,rgba(5,11,21,0) 57%),
@@ -189,10 +198,16 @@ body.fx .main.page-in>*:nth-child(n+5){animation-delay:.2s}
 /* le logo du club, sous le drapeau (un fin halo clair garde lisibles les logos sombres) */
 .card-club{display:block;width:11.6cqw;height:11.6cqw;object-fit:contain;filter:drop-shadow(0 0 .35cqw rgba(240,236,224,.5)) drop-shadow(0 .5cqw 1.2cqw rgba(0,0,0,.7))}
 .card.missing .card-club{filter:grayscale(1) brightness(.7)}
-/* édition KC : le blason de la Karmine, en grand, derrière le joueur */
-.card-crest{position:absolute;top:7%;right:-12%;width:72%;aspect-ratio:1;object-fit:contain;opacity:.2;pointer-events:none;
-  transform:translate(calc((var(--hx) - 50%) * -.08),calc((var(--hy) - 50%) * -.05));filter:brightness(0) invert(1) drop-shadow(0 0 3cqw rgba(60,170,255,.9))}
-.card.missing .card-crest{opacity:.12}
+/* Un blason en relief, en grand, derrière le joueur : la silhouette du logo (un masque) frappée dans le métal de la carte — un dégradé
+   éclairé d'en haut à gauche, une arête claire d'un côté et une ombre de l'autre, un reflet qui suit la lumière (--hx, --hy).
+   Édition KC : le blason de la Karmine, dans ses bleus. Full art d'un coach : celui de son équipe, à la couleur de son rang. */
+.card-crest{position:absolute;top:3%;left:9%;width:82%;aspect-ratio:1;pointer-events:none;opacity:.9;
+  transform:translate(calc((var(--hx) - 50%) * -.08),calc((var(--hy) - 50%) * -.05));
+  filter:drop-shadow(-.4cqw -.45cqw .12cqw color-mix(in srgb,var(--hi) 80%,transparent)) drop-shadow(.6cqw .8cqw .5cqw rgba(1,4,14,.92)) drop-shadow(0 0 3.4cqw color-mix(in srgb,var(--tc) 50%,transparent))}
+.card-crest::before,.card-crest::after{content:"";position:absolute;inset:0;-webkit-mask:var(--logo) center/contain no-repeat;mask:var(--logo) center/contain no-repeat}
+.card-crest::before{background:linear-gradient(140deg,color-mix(in srgb,var(--tc) 78%,var(--hi)) 0%,color-mix(in srgb,var(--tc) 62%,var(--lo)) 24%,var(--lo) 52%,color-mix(in srgb,var(--lo) 72%,#01040e) 78%,color-mix(in srgb,var(--tc) 40%,var(--lo)) 100%)}
+.card-crest::after{mix-blend-mode:screen;background:radial-gradient(circle at var(--hx) var(--hy),rgba(255,255,255,.9) 0,rgba(255,255,255,.32) 16%,rgba(255,255,255,0) 42%)}
+.card.missing .card-crest{opacity:.3}
 /* le logo d'une équipe, à côté de son nom (classeur, adversaires, match) */
 .logo{flex:none;display:block;object-fit:contain;filter:drop-shadow(0 0 1px rgba(240,236,224,.45))}
 .ros-name .logo{align-self:center;width:34px;height:34px}
@@ -376,11 +391,22 @@ body.fx .card.v-holo .card-front .card-frame::after,.card.v-holo .card-front .ca
 body.fx .card.v-holo .card-front .card-frame::after{animation:spin 9s linear infinite}
 .card.missing .card-spark{display:none}
 
-/* full art : le portrait remplit la carte, du haut jusque derrière le nom */
+/* full art : le portrait remplit la carte, du haut jusque derrière le nom ; derrière lui, son champion fétiche sculpté en bas-relief dans
+   le métal de son rang (un filtre d'éclairage : les parties claires de l'illustration ressortent, la lumière vient d'en haut à gauche).
+   Sur une petite carte, l'illustration reste simplement en grisé. */
+.card.v-full .card-art{top:0;left:-8%;width:116%;height:82%;object-position:50% 10%;opacity:.5;
+  -webkit-mask-image:linear-gradient(to bottom,#000 44%,rgba(0,0,0,0) 95%);mask-image:linear-gradient(to bottom,#000 44%,rgba(0,0,0,0) 95%);
+  transform:translate(calc((var(--hx) - 50%) * .05),calc((var(--hy) - 50%) * .035))}
+@container (min-width:140px){.card.v-full .card-art{filter:url(#basRelief) brightness(.8) contrast(1.08);opacity:.72}}
+/* (un full art d'un coach : le blason de son équipe, en grand, autour de lui) */
+.card.v-full .card-crest{top:5%;left:-14%;width:128%;-webkit-mask-position:center top;mask-position:center top}
+.card.v-full .card-crest::before,.card.v-full .card-crest::after{-webkit-mask-position:center top;mask-position:center top}
+.card.v-full .card-art~.card-wm{display:none}
+.card.v-full .card-photo{filter:drop-shadow(0 0 1.5cqw color-mix(in srgb,var(--tc) 50%,transparent)) drop-shadow(-2cqw 2.6cqw 2.8cqw rgba(0,0,0,.66))}
 .card.v-full .card-bg{background:
   radial-gradient(115% 70% at 50% 26%,color-mix(in srgb,var(--tc) 50%,transparent),transparent 75%),
   linear-gradient(172deg,color-mix(in srgb,var(--tc) 30%,#07101d),#040913 80%)}
-.card.v-full .card-wm{display:block;top:15%;left:auto;right:5%;writing-mode:vertical-rl;font-size:13cqw;letter-spacing:.14em;text-align:left;color:var(--tc);-webkit-text-stroke:0;opacity:.2}
+.card.v-full .card-wm{display:none}
 .card.v-full .card-photo{top:2.6%;left:-13%;width:126%;height:86%;
   -webkit-mask-image:linear-gradient(to bottom,#000 70%,transparent 98%);mask-image:linear-gradient(to bottom,#000 70%,transparent 98%)}
 .card.v-full .card-shade{background:
@@ -412,12 +438,16 @@ body.fx .card.v-full .card-holo,.card.v-full .card-holo{opacity:.5;mix-blend-mod
   background:var(--kc) 0 0/36cqw auto,var(--kc) 18cqw 10.8cqw/36cqw auto}
 .card-wall::after{opacity:.13}
 .card-wall::before{opacity:.8;-webkit-mask-image:radial-gradient(circle at var(--hx) var(--hy),#000 0,rgba(0,0,0,.6) 16%,transparent 40%);mask-image:radial-gradient(circle at var(--hx) var(--hy),#000 0,rgba(0,0,0,.6) 16%,transparent 40%)}
-.card.v-kc .card-foil{opacity:.85;background:
+.card.v-kc .card-foil{opacity:.4;background:
   repeating-linear-gradient(62deg,rgba(255,255,255,0) 0,rgba(255,255,255,.32) 3.6cqw,rgba(255,255,255,0) 7.2cqw),
   repeating-linear-gradient(-62deg,rgba(255,255,255,0) 0,rgba(255,255,255,.32) 3.6cqw,rgba(255,255,255,0) 7.2cqw),
   linear-gradient(118deg,#00e5ff 0%,#2f7bff 13%,#ffffff 25%,#00b7ff 38%,#7b61ff 52%,#00e5ff 66%,#ffffff 80%,#2f7bff 100%) var(--hx) var(--hy)/155% 155%;
   background-blend-mode:overlay,overlay,normal}
 .card.v-kc .card-wm{display:none}
+/* le blason de la Karmine, très grand : son anneau déborde la tête du joueur de tous côtés, comme une auréole de métal ; son nom passe derrière
+   le bandeau */
+.card.v-kc .card-crest{top:2.5%;left:-37%;width:190%}
+.card.v-kc .card-crest::before,.card.v-kc .card-crest::after{-webkit-mask-position:center top;mask-position:center top}
 .card.v-kc .card-photo{top:2.6%;left:-13%;width:126%;height:86%;filter:drop-shadow(0 0 2.2cqw rgba(90,190,255,.75));
   -webkit-mask-image:linear-gradient(to bottom,#000 70%,transparent 98%);mask-image:linear-gradient(to bottom,#000 70%,transparent 98%)}
 .card.v-kc .card-shade{background:
