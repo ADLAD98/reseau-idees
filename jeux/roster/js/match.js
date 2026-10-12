@@ -506,6 +506,8 @@ export function runMatch({ data, cat, fx }) {
     soundBtn.classList.toggle('off', !soundOn());
     $('[data-act="pause"]').innerHTML = icon(paused ? 'i-go' : 'i-pause');
     root.classList.toggle('paused', paused);
+    /* les pions vont plus vite quand la partie est accélérée */
+    root.style.setProperty('--k', String(speed));
     root.querySelectorAll('[data-speed]').forEach((b) => b.classList.toggle('on', Number(b.dataset.speed) === speed));
   }
   root.addEventListener('click', (e) => {
