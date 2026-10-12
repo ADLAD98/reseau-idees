@@ -1,0 +1,695 @@
+/* Les déplacements des dix joueurs pendant une partie.
+   Le serveur a joué la partie et envoie la suite des événements (duels, ganks, dragons, combats, tours…).
+   Ce module en tire le trajet complet de chaque joueur, du début à la fin : les joueurs de voie tiennent leur ligne, rentrent à la base
+   après un duel perdu et reviennent à pied ; les junglers enchaînent leurs camps, traversent par la rivière, se cachent avant un gank
+   et se placent en avance sur les objectifs ; après la phase de lane, l'équipe se répartit puis se regroupe.
+   Tout passe par les couloirs de la carte (voies, sentiers de la jungle, rivière), jamais à travers les murs.
+   Rien ici ne touche à la page : match.js lit ces trajets image par image. */
+
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+export const mirror = (p) => [1000 - p[0], 1000 - p[1]];
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+
+/* ---------- la carte : un carré de 1000 de côté, base bleue en bas à gauche, base rouge en haut à droite ---------- */
+/* bâtiments bleus de chaque voie (haut, milieu, bas) : tour extérieure, intérieure, d'inhibiteur, puis l'inhibiteur */
+export const BLUE = [
+  [[92, 300], [92, 530], [92, 690], [92, 768]],
+  [[415, 585], [335, 665], [262, 738], [218, 782]],
+  [[700, 908], [470, 908], [310, 908], [232, 908]],
+];
+/* la carte est symétrique : la voie du haut des rouges est le reflet de la voie du bas des bleus */
+export const STRUCT = [BLUE, [BLUE[2].map(mirror), BLUE[1].map(mirror), BLUE[0].map(mirror)]];
+export const NEXUS_TOWERS = [[[126, 840], [160, 874]], [[874, 160], [840, 126]]];
+export const NEXUS = [[96, 904], [904, 96]];
+export const FOUNTAIN = [[50, 950], [950, 50]];
+export const PIT = { drake: [650, 708], baron: [350, 292] };
+
+/* le tracé des trois voies, de la base bleue à la base rouge */
+const TOP_LINE = [[92, 800], [92, 690], [92, 530], [92, 300], [92, 170], [99, 127], [127, 99], [170, 92], [300, 92], [530, 92], [690, 92], [800, 92]];
+const MID_LINE = [[200, 800], [262, 738], [335, 665], [415, 585], [500, 500], [585, 415], [665, 335], [738, 262], [800, 200]];
+function makeLane(points) {
+  const cum = [0];
+  for (let i = 1; i < points.length; i++) cum.push(cum[i - 1] + dist(points[i - 1], points[i]));
+  return { points, cum, total: cum[cum.length - 1], mid: cum[cum.length - 1] / 2 };
+}
+export const LANES = [makeLane(TOP_LINE), makeLane(MID_LINE), makeLane(TOP_LINE.map(mirror).reverse())];
+const LANE_INDEX = { top: 0, mid: 1, bot: 2 };
+/* de quel côté d'une voie se trouve l'intérieur de la carte (pour la voie du milieu : +1 vers le dragon, −1 vers le Baron) */
+const INSIDE = [1, 1, -1];
+function onLane(lane, d) {
+  const L = LANES[lane], s = clamp(L.mid + d, 0, L.total);
+  let i = 1;
+  while (i < L.points.length - 1 && L.cum[i] < s) i++;
+  const a = L.points[i - 1], b = L.points[i], k = (s - L.cum[i - 1]) / (L.cum[i] - L.cum[i - 1] || 1);
+  return [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k];
+}
+/** Direction de la voie à cet endroit, vers la base rouge (lissée : dans un virage, elle tourne peu à peu). */
+function laneDir(lane, d) {
+  const a = onLane(lane, d - 75), b = onLane(lane, d + 75), len = dist(a, b) || 1;
+  return [(b[0] - a[0]) / len, (b[1] - a[1]) / len];
+}
+/** Le point d'une voie à la distance d de son milieu (positive vers la base rouge), décalé de « off » sur le côté. */
+export function laneAt(lane, d, off = 0) {
+  const p = onLane(lane, d);
+  if (!off) return p;
+  const u = laneDir(lane, d);
+  return [p[0] - u[1] * off, p[1] + u[0] * off];
+}
+/** Distance d'un point au milieu de sa voie, le long de la voie. */
+function laneDist(lane, p) {
+  const L = LANES[lane];
+  let best = Infinity, at = 0;
+  for (let i = 1; i < L.points.length; i++) {
+    const a = L.points[i - 1], b = L.points[i], len = L.cum[i] - L.cum[i - 1];
+    const k = clamp(((p[0] - a[0]) * (b[0] - a[0]) + (p[1] - a[1]) * (b[1] - a[1])) / (len * len), 0, 1);
+    const q = [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k], d = dist(p, q);
+    if (d < best) { best = d; at = L.cum[i - 1] + len * k; }
+  }
+  return at - L.mid;
+}
+/* distance des bâtiments au milieu de leur voie : tour extérieure, intérieure, d'inhibiteur, inhibiteur (les deux camps sont à égale distance) */
+const STRUCT_D = [0, 1, 2].map((lane) => BLUE[lane].map((p) => Math.abs(laneDist(lane, p))));
+
+/* ---------- les couloirs : voies, sentiers de la jungle, rivière ---------- */
+/* points de passage du côté bleu ; ceux du côté rouge sont leur reflet */
+const HALF = {
+  f: [50, 950], n: [160, 840],
+  ti: [92, 740], t2: [92, 530], tq: [92, 415], t1: [92, 300], tp: [92, 205],
+  mi: [232, 768], m2: [335, 665], m1: [415, 585], mp: [458, 542],
+  bi: [260, 908], b2: [470, 908], bq: [585, 908], b1: [700, 908], bp: [800, 908],
+  gr: [150, 440], bb: [262, 468], wo: [258, 566],       // gromp, buff bleu, loups
+  ra: [462, 640], rb: [528, 735], kr: [574, 822],       // raptors, buff rouge, golems
+  g1: [124, 372],     // de la voie du haut vers le gromp
+  g2: [192, 688],     // porte de la base vers les loups
+  g3: [350, 572],     // de la voie du milieu vers les loups
+  g4: [302, 398],     // rampe du buff bleu vers la rivière
+  g5: [372, 470],     // passage vers la rivière, près du milieu
+  g6: [338, 806],     // porte de la base vers le buff rouge
+  g7: [606, 880],     // de la voie du bas vers les golems
+  g8: [598, 690],     // rampe du buff rouge vers le dragon
+  g9: [528, 590],     // des raptors vers la rivière
+  tb: [150, 262],     // buisson du haut, entre la rivière et la tour
+  ub: [768, 846],     // buisson du bas
+};
+/* points communs : milieu des voies, rivière, fosses du Baron et du dragon */
+const SHARED = {
+  tc: [112, 112], mc: [500, 500], bc: [888, 888],
+  r1: [188, 226], r2: [266, 288], r3: [333, 342], r4: [422, 425], r5: [578, 575], r6: [667, 658], r7: [734, 712], r8: [812, 774],
+  ba: [350, 292], dr: [650, 708],
+};
+const SWAP = { tc: 'bc', bc: 'tc', mc: 'mc', r1: 'r8', r2: 'r7', r3: 'r6', r4: 'r5', r5: 'r4', r6: 'r3', r7: 'r2', r8: 'r1', ba: 'dr', dr: 'ba' };
+const LANE_LINKS = 'f-n n-ti n-mi n-bi ti-t2 t2-tq tq-t1 t1-tp tp-tc mi-m2 m2-m1 m1-mp mp-mc bi-b2 b2-bq bq-b1 b1-bp bp-bc';
+const JUNGLE_LINKS = 'n-g2 g2-wo wo-bb bb-gr gr-g1 g1-tq g1-t1 wo-g3 g3-m2 g3-m1 bb-g4 g4-r3 g4-r2 bb-g5 wo-g5 g5-r4 g5-mp'
+  + ' n-g6 g6-rb g6-kr rb-kr rb-ra ra-m1 ra-m2 ra-g9 g9-r5 g9-mp rb-g8 g8-r6 kr-g7 g7-bq g7-b1 kr-ub ub-r8 ub-bp ub-b1 tb-r1 tb-t1 tb-tp';
+const RIVER_LINKS = 'r1-tc r1-r2 r2-r3 r3-ba r3-r4 r4-mc mc-r5 r5-r6 r6-dr r6-r7 r7-r8 r8-bc';
+
+export const NODE = {};
+for (const [k, p] of Object.entries(SHARED)) NODE[k] = p;
+for (const [k, p] of Object.entries(HALF)) { NODE[k + '0'] = p; NODE[k + '1'] = mirror(p); }
+const nodeName = (k, side) => (k in SHARED ? (side ? SWAP[k] : k) : k + side);
+const linksOf = (text) => {
+  const out = [];
+  for (const link of text.split(' ')) { const [a, b] = link.split('-'); for (const side of [0, 1]) out.push([nodeName(a, side), nodeName(b, side)]); }
+  return out;
+};
+/** Les sentiers de la jungle, pour le dessin de la carte. */
+export const TRAILS = linksOf(JUNGLE_LINKS).map(([a, b]) => [NODE[a], NODE[b]]);
+const NAMES = Object.keys(NODE), POINTS = NAMES.map((k) => NODE[k]), COUNT = NAMES.length;
+const INDEX = new Map(NAMES.map((k, i) => [k, i]));
+/* plus court chemin entre tous les points de passage (calculé une fois) */
+const D = POINTS.map(() => new Float64Array(COUNT).fill(Infinity)), NEXT = POINTS.map(() => new Int16Array(COUNT).fill(-1));
+for (let i = 0; i < COUNT; i++) { D[i][i] = 0; NEXT[i][i] = i; }
+for (const [a, b] of [...linksOf(LANE_LINKS), ...linksOf(JUNGLE_LINKS), ...linksOf(RIVER_LINKS)]) {
+  const i = INDEX.get(a), j = INDEX.get(b), d = dist(POINTS[i], POINTS[j]);
+  if (d < D[i][j]) { D[i][j] = D[j][i] = d; NEXT[i][j] = j; NEXT[j][i] = i; }
+}
+for (let k = 0; k < COUNT; k++) for (let i = 0; i < COUNT; i++) {
+  const ik = D[i][k];
+  if (ik === Infinity) continue;
+  for (let j = 0; j < COUNT; j++) if (ik + D[k][j] < D[i][j]) { D[i][j] = ik + D[k][j]; NEXT[i][j] = NEXT[i][k]; }
+}
+/* les points de passage les plus proches d'un endroit (cinq au plus, à moins de 260) */
+function nearest(p) {
+  const list = [];
+  for (let i = 0; i < COUNT; i++) {
+    const d = dist(p, POINTS[i]);
+    if (list.length < 5 || d < list[list.length - 1][0]) {
+      let k = list.length;
+      while (k > 0 && list[k - 1][0] > d) k--;
+      list.splice(k, 0, [d, i]);
+      if (list.length > 5) list.pop();
+    }
+  }
+  return list.filter((x, k) => k === 0 || x[0] < 260);
+}
+const pathLen = (pts) => { let s = 0; for (let i = 1; i < pts.length; i++) s += dist(pts[i - 1], pts[i]); return s; };
+/** Le chemin d'un endroit à un autre, par les couloirs de la carte. */
+export function route(a, b) {
+  const direct = dist(a, b);
+  if (direct < 110) return [a, b];
+  let best = null;
+  for (const [da, i] of nearest(a)) for (const [db, j] of nearest(b)) {
+    const len = da + D[i][j] + db;
+    if (!best || len < best.len) best = { i, j, len };
+  }
+  /* tout près : inutile de faire un détour par un point de passage */
+  if (!best || (direct < 230 && best.len > direct * 1.45)) return [a, b];
+  const pts = [a];
+  let k = best.i;
+  pts.push(POINTS[k]);
+  for (let guard = 0; k !== best.j && guard < COUNT; guard++) { k = NEXT[k][best.j]; pts.push(POINTS[k]); }
+  pts.push(b);
+  /* les points confondus sont retirés */
+  const out = [pts[0]];
+  for (let i = 1; i < pts.length; i++) if (dist(out[out.length - 1], pts[i]) > 6 || i === pts.length - 1) out.push(pts[i]);
+  if (out.length > 2 && dist(out[out.length - 2], out[out.length - 1]) <= 6) out.splice(out.length - 2, 1);
+  return out;
+}
+export const routeLen = (a, b) => pathLen(route(a, b));
+
+/* ---------- les camps de la jungle ---------- */
+/* hold : temps passé à tuer le camp (à l'écran) ; respawn : délai de réapparition, en secondes de jeu */
+const CAMP_KINDS = { bb: ['blue', 950, 300], rb: ['red', 950, 300], gr: ['camp', 780, 135], wo: ['camp', 780, 135], ra: ['camp', 780, 135], kr: ['camp', 820, 135] };
+export const CAMPS = [];
+for (const side of [0, 1]) for (const [k, [kind, hold, respawn]] of Object.entries(CAMP_KINDS)) {
+  CAMPS.push({ id: k + side, p: NODE[k + side], side, kind, hold, respawn, spawn: 50 });
+}
+/* les deux crabes de la rivière : au premier jungler qui passe */
+CAMPS.push({ id: 'crabT', p: NODE.r2, side: -1, kind: 'crab', hold: 620, respawn: 150, spawn: 210 });
+CAMPS.push({ id: 'crabB', p: NODE.r7, side: -1, kind: 'crab', hold: 620, respawn: 150, spawn: 210 });
+/* les camps que chaque jungler peut tuer, et la longueur du chemin de l'un à l'autre (calculée une fois) */
+const CAMPS_OF = [0, 1].map((side) => CAMPS.filter((c) => c.side === side || c.side < 0));
+const CAMP_PATHS = CAMPS_OF.map((list) => list.map((a) => list.map((b) => (a === b ? 0 : routeLen(a.p, b.p)))));
+
+/* ---------- le rythme de la mise en scène (millisecondes à vitesse ×1) ---------- */
+const PACE = 64, TRAVEL_MIN = 1400, TRAVEL_MAX = 3500;   // durée du trajet entre deux événements, selon le temps de jeu qui les sépare
+const OPENING = [4800, 6000];                            // le tout début : chacun gagne sa voie, les junglers lancent leur premier tour
+export const SHOW_LEAD = 480, KILL_GAP = 250;            // avant la première élimination, puis entre deux
+const V = 0.34, VFAST = 0.52, VRUSH = 0.8, VMAX = 1.5, VSLOW = 0.09;   // vitesses de marche, en unités de carte par milliseconde
+const LANING_END = 840, LATE = 1500;
+
+/** Prépare tous les déplacements d'une partie. sim : ce que le serveur renvoie (events, duration, kills). */
+export function planMoves(sim) {
+  const ev = sim.events, N = ev.length;
+  const rnd = mulberry32((Math.round(sim.duration) * 7919 + N * 104729 + (sim.kills ? sim.kills[0] * 31 + sim.kills[1] : 0)) >>> 0);
+  const rand = (a, b) => a + rnd() * (b - a);
+  const pick = (list) => list[Math.floor(rnd() * list.length)];
+
+  /* ---------- 1. le temps : chaque événement a son heure d'arrivée à l'écran ---------- */
+  const at = [];
+  let tau = 0, prev = 0;
+  for (const e of ev) {
+    const start = tau;
+    tau += at.length ? clamp(Math.max(0, e.t - prev) * PACE, TRAVEL_MIN, TRAVEL_MAX) : clamp(e.t * 30, OPENING[0], OPENING[1]);
+    const kills = e.kills.map((k, j) => tau + SHOW_LEAD + KILL_GAP * j);
+    const hud = tau + SHOW_LEAD + KILL_GAP * e.kills.length;
+    const end = hud + (e.k === 'nexus' ? 1700 : e.kills.length ? 560 : 760);
+    at.push({ start, tau, kills, hud, end, t0: prev, t1: e.t });
+    tau = end; prev = e.t;
+  }
+  const total = tau;
+  /* numéro de l'événement en cours (ou à venir) à l'instant tau */
+  const indexAt = (x) => { let lo = 0, hi = N - 1; while (lo < hi) { const m = (lo + hi) >> 1; if (at[m].end > x) hi = m; else lo = m + 1; } return lo; };
+  /** Temps de jeu (secondes) à l'instant tau de la mise en scène. */
+  const gameAt = (x) => {
+    if (!N) return 0;
+    const a = at[indexAt(x)];
+    return x >= a.tau ? a.t1 : a.t0 + (a.t1 - a.t0) * clamp((x - a.start) / (a.tau - a.start), 0, 1);
+  };
+  /** Instant de la mise en scène où l'horloge du jeu atteint g. */
+  const tauOfGame = (g) => {
+    for (const a of at) if (a.t1 >= g) return g <= a.t0 ? a.start : a.start + (a.tau - a.start) * ((g - a.t0) / (a.t1 - a.t0 || 1));
+    return total + (g - prev) * 30;
+  };
+
+  /* ---------- 2. l'état de la carte avant chaque événement : phase, tours tombées, ligne de front de chaque voie ---------- */
+  const state = [];
+  {
+    let lost = [[0, 0, 0, 0], [0, 0, 0, 0]], lead = 0;
+    const laneState = [0, 0, 0];
+    const fronts = (phase) => [0, 1, 2].map((l) => {
+      const b = STRUCT_D[l][Math.min(3, lost[0][l])], r = STRUCT_D[l][Math.min(3, lost[1][l])];
+      if (phase === 'lane') return clamp(laneState[l] * 26, -Math.min(150, b - 66), Math.min(150, r - 66));
+      return clamp((r - b) / 2 + clamp(lead * 7, -50, 50), -(b - 74), r - 74);
+    });
+    for (let n = 0; n <= N; n++) {
+      const t0 = n ? ev[n - 1].t : 0;
+      const phase = t0 < LANING_END ? 'lane' : t0 < LATE ? 'mid' : 'late';
+      state.push({ t0, phase, lost: [lost[0].slice(), lost[1].slice()], front: fronts(phase), lead, obj: 'bot' });
+      if (n === N) break;
+      const e = ev[n], l = LANE_INDEX[e.z];
+      if (e.st) lost = [e.st[0].slice(), e.st[1].slice()];
+      if (l !== undefined && e.s >= 0 && e.t <= LANING_END + 60) laneState[l] += (e.s === 0 ? 1 : -1) * (e.k === 'kill' ? 1.5 : 1);
+      lead = (e.g[0] - e.g[1]) / 1000;
+    }
+    /* le prochain objectif neutre : en bas (dragon) ou en haut (larves, Héraut, Baron) */
+    let obj = 'bot';
+    for (let n = N; n >= 0; n--) {
+      const e = ev[n];
+      if (e) { if (e.k === 'dragon' || e.k === 'elder') obj = 'bot'; else if (e.k === 'baron' || e.k === 'herald' || e.k === 'grubs') obj = 'top'; }
+      state[n].obj = obj;
+    }
+  }
+  /* tenue de chaque poste hors événement : une place sur une voie, ou la jungle */
+  const LANE = (lane, back, lat) => ({ lane, back, lat });
+  function dutyOf(role, s) {
+    const objLane = s.obj === 'bot' ? 2 : 0, side = s.obj === 'bot' ? 1 : -1;
+    /* phase de lane : en bas, les supports sont devant, les ADC derrière eux (le virage ne laisse pas de place côte à côte) */
+    if (s.phase === 'lane') return [LANE(0, 58, 0), null, LANE(1, 50, 0), LANE(2, 122, -8 * INSIDE[2]), LANE(2, 48, 12 * INSIDE[2])][role];
+    /* milieu de partie : l'ADC et le support tiennent le milieu, le midlaner la voie proche du prochain objectif, le toplaner l'autre */
+    if (s.phase === 'mid') return [LANE(2 - objLane, 56, 0), null, LANE(objLane, 56, 0), LANE(1, 64, 0), LANE(1, 48, 60 * side)][role];
+    /* fin de partie : tout le monde au milieu */
+    return [LANE(1, 42, -8 * side), LANE(1, 66, -62 * side), LANE(1, 74, 34 * side), LANE(1, 104, -12 * side), LANE(1, 66, 66 * side)][role];
+  }
+  const dutySpot = (i, s) => {
+    const d = dutyOf(i % 5, s);
+    return d ? laneAt(d.lane, s.front[d.lane] + (i < 5 ? -1 : 1) * d.back, d.lat) : null;
+  };
+
+  /* ---------- 3. qui est présent à chaque événement, et où ---------- */
+  const U = [0.7071, -0.7071];                       // de la base bleue vers la base rouge
+  const deadUntil = new Array(10).fill(0), deathAt = new Array(10).fill(0);
+  const deaths = Array.from({ length: 10 }, () => []);
+  const appts = Array.from({ length: 10 }, () => []);
+  const anchors = [], casts = [];
+  const baronUntil = [-1, -1];
+  const fountainSpot = (i) => { const side = i < 5 ? 0 : 1, r = i % 5, p = [44 + r * 13, 956 - (4 - r) * 13]; return side ? mirror(p) : p; };
+  /* temps qu'il faut à un mort pour être à l'heure : le trajet depuis la fontaine, au pas de course */
+  const needFrom = (i, spot) => routeLen(fountainSpot(i), spot) / VRUSH + 250;
+  const aliveAt = (i, x) => deadUntil[i] <= x;
+
+  function towerCast(n) {
+    const e = ev[n], def = Number(e.z[2]), lane = Number(e.z[3]), att = 1 - def, s = state[n], when = at[n].tau - 350;
+    const p = ev[n - 1];
+    let roles;
+    /* dans la foulée d'un combat ou d'un objectif gagné : ceux qui y étaient continuent ensemble */
+    if (p && e.t - p.t <= 45 && p.s === att && casts[n - 1].filter((i) => (i < 5 ? 0 : 1) === att).length >= 3) roles = casts[n - 1].filter((i) => (i < 5 ? 0 : 1) === att).map((i) => i % 5);
+    else if (s.phase === 'lane') roles = lane === 0 ? [0, 1] : lane === 1 ? [2, 1] : [3, 4];
+    else if (s.phase === 'late' || baronUntil[att] > e.t) roles = [0, 1, 2, 3, 4];
+    else { roles = [0, 2, 3, 4].filter((r) => dutyOf(r, s).lane === lane); roles.push(1); }
+    let list = roles.map((r) => att * 5 + r).filter((i) => aliveAt(i, when));
+    if (!list.length) list = [0, 1, 2, 3, 4].map((r) => att * 5 + r).filter((i) => aliveAt(i, when)).slice(0, 2);
+    /* un siège repoussé : les défenseurs sont là aussi */
+    if (e.k === 'duel') {
+      const guards = s.phase === 'lane' ? (lane === 0 ? [0] : lane === 1 ? [2] : [3, 4]) : s.phase === 'late' ? [0, 1, 2, 3, 4] : [0, 2, 3, 4].filter((r) => dutyOf(r, s).lane === lane).concat([1]);
+      list = list.concat(guards.map((r) => def * 5 + r).filter((i) => aliveAt(i, when)));
+    }
+    return list;
+  }
+  /** Range deux groupes face à face autour d'un point : les bleus du côté de leur base, les rouges en face. */
+  function faceOff(out, list, a, u, gap = 46, spread = 64, stagger = 36) {
+    for (const side of [0, 1]) {
+      const group = list.filter((i) => (i < 5 ? 0 : 1) === side), sg = side ? 1 : -1, m = group.length;
+      group.forEach((i, k) => {
+        const across = (k - (m - 1) / 2) * spread, along = sg * (gap + (m > 3 ? (k % 2) * stagger : 0));
+        out.set(i, [a[0] + u[0] * along - u[1] * across, a[1] + u[1] * along + u[0] * across]);
+      });
+    }
+  }
+  /** Une équipe seule autour d'une fosse : le jungler dedans, les autres à l'entrée. */
+  function aroundPit(out, group, pit, door) {
+    const len = dist(pit, door) || 1, o = [(door[0] - pit[0]) / len, (door[1] - pit[1]) / len];
+    const jgl = group.find((i) => i % 5 === 1), rest = group.filter((i) => i !== jgl);
+    if (jgl !== undefined) out.set(jgl, [pit[0] + o[0] * 10, pit[1] + o[1] * 10]);
+    rest.forEach((i, k) => {
+      const across = (k - (rest.length - 1) / 2) * 62, away = 66 + (k % 2) * 22;
+      out.set(i, [pit[0] + o[0] * away - o[1] * across, pit[1] + o[1] * away + o[0] * across]);
+    });
+  }
+  function spotsOf(n, list) {
+    const e = ev[n], s = state[n], z = e.z, out = new Map(), lane = LANE_INDEX[z];
+    let anchor = [500, 500];
+    if (lane !== undefined && s.phase === 'lane' && list.length <= 5) {
+      /* sur une voie : chacun reste de son côté de la ligne de front, là où il se tient d'habitude, un pas plus près */
+      const f = s.front[lane];
+      anchor = laneAt(lane, f);
+      const lanePos = (i) => {
+        const d = dutyOf(i % 5, s), sg = i < 5 ? -1 : 1;
+        if (d && d.lane === lane) return [f + sg * (d.back - 6), d.lat];
+        return null;
+      };
+      if (e.k === 'gank') {
+        const j = list[0], victim = list[2], vp = lanePos(victim) || [f + (victim < 5 ? -44 : 44), 0], sv = victim < 5 ? -1 : 1;
+        for (const i of list) {
+          const p = lanePos(i);
+          if (p) out.set(i, laneAt(lane, p[0], p[1]));
+        }
+        /* le jungler surgit du côté de la rivière, sur le flanc de sa cible ; en cas de contre-gank, l'autre jungler couvre la retraite */
+        out.set(j, laneAt(lane, vp[0] + sv * 12, vp[1] + INSIDE[lane] * 64));
+        if (list[3] !== undefined) out.set(list[3], laneAt(lane, vp[0] + sv * 62, vp[1] + INSIDE[lane] * 44));
+      } else {
+        let extra = 0;
+        for (const i of list) {
+          const p = lanePos(i);
+          if (p) out.set(i, laneAt(lane, p[0], p[1]));
+          else { out.set(i, laneAt(lane, f + (i < 5 ? -1 : 1) * (70 + extra * 30), INSIDE[lane] * 50)); extra++; }
+        }
+      }
+    } else if (lane !== undefined) {
+      anchor = laneAt(lane, s.front[lane]);
+      faceOff(out, list, anchor, laneDir(lane, s.front[lane]));
+    } else if (z === 'drake' || z === 'baron') {
+      const pit = PIT[z], door = z === 'drake' ? NODE.r6 : NODE.r3;
+      const sides = [list.filter((i) => i < 5), list.filter((i) => i >= 5)];
+      if (!sides[0].length || !sides[1].length || e.k === 'grubs') {
+        /* objectif pris sans combat (ou larves partagées) : l'équipe qui prend est dans la fosse */
+        const taker = e.s >= 0 ? e.s : sides[0].length ? 0 : 1;
+        anchor = pit;
+        aroundPit(out, sides[taker], pit, door);
+        sides[1 - taker].forEach((i, k) => out.set(i, [door[0] + (taker ? -1 : 1) * U[0] * (96 + k * 40), door[1] + (taker ? -1 : 1) * U[1] * (96 + k * 40)]));
+      } else {
+        anchor = door;
+        faceOff(out, list, door, U, 46, 62);
+      }
+    } else if (z.slice(0, 2) === 'tw') {
+      const def = Number(z[2]), l = Number(z[3]), att = 1 - def;
+      /* le bâtiment qui vient de tomber, ou celui qui est attaqué */
+      const k = clamp(e.st ? e.st[def][l] - 1 : s.lost[def][l], 0, 3);
+      anchor = STRUCT[def][l][k];
+      const d = (def ? 1 : -1) * STRUCT_D[l][k], sg = att ? 1 : -1;
+      const group = list.filter((i) => (i < 5 ? 0 : 1) === att), guards = list.filter((i) => (i < 5 ? 0 : 1) === def);
+      group.forEach((i, j) => out.set(i, laneAt(l, d + sg * (66 + (j % 2) * 32), (j - (group.length - 1) / 2) * 44)));
+      guards.forEach((i, j) => out.set(i, laneAt(l, d - sg * (48 + (j % 2) * 30), (j - (guards.length - 1) / 2) * 44)));
+    } else if (z === 'base0' || z === 'base1') {
+      const def = Number(z[4]);
+      if (e.k === 'nexus') {
+        /* les vainqueurs autour du Nexus qui explose */
+        const c = NEXUS[def], o = def ? [-0.7071, 0.7071] : [0.7071, -0.7071];
+        anchor = c;
+        list.forEach((i, k) => { const across = (k - (list.length - 1) / 2) * 50; out.set(i, [c[0] + o[0] * (78 + (k % 2) * 26) - o[1] * across, c[1] + o[1] * (78 + (k % 2) * 26) + o[0] * across]); });
+      } else {
+        anchor = def ? [830, 170] : [170, 830];
+        faceOff(out, list, anchor, U, 44, 58);
+      }
+    } else {
+      /* dans la rivière ou dans la jungle : du côté du prochain objectif */
+      const low = s.obj === 'bot';
+      anchor = z === 'river' ? (low ? NODE.r5 : NODE.r4) : z === 'jg0' ? (low ? [520, 716] : [300, 520]) : z === 'jg1' ? (low ? [700, 480] : [480, 284]) : [500, 500];
+      faceOff(out, list, anchor, U);
+    }
+    /* une rangée qui déborderait de la carte (voie collée au bord) est ramenée d'un bloc vers l'intérieur */
+    for (const side of [0, 1]) {
+      const group = [...out.keys()].filter((i) => (i < 5 ? 0 : 1) === side);
+      if (!group.length) continue;
+      const xs = group.map((i) => out.get(i)[0]), ys = group.map((i) => out.get(i)[1]);
+      const dx = Math.max(0, 48 - Math.min(...xs)) - Math.max(0, Math.max(...xs) - 952), dy = Math.max(0, 48 - Math.min(...ys)) - Math.max(0, Math.max(...ys) - 952);
+      if (dx || dy) for (const i of group) { const p = out.get(i); out.set(i, [p[0] + dx, p[1] + dy]); }
+    }
+    /* deux joueurs ne se tiennent jamais l'un sur l'autre : on les écarte un peu s'il le faut */
+    const ids = [...out.keys()];
+    for (let pass = 0; pass < 8; pass++) {
+      let moved = false;
+      for (let x = 0; x < ids.length; x++) for (let y = x + 1; y < ids.length; y++) {
+        const p = out.get(ids[x]), q = out.get(ids[y]), d = dist(p, q);
+        if (d >= 54) continue;
+        const ux = d > 0.5 ? (q[0] - p[0]) / d : 0.7071, uy = d > 0.5 ? (q[1] - p[1]) / d : 0.7071, push = (56 - d) / 2;
+        out.set(ids[x], [p[0] - ux * push, p[1] - uy * push]);
+        out.set(ids[y], [q[0] + ux * push, q[1] + uy * push]);
+        moved = true;
+      }
+      if (!moved) break;
+    }
+    for (const [i, p] of out) out.set(i, [clamp(p[0], 40, 960), clamp(p[1], 40, 960)]);
+    return { anchor, spots: out };
+  }
+  const OBJECTIVE = { dragon: 1, elder: 1, baron: 1, herald: 1, grubs: 1 };
+  function marginOf(e, i, n) {
+    const role = i % 5, lane = LANE_INDEX[e.z];
+    if (e.k === 'gank') return role === 1 ? 70 : 260;
+    if (lane !== undefined && state[n].phase === 'lane') return role === 1 ? 120 : 280;
+    if (OBJECTIVE[e.k]) return role === 1 ? 1350 : role === 4 ? 1050 : 420 + role * 110;
+    if (e.k === 'kill') return e.kills.length && e.kills[0][1] === i ? 800 : 90 + role * 40;
+    if (e.z.slice(0, 2) === 'tw') return 320 + role * 70;
+    return 160 + role * 75;
+  }
+
+  for (let n = 0; n < N; n++) {
+    const e = ev[n], a = at[n];
+    let list;
+    if (e.who.length) {
+      /* le serveur ne tient pas le compte des temps de mort : un joueur encore mort ne vient que s'il prend part aux éliminations */
+      const involved = new Set();
+      for (const k of e.kills) { involved.add(k[0]); involved.add(k[1]); for (const h of k[2]) involved.add(h); }
+      list = [...new Set(e.who)].filter((i) => aliveAt(i, a.tau - 500) || involved.has(i));
+    }
+    else if (e.k === 'nexus') list = (casts[n - 1] || []).filter((i) => (i < 5 ? 0 : 1) === e.s && aliveAt(i, a.tau));
+    else if (e.z.slice(0, 2) === 'tw') list = towerCast(n);
+    else list = [];
+    const { anchor, spots } = spotsOf(n, list);
+    /* un joueur que le serveur fait jouer alors qu'il serait encore mort revient un peu plus tôt */
+    for (const i of list) {
+      if (deadUntil[i] > 0 && deadUntil[i] > a.tau - needFrom(i, spots.get(i))) {
+        const d = deaths[i][deaths[i].length - 1];
+        deadUntil[i] = Math.max(deathAt[i] + 600, Math.min(deadUntil[i], a.tau - needFrom(i, spots.get(i))));
+        if (d) d[1] = deadUntil[i];
+      }
+    }
+    anchors.push(anchor); casts.push(list);
+    const victims = new Map();
+    e.kills.forEach((k, j) => { if (!victims.has(k[1])) victims.set(k[1], a.kills[j]); });
+    for (const i of list) appts[i].push({ n, spot: spots.get(i), margin: marginOf(e, i, n), dies: victims.get(i) });
+    for (const [v, when] of victims) {
+      /* temps de mort : une dizaine de secondes en début de partie, près d'une minute à la fin */
+      const back = Math.max(when + 1000, tauOfGame(e.t + 9 + (e.t / 60) * 1.5));
+      deathAt[v] = when; deadUntil[v] = back;
+      deaths[v].push([when, back]);
+      /* une victime que le serveur ne citait pas parmi les présents meurt là où elle se trouve : rare, on l'y convoque quand même */
+      if (!list.includes(v)) appts[v].push({ n, spot: null, margin: 0, dies: when });
+    }
+    if (e.k === 'baron' && e.s >= 0) baronUntil[e.s] = e.t + 180;
+    /* le perdant d'un duel de voie rentre à la base */
+    if (e.k === 'duel' && LANE_INDEX[e.z] !== undefined && e.s >= 0 && list.length >= 2) {
+      const loser = list.find((i) => (i < 5 ? 0 : 1) !== e.s);
+      const mine = appts[loser] && appts[loser][appts[loser].length - 1];
+      if (mine && mine.n === n) mine.recall = true;
+    }
+  }
+
+  /* ---------- 4. les camps : qui les a tués, et quand ils reviennent ---------- */
+  const campDown = new Map(CAMPS.map((c) => [c.id, []]));
+  const campSpawn = new Map(CAMPS.map((c) => [c.id, tauOfGame(c.spawn)]));
+  const campReady = (c, x, hold) => {
+    /* instant à partir duquel le camp est debout pour ce passage ; Infinity s'il est pris par l'autre jungler */
+    let start = Math.max(x, campSpawn.get(c.id));
+    for (const [d0, d1] of [...campDown.get(c.id)].sort((a, b) => a[0] - b[0])) {
+      if (start + hold <= d0 - 250) {
+        /* on passerait avant l'autre jungler : il faut que le camp ait le temps de revenir pour lui */
+        if (tauOfGame(gameAt(start + hold) + c.respawn) > d0 - 1100) return Infinity;
+        break;
+      }
+      start = Math.max(start, d1);
+    }
+    return start;
+  };
+
+  /* ---------- 5. le trajet de chaque joueur ---------- */
+  const tracks = [];
+  const stats = { camps: [0, 0], rushes: 0, late: 0, recalls: 0 };
+  for (let i = 0; i < 10; i++) {
+    const side = i < 5 ? 0 : 1, role = i % 5, sg = side ? 1 : -1, home = fountainSpot(i);
+    const keys = [{ t: 0, x: home[0], y: home[1], k: 'h' }];
+    const cur = { t: 0, p: home };
+    /* chacun a son allure, pour que deux joueurs qui font le même chemin ne se superposent pas */
+    const pace = 0.93 + rnd() * 0.14;
+    let queue = [], cleared = 0, lastHover = null, opened = false;
+    const push = (t, p, k = 'h') => { keys.push({ t, x: p[0], y: p[1], k }); cur.t = t; cur.p = p; };
+    const kind = (k) => { keys[keys.length - 1].k = k; };
+    const stay = (until, k = 'h') => { if (until > cur.t + 1) { kind(k); push(until, cur.p); } };
+    const walkPath = (path, speed, k = 'w') => {
+      kind(k);
+      let t = cur.t;
+      for (let j = 1; j < path.length; j++) { t += dist(path[j - 1], path[j]) / speed; push(t, path[j], k); }
+      kind('h');
+    };
+    const jump = (p) => push(cur.t, p);
+    const sOf = (x) => state[Math.min(N, indexAt(x) + (N && x >= at[N - 1].end ? 1 : 0))];
+
+    /* --- jungle : la meilleure suite de camps d'ici le prochain rendez-vous --- */
+    function planCamps(deadline, target) {
+      const mine = CAMPS_OF[side], between = CAMP_PATHS[side];
+      const fromHere = mine.map((c) => routeLen(cur.p, c.p));
+      const toTarget = target ? mine.map((c) => routeLen(c.p, target)) : null;
+      const late = sOf(cur.t).phase === 'late', group = late ? dutySpot(i, sOf(cur.t)) : null;
+      /* le tout premier camp de la partie est un buff, comme dans une vraie partie */
+      const buffFirst = !opened;
+      let best = null;
+      const seq = [];
+      const walk = (k, t, walked) => {
+        const len = seq.length;
+        if (len) {
+          const last = seq[len - 1];
+          const cost = walked + (toTarget ? toTarget[last] * 0.6 : 0);
+          if (!best || len > best.seq.length || (len === best.seq.length && cost < best.cost)) best = { seq: seq.slice(), cost };
+        }
+        if (len >= 6) return;
+        const cands = [];
+        for (let c = 0; c < mine.length; c++) {
+          if (seq.includes(c)) continue;
+          const camp = mine[c], d = k < 0 ? fromHere[c] : between[k][c];
+          if (buffFirst && !len && camp.kind !== 'blue' && camp.kind !== 'red') continue;
+          /* en fin de partie, le jungler ne s'éloigne plus de son équipe */
+          if (group && dist(camp.p, group) > 330) continue;
+          let arrive = t + d / V;
+          const ready = campReady(camp, arrive, camp.hold);
+          if (ready > arrive + 700) continue;
+          arrive = Math.max(arrive, ready);
+          const end = arrive + camp.hold;
+          if (end + (toTarget ? toTarget[c] / VFAST : 0) > deadline - 120) continue;
+          cands.push([d, c, end]);
+        }
+        /* on ne regarde que les quatre camps les plus proches : un jungler ne traverse pas la carte pour un camp */
+        cands.sort((x, y) => x[0] - y[0]);
+        for (const [d, c, end] of cands.slice(0, 4)) {
+          seq.push(c);
+          walk(c, end, walked + d);
+          seq.pop();
+        }
+      };
+      walk(-1, cur.t, 0);
+      queue = best ? best.seq.map((c) => mine[c]) : [];
+      if (queue.length) opened = true;
+    }
+    function jungleAction(deadline, target) {
+      if (!queue.length) planCamps(deadline, target);
+      const camp = queue.shift();
+      if (camp) {
+        /* il se place à côté du camp, du côté d'où il arrive */
+        const path = route(cur.p, camp.p), from = path[path.length - 2] || cur.p, len = dist(from, camp.p) || 1;
+        const stand = len < 40 ? cur.p : [camp.p[0] + ((from[0] - camp.p[0]) / len) * 36, camp.p[1] + ((from[1] - camp.p[1]) / len) * 36];
+        const arrive = cur.t + routeLen(cur.p, stand) / V;
+        const ready = campReady(camp, arrive, camp.hold);
+        if (ready === Infinity) { queue = []; return null; }
+        return {
+          p: stand, speed: V, until: ready, dwell: camp.hold, kind: 'c', camp: camp.id,
+          done: (t) => { campDown.get(camp.id).push([t, tauOfGame(gameAt(t) + camp.respawn), i]); cleared++; stats.camps[side]++; },
+        };
+      }
+      const s = sOf(cur.t);
+      if (s.phase === 'late') { const p = dutySpot(i, s); return { p: [p[0] + rand(-12, 12), p[1] + rand(-12, 12)], speed: dist(cur.p, p) > 70 ? V : VSLOW, dwell: rand(500, 1000), kind: 'h' }; }
+      /* plus rien à tuer : retour à la base après un tour complet de jungle, sinon il surveille une voie depuis un buisson */
+      if (cleared >= 5 && deadline - cur.t > 3200) {
+        return { recall: true, cost: 700 + 300 };
+      }
+      const low = s.obj === 'bot';
+      /* (la jungle rouge est le reflet de la bleue : ses sentiers du bas portent les noms de ceux du haut) */
+      const names = low !== !!side ? ['g9', 'g8', 'ub', 'g7', 'g3'] : ['g5', 'g4', 'tb', 'g1', 'g3'];
+      const spots = names.map((k) => NODE[k + side]).concat(low ? [NODE.r5, NODE.r6] : [NODE.r4, NODE.r3]).filter((p) => !lastHover || dist(p, lastHover) > 60);
+      const p = spots.map((q) => [routeLen(cur.p, q) + rand(0, 160), q]).sort((a, b) => a[0] - b[0])[0][1];
+      lastHover = p;
+      return { p, speed: V * 0.9, dwell: rand(800, 1400), kind: 'h' };
+    }
+    /* --- voie : de petits pas autour de sa place, de temps en temps une balise posée dans la rivière --- */
+    function laneAction(duty, s) {
+      const f = s.front[duty.lane];
+      if (role === 4 && s.phase !== 'late' && s.t0 > 280 && rnd() < (s.phase === 'lane' ? 0.13 : 0.3)) {
+        const low = s.phase === 'lane' ? true : s.obj === 'bot';
+        const p = pick(low ? [NODE.r7, NODE.r8, NODE.r6, NODE[(side ? 'tb' : 'ub') + side]] : [NODE.r2, NODE.r3, NODE.r4, NODE[(side ? 'ub' : 'tb') + side]]);
+        if (routeLen(cur.p, p) < 420) return { p: [p[0] + rand(-10, 10), p[1] + rand(-10, 10)], speed: V, dwell: rand(450, 700), kind: 'h' };
+      }
+      const p = laneAt(duty.lane, f + sg * (duty.back + rand(-15, 15)), duty.lat + rand(-9, 9));
+      const far = dist(cur.p, p) > 60;
+      return { p, speed: far ? V : VSLOW, dwell: far ? rand(150, 350) : rand(450, 1050), kind: 'h' };
+    }
+    function nextAction(deadline, target) {
+      const s = sOf(cur.t), duty = dutyOf(role, s);
+      return duty ? laneAction(duty, s) : jungleAction(deadline, target);
+    }
+    /** Rentrer à la base : une incantation sur place, puis le joueur réapparaît à la fontaine. */
+    function recall() {
+      stay(cur.t + 450, 'r');
+      stay(cur.t + 250, 'g');
+      jump(home);
+      stay(cur.t + 300, 'h');
+      cleared = 0;
+      stats.recalls++;
+    }
+    /** Occupe le joueur jusqu'à « deadline », où il doit se trouver à « target » (ou n'importe où si target est nul). */
+    function routine(deadline, target, sneak) {
+      queue = [];
+      for (let guard = 0; guard < 600 && cur.t < deadline - 150; guard++) {
+        const act = nextAction(deadline, target);
+        if (!act) break;
+        if (act.recall) {
+          if (cur.t + act.cost + (target ? routeLen(home, target) / VFAST : 0) > deadline - 100) break;
+          recall();
+          continue;
+        }
+        const speed = act.speed * (act.speed === V ? pace : 1);
+        const path = route(cur.p, act.p), w = pathLen(path) / speed;
+        const back = target ? routeLen(act.p, target) / VFAST : 0;
+        if (Math.max(cur.t + w, act.until || 0) + act.dwell + back > deadline) { queue = []; break; }
+        walkPath(path, speed);
+        /* le camp n'est pas encore revenu : il l'attend */
+        if (act.until) stay(act.until, 'h');
+        stay(cur.t + act.dwell, act.kind);
+        if (act.done) act.done(cur.t);
+      }
+      if (!target) { stay(deadline, 'h'); return; }
+      const path = route(cur.p, target), len = pathLen(path), left = deadline - cur.t;
+      if (len < 2) { stay(deadline, 'h'); return; }
+      /* un gank : le jungler attend caché au dernier tournant, puis fonce */
+      if (sneak && path.length > 2) {
+        const last = dist(path[path.length - 2], path[path.length - 1]), dash = last / VRUSH;
+        const before = path.slice(0, -1), lenBefore = pathLen(before);
+        if (last > 50 && lenBefore / V + 380 + dash <= left) {
+          stay(deadline - dash - 380 - lenBefore / V, 'h');
+          walkPath(before, V);
+          stay(deadline - dash, 'h');
+          walkPath([cur.p, target], VRUSH, 'd');
+          return;
+        }
+      }
+      if (len / V <= left) { stay(deadline - len / V, 'h'); walkPath(path, V); return; }
+      /* il faut presser le pas */
+      const speed = Math.min(VMAX, len / Math.max(1, left));
+      if (speed > VRUSH) stats.rushes++;
+      if (speed >= VMAX) stats.late++;
+      walkPath(path, speed, speed > VFAST ? 'd' : 'w');
+    }
+
+    /* au coup d'envoi, les joueurs ne quittent pas la fontaine tous au même instant */
+    stay(60 + role * 70 + rnd() * 260, 'h');
+    for (const A of appts[i]) {
+      const a = at[A.n], e = ev[A.n];
+      if (A.spot) {
+        /* il arrive en avance de « margin » ; s'il vient de loin, il a jusqu'au début de l'événement */
+        const soonest = cur.t + routeLen(cur.p, A.spot) / VFAST;
+        routine(Math.max(cur.t, Math.min(a.tau, Math.max(a.tau - A.margin, soonest))), A.spot, e.k === 'gank' && role === 1);
+      } else routine(Math.max(cur.t, a.tau), null, false);
+      stay(a.tau, 'h');
+      if (A.dies !== undefined) {
+        const d = deaths[i].find((x) => x[0] === A.dies);
+        stay(A.dies, 'f');
+        kind('x');
+        push(d ? d[1] : A.dies + 1500, cur.p);
+        jump(home);
+        cleared = 0;
+        continue;
+      }
+      stay(a.end, 'f');
+      if (A.recall) {
+        const next = appts[i][appts[i].indexOf(A) + 1];
+        if (!next || !next.spot || cur.t + 1000 + routeLen(home, next.spot) / VFAST < at[next.n].tau - next.margin) recall();
+      }
+    }
+    routine(total, null, false);
+    tracks.push(keys);
+  }
+
+  return { total, at, anchors, casts, tracks, deaths, camps: CAMPS.map((c) => ({ id: c.id, p: c.p, side: c.side, kind: c.kind, hold: c.hold, down: campDown.get(c.id) })), gameAt, tauOfGame, stats };
+}
+
+/** Où se trouve un joueur à l'instant tau : { x, y, k } (k : ce qu'il fait — w marche, d court, h attend, f combat, c tue un camp, r rentre, g parti, x mort). */
+export function sample(keys, tau, hint = 0) {
+  let j = hint;
+  if (j >= keys.length || keys[j].t > tau) j = 0;
+  while (j + 1 < keys.length && keys[j + 1].t <= tau) j++;
+  const a = keys[j], b = keys[j + 1];
+  if (!b || b.t <= a.t) return { x: a.x, y: a.y, k: a.k, j };
+  const part = clamp((tau - a.t) / (b.t - a.t), 0, 1);
+  return { x: a.x + (b.x - a.x) * part, y: a.y + (b.y - a.y) * part, k: a.k, j };
+}

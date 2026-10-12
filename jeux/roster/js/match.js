@@ -3,6 +3,7 @@
 import { cardHTML, esc, iconUrl } from './cards.js';
 import { DDRAGON, ROLE_LABEL, STORE } from './config.js';
 import { createFx } from './fx.js';
+import { CAMPS, KILL_GAP, NEXUS, NEXUS_TOWERS, PIT, SHOW_LEAD, STRUCT, TRAILS, planMoves, sample } from './moves.js';
 import { ROLES, signed } from './rules.js';
 import { setSound, sfx, soundOn } from './sound.js';
 
@@ -14,44 +15,8 @@ const SIDE_COLORS = [['#4ea3ff', '#bfe0ff', '#ffffff'], ['#f0586a', '#ffc2c9', '
 const GOLD = ['#f0e6d2', '#c8aa6e', '#ffe7a8', '#ffffff'];
 const STREAK = ['', '', 'Doublé', 'Triplé', 'Quadruplé', 'Pentakill'];
 
-/* ---------- la carte : un carré de 1000 de côté, base bleue en bas à gauche, base rouge en haut à droite ---------- */
-const mirror = (p) => [1000 - p[0], 1000 - p[1]];
-/* bâtiments bleus de chaque voie (haut, milieu, bas) : tour extérieure, intérieure, d'inhibiteur, puis l'inhibiteur */
-const BLUE = [
-  [[92, 300], [92, 530], [92, 690], [92, 768]],
-  [[415, 585], [335, 665], [262, 738], [218, 782]],
-  [[700, 908], [470, 908], [310, 908], [232, 908]],
-];
-/* la carte est symétrique : la voie du haut des rouges est le reflet de la voie du bas des bleus */
-const STRUCT = [BLUE, [BLUE[2].map(mirror), BLUE[1].map(mirror), BLUE[0].map(mirror)]];
-const NEXUS_TOWERS = [[[126, 840], [160, 874]], [[874, 160], [840, 126]]];
-const NEXUS = [[96, 904], [904, 96]];
-const FOUNTAIN = [[50, 950], [950, 50]];
-const PIT = { drake: [650, 708], baron: [350, 292] };
-const ZONE = { top: [128, 128], mid: [500, 500], bot: [872, 872], drake: PIT.drake, baron: PIT.baron, base0: [170, 830], base1: [830, 170] };
-/* phase de lane : place de chaque joueur, [bleu, rouge], pour TOP, JGL, MID, ADC, SUP */
-const LANE_HOME = [
-  [[95, 226], [226, 95]],
-  [[290, 570], [710, 430]],
-  [[462, 538], [538, 462]],
-  [[734, 906], [906, 734]],
-  [[826, 878], [878, 826]],
-];
-/* après la phase de lane, le gros de l'équipe bleue tient le milieu, là où en sont les tours (shift : avancée vers la base rouge) */
-function bluePost(role, t, shift) {
-  const a0 = shift - 72;
-  const ab = role === 2 ? [a0, 0] : role === 1 ? [a0 - 22, -86] : role === 4 ? [a0 - 12, 82] : role === 3 ? [a0 - 78, 32] : t > 1500 ? [a0 - 74, -46] : null;
-  if (!ab) return [95, 330];
-  return [500 + 0.707 * (ab[0] + ab[1]), 500 + 0.707 * (ab[1] - ab[0])];
-}
-function homeOf(i, t, lost) {
-  const side = i < 5 ? 0 : 1, role = i % 5;
-  if (t < 840) return LANE_HOME[role][side];
-  const shift = clamp(lost[1][1] - lost[0][1], -2, 2) * 52;
-  if (side === 0) return bluePost(role, t, shift);
-  /* les toplaners se font face sur la même voie tant que les équipes ne se regroupent pas */
-  return role === 0 && t <= 1500 ? [330, 95] : mirror(bluePost(role, t, -shift));
-}
+/* La carte est un carré de 1000 de côté, base bleue en bas à gauche, base rouge en haut à droite.
+   Sa géométrie (bâtiments, fosses, camps, sentiers) et les trajets des joueurs sont dans moves.js. */
 
 function mapSVG() {
   const lanes = ['M92 868V162Q92 92 162 92H868', 'M152 848 848 152', 'M132 908H838Q908 908 908 838V132'];
@@ -64,11 +29,14 @@ function mapSVG() {
     + '<pattern id="mvHatch" width="16" height="16" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="1.5" height="16" fill="#c8aa6e" fill-opacity=".055"/></pattern></defs>'
     + '<rect class="m-ground" width="1000" height="1000"/><rect width="1000" height="1000" fill="url(#mvHatch)"/>'
     + '<rect x="0" y="640" width="360" height="360" fill="url(#mvBase0)"/><rect x="640" y="0" width="360" height="360" fill="url(#mvBase1)"/>'
+    /* les sentiers de la jungle, sous la rivière et les voies */
+    + '<path class="m-trail" d="' + TRAILS.map(([a, b]) => 'M' + a[0] + ' ' + a[1] + 'L' + b[0] + ' ' + b[1]).join('') + '"/>'
     + '<path class="m-river" d="M168 212C300 310 430 430 500 500S700 690 832 788"/><path class="m-river-line" d="M168 212C300 310 430 430 500 500S700 690 832 788"/>'
     + lanes.map((d) => '<path class="m-lane" d="' + d + '"/>').join('') + lanes.map((d) => '<path class="m-lane-line" d="' + d + '"/>').join('')
-    /* les bases, et les quatre camps de la jungle qui donnent un bonus (bleu, rouge) */
+    /* les bases, puis les camps de la jungle : les deux buffs de chaque équipe (grands losanges), les petits camps, les crabes de la rivière */
     + '<path class="m-base s0" d="M0 700A300 300 0 0 1 300 1000"/><path class="m-base s1" d="M700 0A300 300 0 0 0 1000 300"/>'
-    + [[255, 462, 'b'], [540, 742, 'r'], [745, 538, 'b'], [460, 258, 'r']].map((c) => '<path class="m-camp ' + c[2] + '" d="' + diamond(c, 13) + '"/>').join('')
+    + CAMPS.map((c) => (c.kind === 'crab' ? '<circle class="m-camp crab" data-camp="' + c.id + '" cx="' + c.p[0] + '" cy="' + c.p[1] + '" r="10"/>'
+      : '<path class="m-camp ' + c.kind + '" data-camp="' + c.id + '" d="' + diamond(c.p, c.kind === 'camp' ? 10 : 15) + '"/>')).join('')
     + pit('baron', 'i-baron') + pit('drake', 'i-drake');
   for (const side of [0, 1]) {
     STRUCT[side].forEach((lane, l) => lane.forEach((p, k) => {
@@ -158,7 +126,12 @@ export function runMatch({ data, cat, fx }) {
   try { speed = Number(localStorage.getItem(STORE + 'vitesse')) || 1; } catch (e) { speed = 1; }
   if (![1, 2, 4].includes(speed)) speed = 1;
   let clockT = 0, lost = [[0, 0, 0, 0], [0, 0, 0, 0]];
-  const pos = P.map(() => [500, 500]), kda = P.map(() => ({ k: 0, d: 0, a: 0 })), deadUntil = P.map(() => 0), score = [0, 0];
+  const pos = P.map(() => [500, 500]), kda = P.map(() => ({ k: 0, d: 0, a: 0 })), score = [0, 0];
+  /* Les déplacements de toute la partie sont calculés d'avance (moves.js). tau : l'instant affiché, en millisecondes à vitesse ×1. */
+  const plan = planMoves(sim);
+  let tau = 0, lastDraw = 0;
+  const cursor = P.map(() => 0), shown = P.map(() => null), look = P.map(() => '?');
+  const campEls = plan.camps.map((c) => root.querySelector('[data-camp="' + c.id + '"]')), campLook = plan.camps.map(() => '?');
   const stage = (name) => { root.dataset.stage = name; };
   const pop = (node) => { node.classList.remove('pop'); void node.offsetWidth; node.classList.add('pop'); };
   const set = (key, value) => { const n = H[key], v = String(value); if (n.textContent !== v) { n.textContent = v; pop(n); } };
@@ -184,62 +157,58 @@ export function runMatch({ data, cat, fx }) {
   const stopped = (mine) => closed || skipped || mine !== run;
 
   /* ---------- pions ---------- */
-  function moveTo(i, x, y) {
-    pos[i] = [clamp(x, 40, 960), clamp(y, 40, 960)];
-    tokens[i].style.left = pos[i][0] / 10 + '%';
-    tokens[i].style.top = pos[i][1] / 10 + '%';
-  }
   function setDead(i, dead) {
     tokens[i].classList.toggle('dead', dead);
     if (!dead) tokens[i].classList.remove('away');
     rows[i].classList.toggle('dead', dead);
   }
-  function goHome(i, jitter) {
-    if (deadUntil[i] && deadUntil[i] > clockT) { const f = FOUNTAIN[i < 5 ? 0 : 1]; tokens[i].classList.add('away'); moveTo(i, f[0] + (i % 5 - 2) * 9, f[1] + (i % 5 - 2) * 9); return; }
-    const h = homeOf(i, clockT, lost), j = jitter ? 8 : 0;
-    moveTo(i, h[0] + (Math.random() * 2 - 1) * j, h[1] + (Math.random() * 2 - 1) * j);
-  }
-  /* les morts reviennent à la vie quand leur délai est écoulé ; les autres bougent un peu, pour que la carte vive */
-  function idle() {
-    P.forEach((p, i) => {
-      if (deadUntil[i] && deadUntil[i] <= clockT) { deadUntil[i] = 0; setDead(i, false); }
-      goHome(i, fx);
+  /* léger balancement d'un joueur qui attend (h), combat (f) ou tue un camp (c) : [ampleur, période]. La carte vit, même quand personne ne marche. */
+  const SWAY = { h: [2.2, 520], f: [6.5, 150], c: [4.5, 190] };
+  /** Place les dix pions là où ils se trouvent à l'instant tau. snap : sans adoucir le mouvement (départ, saut dans le temps). */
+  function draw(snap) {
+    const now = performance.now(), dt = Math.min(120, Math.max(0, now - lastDraw));
+    lastDraw = now;
+    /* les pions suivent leur trajet avec un très léger retard, qui arrondit les virages */
+    const ease = 1 - Math.exp((-dt * speed) / 70);
+    const slow = root.classList.contains('slow');
+    for (let i = 0; i < 10; i++) {
+      const s = sample(plan.tracks[i], tau, cursor[i]);
+      cursor[i] = s.j;
+      const sw = SWAY[s.k];
+      let x = s.x, y = s.y;
+      if (sw) { x += Math.sin(tau / sw[1] + i * 1.9) * sw[0]; y += Math.cos(tau / (sw[1] * 1.17) + i * 2.6) * sw[0]; }
+      const was = shown[i];
+      /* un retour à la base ou une réapparition : le pion change de place d'un coup */
+      if (!was || snap || Math.hypot(x - was[0], y - was[1]) > 240) shown[i] = [x, y];
+      else shown[i] = [was[0] + (x - was[0]) * ease, was[1] + (y - was[1]) * ease];
+      pos[i] = shown[i];
+      tokens[i].style.left = (shown[i][0] / 10).toFixed(2) + '%';
+      tokens[i].style.top = (shown[i][1] / 10).toFixed(2) + '%';
+      /* pendant un ralenti, c'est la mise en scène qui dit qui est debout */
+      if (slow) continue;
+      const dead = s.k === 'x', back = s.k === 'g', away = back || (dead && tau - plan.tracks[i][s.j].t > 900);
+      const sig = (dead ? 'x' : '') + (away ? 'a' : '') + (back ? 'g' : '') + (s.k === 'r' ? 'r' : '');
+      if (sig !== look[i]) {
+        look[i] = sig;
+        tokens[i].classList.toggle('dead', dead);
+        tokens[i].classList.toggle('away', away);
+        tokens[i].classList.toggle('back', back);
+        tokens[i].classList.toggle('recall', s.k === 'r');
+        rows[i].classList.toggle('dead', dead);
+      }
+    }
+    /* les camps de la jungle : attaqués, tués, puis de retour */
+    plan.camps.forEach((c, k) => {
+      let sig = '';
+      for (const d of c.down) { if (tau >= d[0] - c.hold && tau < d[0]) sig = ' hit'; else if (tau >= d[0] && tau < d[1]) sig = ' down'; }
+      if (sig !== campLook[k]) { campLook[k] = sig; campEls[k].setAttribute('class', 'm-camp ' + c.kind + sig); }
     });
   }
-  /** Où se passe un événement. */
-  function anchor(ev, n) {
-    const z = ev.z;
-    if (ZONE[z]) return ZONE[z];
-    if (z === 'river') return n % 2 ? [588, 592] : [412, 408];
-    if (z === 'jg0') return n % 2 ? [300, 520] : [540, 745];
-    if (z === 'jg1') return n % 2 ? [700, 480] : [460, 255];
-    if (z.slice(0, 2) === 'tw') {
-      const def = Number(z[2]), lane = Number(z[3]);
-      /* le bâtiment qui vient de tomber, ou celui qui est attaqué */
-      const k = ev.st ? ev.st[def][lane] - 1 : lost[def][lane];
-      return STRUCT[def][lane][clamp(k, 0, 3)];
-    }
-    return [500, 500];
-  }
-  /** Les joueurs présents. Pour une tour, le serveur ne les cite pas : on envoie ceux qui tiennent la voie. */
-  function castOf(ev) {
-    if (ev.who.length || ev.z.slice(0, 2) !== 'tw') return ev.who;
-    const def = Number(ev.z[2]), lane = Number(ev.z[3]), att = 1 - def;
-    const roles = clockT > 1500 ? [0, 1, 2, 3, 4] : lane === 0 ? [0, 1] : lane === 1 ? [2, 3, 4] : [3, 4];
-    const list = roles.map((r) => att * 5 + r);
-    /* un siège repoussé : les défenseurs sont là aussi */
-    if (ev.k === 'duel') list.push(def * 5 + 2, def * 5 + (lane === 0 ? 0 : 3));
-    return list.filter((i) => !(deadUntil[i] > clockT));
-  }
-  /** Range les joueurs présents de part et d'autre du point d'action : les bleus côté base bleue, les rouges en face. */
-  function place(who, a) {
-    for (const side of [0, 1]) {
-      const group = who.filter((i) => (i < 5 ? 0 : 1) === side), sgn = side === 0 ? -1 : 1;
-      group.forEach((i, k) => {
-        const across = (k - (group.length - 1) / 2) * 64, along = sgn * (group.length > 3 ? 46 + (k % 2) * 36 : 46);
-        moveTo(i, a[0] + 0.707 * (along + across), a[1] + 0.707 * (across - along));
-      });
-    }
+  /** Fait avancer la partie jusqu'à l'instant « to » : l'horloge tourne et chacun suit son trajet. */
+  function advance(to) {
+    const from = tau, span = to - from;
+    if (span <= 0) return Promise.resolve();
+    return nap(span, (part) => { tau = from + span * part; setClock(plan.gameAt(tau)); draw(false); });
   }
   const clientOf = (node) => { const r = node.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; };
   function ping(a, side) {
@@ -323,44 +292,29 @@ export function runMatch({ data, cat, fx }) {
     for (const a of kill[2]) { kda[a].a++; drawKda(a); }
     drawKda(killer); drawKda(victim);
     set('k' + side, score[side]);
-    deadUntil[victim] = clockT + 12 + (clockT / 60) * 1.7;
   }
 
   /* ---------- déroulé ---------- */
-  /** Le temps passe jusqu'au prochain événement : l'horloge tourne, chacun regagne sa place. */
-  async function travel(ev) {
-    const from = clockT, span = ev.t - from;
-    let next = 0;
-    idle();
-    await nap(clamp(span * 62, 1300, 3300), (part) => {
-      setClock(from + span * part);
-      const now = performance.now();
-      if (now > next) { next = now + 1100; idle(); }
-    });
-    setClock(ev.t);
-  }
-  /** Un événement, en direct. */
+  /** Un événement, en direct. Les joueurs concernés sont déjà sur place : ils y sont venus à pied, par leur propre chemin. */
   async function show(ev, n) {
-    const mine = run, a = anchor(ev, n), who = castOf(ev);
-    for (const i of who) { deadUntil[i] = 0; setDead(i, false); }
-    place(who, a);
-    ping(a, ev.s);
+    const mine = run, a = plan.at[n];
+    ping(plan.anchors[n], ev.s);
     say(ev);
     if (ev.k === 'tower' || ev.k === 'inhib') sfx.tower();
     else if (ev.k === 'baron' || ev.k === 'elder') sfx.objective(true);
     else if (ev.k === 'dragon' || ev.k === 'herald' || ev.k === 'grubs') sfx.objective(false);
-    await nap(480);
-    for (const kill of ev.kills) {
+    await advance(a.tau + SHOW_LEAD);
+    for (let j = 0; j < ev.kills.length; j++) {
       if (stopped(mine)) return;
-      strike(kill, false);
-      await nap(250);
+      strike(ev.kills[j], false);
+      await advance(a.kills[j] + KILL_GAP);
     }
     if (stopped(mine)) return;
     if (ev.st) structures(ev.st, false);
     pulsePit(ev);
     if (ev.k === 'nexus') explode(ev);
     hud(ev);
-    await nap(ev.k === 'nexus' ? 1700 : ev.kills.length ? 560 : 760);
+    await advance(a.end);
   }
   function explode(ev) {
     const loser = 1 - ev.s, node = built.get('x' + loser);
@@ -376,7 +330,7 @@ export function runMatch({ data, cat, fx }) {
   }
   /** Le ralenti : la carte se resserre sur l'action, qui est rejouée lentement, élimination par élimination. */
   async function slowmo(ev, n) {
-    const mine = run, a = anchor(ev, n), foot = banner.querySelector('.mv-replay-foot');
+    const mine = run, a = plan.anchors[n], foot = banner.querySelector('.mv-replay-foot');
     skipSlow = false;
     banner.querySelector('b').textContent = ev.hl;
     foot.innerHTML = '<em>Touche pour passer</em>';
@@ -403,6 +357,8 @@ export function runMatch({ data, cat, fx }) {
     mapIn.style.transform = 'translate(0%,0%) scale(1)';
     root.classList.remove('slow');
     for (const kill of ev.kills) setDead(kill[1], true);
+    /* le direct reprend : chaque pion retrouve l'allure que lui donne son trajet */
+    look.fill('?');
     skipSlow = false;
     await nap(520);
   }
@@ -413,7 +369,10 @@ export function runMatch({ data, cat, fx }) {
     built.forEach((node) => node.classList.remove('down'));
     score[0] = 0; score[1] = 0;
     setClock(0);
-    P.forEach((p, i) => { kda[i] = { k: 0, d: 0, a: 0 }; deadUntil[i] = 0; setDead(i, false); drawKda(i); goHome(i, false); });
+    tau = 0;
+    cursor.fill(0); look.fill('?'); campLook.fill('?');
+    P.forEach((p, i) => { kda[i] = { k: 0, d: 0, a: 0 }; setDead(i, false); drawKda(i); });
+    draw(true);
     cast.innerHTML = '<p class="mv-line"><time>0:00</time><span>Bienvenue sur la Faille de l\'invocateur : ' + esc(M.teams[0].name) + ' contre ' + esc(M.teams[1].name) + '.</span></p>';
     hud({ sc: [0, 0], g: [2500, 2500], tw: [0, 0], dr: [0, 0], bn: [0, 0] });
     root.classList.remove('slow');
@@ -431,6 +390,9 @@ export function runMatch({ data, cat, fx }) {
     P.forEach((p, i) => { kda[i] = sim.players[i]; drawKda(i); });
     root.classList.remove('slow');
     mapIn.style.transform = 'translate(0%,0%) scale(1)';
+    tau = plan.total;
+    look.fill('?');
+    draw(true);
   }
   async function playGame() {
     if (playing) return;
@@ -439,8 +401,10 @@ export function runMatch({ data, cat, fx }) {
     stage('game');
     const mine = run;
     for (let n = 0; n < events.length && !stopped(mine); n++) {
-      await travel(events[n]);
+      /* le temps passe jusqu'au prochain événement */
+      await advance(plan.at[n].tau);
       if (stopped(mine)) break;
+      setClock(events[n].t);
       await show(events[n], n);
       if (events[n].hl && fx && !stopped(mine)) await slowmo(events[n], n);
     }

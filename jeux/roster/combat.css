@@ -327,9 +327,17 @@
 .m-base{fill:none;stroke-width:2;opacity:.4}
 .m-base.s0{stroke:var(--s0)}
 .m-base.s1{stroke:var(--s1)}
-.m-camp{fill:#06121f;stroke-width:2;opacity:.7}
-.m-camp.b{stroke:#2bb6c9}
-.m-camp.r{stroke:#c9606b}
+/* la jungle : des sentiers en pointillé, les buffs (grands losanges), les petits camps, les crabes de la rivière */
+.m-trail{fill:none;stroke:rgba(200,170,110,.26);stroke-width:2.5;stroke-dasharray:1 11;stroke-linecap:round}
+.m-camp{fill:#0a1c2e;stroke-width:2.5;transition:opacity .35s,fill .2s}
+.m-camp.blue{stroke:#39c6da}
+.m-camp.red{stroke:#e0707b}
+.m-camp.camp{stroke:#b3a988;stroke-width:2.2}
+.m-camp.crab{stroke:#0ac8b9;stroke-width:2.2}
+/* un camp attaqué clignote, un camp tué s'efface jusqu'à son retour */
+.m-camp.hit{opacity:1;animation:camphit .26s ease-in-out infinite alternate}
+.m-camp.down{opacity:.14}
+@keyframes camphit{to{fill:#f0e6d2}}
 .m-lane{fill:none;stroke:#132a40;stroke-width:58}
 .m-lane-line{fill:none;stroke:rgba(200,170,110,.24);stroke-width:2;stroke-dasharray:3 14}
 .m-river{fill:none;stroke:rgba(10,200,185,.13);stroke-width:74}
@@ -347,7 +355,10 @@
 .m-nexus{stroke:var(--gold-hi)}
 .m-tw.down,.m-inh.down,.m-nexus.down{fill:#16212e;stroke:#2a3442;opacity:.6}
 .tk{--c:var(--s0);position:absolute;z-index:2;width:6.6%;aspect-ratio:1;margin:-3.3% 0 0 -3.3%;border-radius:50%;overflow:hidden;background:#050d18;
-  box-shadow:0 0 0 2px var(--c),0 0 0 3px #010a13,0 2px 8px rgba(0,0,0,.7);transition:left calc(.85s / var(--k,1)) cubic-bezier(.3,.6,.3,1),top calc(.85s / var(--k,1)) cubic-bezier(.3,.6,.3,1),filter .3s,opacity .3s}
+  box-shadow:0 0 0 2px var(--c),0 0 0 3px #010a13,0 2px 8px rgba(0,0,0,.7);transition:filter .3s,opacity .3s}
+/* retour à la base : un anneau se resserre autour du joueur, qui disparaît puis reparaît à sa fontaine */
+.tk.recall{animation:recall .45s linear forwards}
+@keyframes recall{0%{box-shadow:0 0 0 2px var(--c),0 0 0 3px #010a13,0 0 0 16px color-mix(in srgb,var(--c) 0%,transparent)}100%{box-shadow:0 0 0 2px #fff,0 0 0 3px #010a13,0 0 0 5px var(--c)}}
 .tk.s1{--c:var(--s1)}
 .tk img{display:block;width:100%;height:100%;object-fit:cover;transform:scale(1.14)}
 .tk.dead{z-index:1;filter:grayscale(1) brightness(.5);opacity:.55}

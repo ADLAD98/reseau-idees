@@ -1,7 +1,7 @@
 /* Roster — le jeu. Cinq écrans : Packs, Jouer, Collection, Classement, Profil.
    Le serveur décide de tout (cartes tirées, délais, collection, matchs) ; cette page affiche et met en scène. */
 import { ApiError, call, clearSession, deriveKey, loadSession, saveSession } from './api.js';
-import { VARIANTS, cardHTML, champName, esc, flagUrl, iconUrl, prepare, statsOf, tiltCard, variantRank } from './cards.js';
+import { VARIANTS, cardHTML, champName, esc, flagUrl, iconUrl, karmineEra, prepare, statsOf, tiltCard, variantRank } from './cards.js';
 import { GAME_NAME, ROLE_NAME, ROLE_ORDER, STORE } from './config.js';
 import { packHTML, runOpening } from './opening.js';
 import { viewPlay } from './play.js';
@@ -258,7 +258,7 @@ function viewPacks(main) {
   main.innerHTML = '<section class="home"><div class="home-pack" id="packBox">' + packHTML(packReady() ? 'ready' : 'waiting', S.cat.season, S.free.size) + '</div>'
     + '<div class="home-side"><div class="eyebrow">Pack gratuit · toutes les ' + Math.round(S.free.cooldownMs / 60000) + ' minutes</div>'
     + '<h1 class="h1">' + S.free.size + ' cartes à découvrir</h1>'
-    + '<p class="lead">Joueurs et coachs pros de la saison ' + S.cat.season + '. La dernière carte du pack est une carte bonus : rang Titulaire au minimum. Les plus belles cartes existent aussi en version holographique et en full art.</p>'
+    + '<p class="lead">Joueurs et coachs pros de la saison ' + S.cat.season + '. La dernière carte du pack est une carte bonus : rang Titulaire au minimum. Les plus belles cartes existent aussi en version holographique et en full art, et les joueurs passés par la Karmine en édition KC.</p>'
     + '<div id="packAction" data-sig="' + packSig() + '">' + packActionHTML() + '</div>' + progressHTML() + '</div></section>'
     + '<section><h2 class="h2">Dernières cartes obtenues</h2>'
     + (recent.length ? '<div class="row-cards">' + recent.map((c) => tile(c)).join('') + '</div>' : '<p class="empty">Ta collection est vide. Ouvre ton premier pack !</p>')
@@ -483,7 +483,8 @@ function showSheet(id) {
     + '<div><h3 class="h2">Statistiques de la carte</h3><div class="bars">' + statsOf(card).map((s) => '<div title="' + esc(s[3]) + '"><span>' + s[2] + '</span><span class="bar"><i style="width:' + card.stats[s[0]] + '%"></i></span><b>' + card.stats[s[0]] + '</b></div>').join('') + '</div></div>'
     + (facts ? '<div><h3 class="h2">Saison ' + cat.season + (card.kind === 'c' ? ' de son équipe' : ' en chiffres') + '</h3><div class="facts">' + facts + '</div></div>' : '<p class="note">Aucune partie officielle jouée cette saison : la note est celle d\'un remplaçant.</p>')
     + (card.champs && card.champs.length ? '<div><h3 class="h2">Champions fétiches</h3><div class="champs">' + card.champs.map((c) => '<div class="champ"><img src="' + iconUrl(cat, c[0]) + '" alt="" loading="lazy"><div><b>' + esc(champName(cat, c[0])) + '</b><span>' + c[1] + ' parties · ' + pct(c[2], c[1]) + ' %</span></div></div>').join('') + '</div></div>' : '')
-    + (card.variant ? '<p class="note">Version ' + (card.variant === 'holo' ? 'holographique' : 'full art') + ' de la carte de ' + esc(card.name) + ' : même joueur, même note, un autre habillage. Elle sort parfois d\'un pack à la place de la carte ordinaire, et se collectionne à part.</p>' : '')
+    + (card.variant ? '<p class="note">' + (card.variant === 'kc' ? 'Édition Karmine Corp de la carte de ' + esc(card.name) + ' (' + esc(karmineEra(cat, card)) + '), réservée à celles et ceux qui portent ou ont porté ses couleurs'
+      : 'Version ' + (card.variant === 'holo' ? 'holographique' : 'full art') + ' de la carte de ' + esc(card.name)) + ' : même joueur, même note, un autre habillage. Elle sort parfois d\'un pack à la place de la carte ordinaire, et se collectionne à part.</p>' : '')
     + '<p class="note">Note calculée à partir des statistiques officielles de la saison ' + cat.season + ' (ligue, tournois internationaux, palmarès). Données : Leaguepedia.</p>'
     + '</div></div>';
   const close = () => { sheet.remove(); document.removeEventListener('keydown', onKey); document.body.style.overflow = ''; };
@@ -570,6 +571,8 @@ async function viewProfile(main) {
     + '</tbody></table>'
     + (data.variants || []).map((v) => {
       const from = S.cat.tiers.filter((t) => t.id >= v.minTier).map((t) => t.name);
+      /* l'édition KC ne dépend pas du rang : elle concerne les joueurs et les coachs passés par la Karmine */
+      if (v.id === 'kc') return '<p class="hint"><b class="v-kc">' + esc(v.name) + '</b> — ' + show(v.chance) + ' des cartes des joueurs et des coachs passés par la Karmine Corp (' + v.cards + ' cartes) sortent dans cette édition.</p>';
       return '<p class="hint"><b class="v-' + esc(v.id) + '">' + esc(v.name) + '</b> — ' + show(v.chance) + ' des cartes ' + esc(from.slice(0, -1).join(', ') + (from.length > 1 ? ' et ' : '') + from[from.length - 1]) + ' sortent dans cette version.</p>';
     }).join('')
     + '<p class="hint">Les cartes sont tirées au sort par le serveur. Un coach sort moins souvent qu\'un joueur.</p>';

@@ -163,6 +163,8 @@ body.fx .op-rays{animation:turn 46s linear infinite}
 .op-clues img{width:1.6em;height:1.2em;object-fit:cover;box-shadow:0 0 0 1px rgba(240,230,210,.3)}
 .op-clues .v-holo{background:linear-gradient(100deg,#ff9cc6,#ffd88a,#a8ffdc,#9ccfff,#d3b4ff);-webkit-background-clip:text;background-clip:text;color:transparent}
 .op-clues .v-full{color:#f1dca0}
+.op-clues .v-kc{color:#7fd4ff;text-shadow:0 0 14px rgba(60,170,255,.8)}
+.op[data-variant="kc"] .op-rays{background:conic-gradient(#eaf8ff,#39b8ff,#0b47ff,#9be7ff,#ffffff,#1d6bff,#39b8ff,#eaf8ff)}
 @keyframes opclue{from{opacity:0;transform:translateY(9px)}}
 .op-label{white-space:nowrap;font:400 min(25px,calc((100vw - 28px) / (var(--n,8) * 1.02)))/34px var(--title);letter-spacing:.36em;text-indent:.36em;text-transform:uppercase;color:var(--beam);text-shadow:0 0 22px color-mix(in srgb,var(--beam) 60%,transparent)}
 /* bas de l'écran : consigne, puis bilan */

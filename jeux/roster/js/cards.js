@@ -6,12 +6,20 @@ const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;
 export const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ESC[c]);
 
 /* Les versions spéciales d'une carte : même joueur, même note, mêmes statistiques, un autre habillage.
-   L'identifiant d'une version est celui de la carte suivi de « ~h » ou « ~f » (comme sur le serveur). */
+   L'identifiant d'une version est celui de la carte suivi de « ~h », « ~f » ou « ~k » (comme sur le serveur). */
 export const VARIANTS = {
   holo: { suffix: '~h', name: 'Holographique', mark: 'Holo', rank: 1 },
   full: { suffix: '~f', name: 'Full art', mark: 'Full art', rank: 2 },
+  /* l'édition Karmine Corp : pour ceux qui portent ou ont porté ses couleurs */
+  kc: { suffix: '~k', name: 'Full art KC', mark: 'KC', rank: 3 },
 };
-/** 0 pour une carte ordinaire, 1 pour une holographique, 2 pour une full art. */
+/** Les années d'un joueur à la Karmine, telles qu'on les écrit sur sa carte : « Karmine Corp · 2023–2024 », « KC Blue · depuis 2025 ». */
+export function karmineEra(cat, card) {
+  const k = cat.karmine ? cat.karmine[card.base || card.id] : null;
+  if (!k) return '';
+  return (k[2] === 'KCB' ? 'KC Blue' : 'Karmine Corp') + ' · ' + (k[1] ? (k[0] === k[1] ? k[0] : k[0] + '–' + k[1]) : 'depuis ' + k[0]);
+}
+/** 0 pour une carte ordinaire, 1 pour une holographique, 2 pour une full art, 3 pour une édition KC. */
 export const variantRank = (card) => (card.variant ? VARIANTS[card.variant].rank : 0);
 
 /** Ajoute au catalogue reçu du serveur de quoi retrouver vite une carte, une équipe ou un rang, et les versions spéciales des cartes. */
@@ -63,9 +71,10 @@ export function cardHTML(card, cat, opts = {}) {
   return '<article class="card t' + card.tier + (card.kind === 'c' ? ' is-coach' : '') + (v ? ' v-' + v : '') + (opts.cls ? ' ' + opts.cls : '') + '" data-id="' + esc(card.id) + '">'
     + '<div class="card-in"><div class="card-face card-front">'
     + '<div class="card-bg"></div>'
-    /* holographique : une feuille de métal irisée derrière le joueur, et ses paillettes */
-    + (v === 'holo' ? '<div class="card-foil"></div><div class="card-spark"></div>' : '')
-    + '<span class="card-wm">' + esc(team ? team.short : '') + '</span>'
+    /* édition KC : le « mur bleu » ; holographique et édition KC : une feuille de métal irisée derrière le joueur, et ses paillettes */
+    + (v === 'kc' ? '<div class="card-wall"></div>' : '')
+    + (v === 'holo' || v === 'kc' ? '<div class="card-foil"></div><div class="card-spark"></div>' : '')
+    + '<span class="card-wm">' + esc(v === 'kc' ? 'KC' : team ? team.short : '') + '</span>'
     + picture
     + '<div class="card-shade"></div>'
     + '<div class="card-side"><span class="card-ovr">' + card.ovr + '</span><span class="card-role">' + ROLE_LABEL[card.role] + '</span><i></i>'
@@ -75,6 +84,7 @@ export function cardHTML(card, cat, opts = {}) {
     + '<ul class="card-stats">' + statsOf(card).map((s) => '<li><b>' + card.stats[s[0]] + '</b><span>' + s[1] + '</span></li>').join('') + '</ul></div>'
     + '<div class="card-holo"></div><div class="card-frame"></div>'
     + (v ? '<span class="card-mark">' + VARIANTS[v].mark + '</span>' : '')
+    + (v === 'kc' ? '<div class="card-glint"></div><span class="card-era">' + esc(karmineEra(cat, card)) + '</span>' : '')
     + '</div>' + (opts.back ? BACK : '') + '</div><i class="card-gem"></i></article>';
 }
 

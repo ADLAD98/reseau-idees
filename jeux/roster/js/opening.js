@@ -17,7 +17,8 @@ export { packHTML } from './pack.js';
 
 const PRISM = ['#ffe7a8', '#9fe8ff', '#ffffff'];
 const RAINBOW = ['#ff9cc6', '#ffd88a', '#a8ffdc', '#9ccfff', '#d3b4ff', '#ffffff'];
-const dustOf = (card) => (card.variant === 'holo' ? RAINBOW : card.tier === 5 ? PRISM : [TIER_COLOR[card.tier], '#ffffff', '#f0e6d2']);
+const KC_BLUE = ['#39b8ff', '#ffffff', '#0b47ff', '#9be7ff'];
+const dustOf = (card) => (card.variant === 'kc' ? KC_BLUE : card.variant === 'holo' ? RAINBOW : card.tier === 5 ? PRISM : [TIER_COLOR[card.tier], '#ffffff', '#f0e6d2']);
 /* l'éclat d'une carte, de 1 à 5 : son rang, relevé d'un cran pour une holographique et de deux pour une full art */
 const shineOf = (card) => Math.min(5, card.tier + variantRank(card));
 /* pour examiner l'animation image par image, les essais peuvent tout ralentir : window.__lent = 4 */
@@ -179,7 +180,7 @@ export async function runOpening({ request, getCat, fx, size, from }) {
   const setStage = (name) => { op.dataset.stage = name; };
   const setInfo = (html, pulse) => { info.innerHTML = html; info.classList.toggle('pulse', !!pulse); };
   /* la lumière de la scène prend la couleur de la carte */
-  const setBeam = (card) => { op.style.setProperty('--beam', card.tier >= 3 ? TIER_COLOR[card.tier] : '#c8aa6e'); op.dataset.tier = card.tier; op.dataset.variant = card.variant || ''; };
+  const setBeam = (card) => { op.style.setProperty('--beam', card.variant === 'kc' ? '#39b8ff' : card.tier >= 3 ? TIER_COLOR[card.tier] : '#c8aa6e'); op.dataset.tier = card.tier; op.dataset.variant = card.variant || ''; };
   let untilt = null;
   const cardEl = (i) => boxes[i].querySelector('.card');
   const clientOf = (pose) => [M.x + pose.x, M.y + pose.y];
