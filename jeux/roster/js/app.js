@@ -1,9 +1,10 @@
-/* Roster — le jeu. Quatre écrans : Packs, Collection, Classement, Profil.
-   Le serveur décide de tout (cartes tirées, délais, collection) ; cette page affiche et met en scène. */
+/* Roster — le jeu. Cinq écrans : Packs, Jouer, Collection, Classement, Profil.
+   Le serveur décide de tout (cartes tirées, délais, collection, matchs) ; cette page affiche et met en scène. */
 import { ApiError, call, clearSession, deriveKey, loadSession, saveSession } from './api.js';
 import { cardHTML, champName, esc, flagUrl, iconUrl, prepare, statsOf } from './cards.js';
 import { GAME_NAME, ROLE_NAME, ROLE_ORDER, STORE } from './config.js';
 import { packHTML, runOpening } from './opening.js';
+import { viewPlay } from './play.js';
 import { setSound, sfx, soundOn } from './sound.js';
 
 const app = document.getElementById('app');
@@ -11,6 +12,7 @@ const $ = (sel, root) => (root || document).querySelector(sel);
 const NAME_RULE = /^[A-Za-z0-9][A-Za-z0-9_-]{2,15}$/;
 const TABS = [
   ['packs', 'Packs', 'i-pack'],
+  ['jouer', 'Jouer', 'i-play'],
   ['collection', 'Collection', 'i-cards'],
   ['classement', 'Classement', 'i-board'],
   ['profil', 'Profil', 'i-user'],
@@ -27,6 +29,9 @@ const S = {
   fx: true,               // animations
   filtersOpen: false,     // listes de filtres dépliées (téléphone)
   opening: false,
+  play: null,             // l'écran Jouer : équipe, adversaires, parties (dernière réponse du serveur)
+  playLeague: '',         // ligue affichée dans la liste des adversaires
+  busy: false,            // une draft ou une partie est à l'écran
 };
 
 /* ---------- petits outils ---------- */
@@ -49,6 +54,8 @@ function toast(message, bad) {
 }
 function applyState(data) {
   if (data.player) S.player = data.player;
+  const credits = document.getElementById('credits');
+  if (credits && S.player) credits.textContent = S.player.coins;
   if (data.free) S.free = data.free;
   if (typeof data.skew === 'number') S.skew = data.skew;
 }
@@ -182,13 +189,20 @@ function showAuth(message) {
 function shell() {
   app.innerHTML = '<header class="top"><a class="brand" href="#/packs"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#mark"/></svg>' + esc(GAME_NAME) + '<small>saison ' + S.cat.season + '</small></a>'
     + '<nav class="nav">' + TABS.map((t) => '<a href="#/' + t[0] + '" data-tab="' + t[0] + '">' + t[1] + '</a>').join('') + '</nav>'
-    + '<span class="spacer"></span><a class="who" href="#/profil">' + icon('i-user') + '<b>' + esc(S.player.name) + '</b></a></header>'
+    + '<span class="spacer"></span><a class="purse" href="#/jouer" title="Crédits gagnés en jouant">' + icon('i-coin') + '<b id="credits">' + S.player.coins + '</b></a>'
+    + '<a class="who" href="#/profil">' + icon('i-user') + '<b>' + esc(S.player.name) + '</b></a></header>'
     + '<main class="main" id="main"></main>'
     + '<nav class="tabs">' + TABS.map((t) => '<a href="#/' + t[0] + '" data-tab="' + t[0] + '">' + icon(t[2]) + t[1] + '</a>').join('') + '</nav>';
 }
-const VIEWS = { packs: viewPacks, collection: viewCollection, classement: viewBoard, profil: viewProfile };
+/* ce que l'application prête à l'écran Jouer */
+const PLAY = {
+  S, call, guard, toast, applyState, icon,
+  refresh: () => route(),
+  expired: () => { clearSession(); S.session = null; showAuth('Ta connexion a expiré. Reconnecte-toi.'); },
+};
+const VIEWS = { packs: viewPacks, jouer: (main) => viewPlay(main, PLAY), collection: viewCollection, classement: viewBoard, profil: viewProfile };
 function route() {
-  if (!S.session || !S.cat || !$('#main')) return;
+  if (!S.session || !S.cat || !$('#main') || S.busy) return;
   const name = (location.hash.replace(/^#\/?/, '').split('/')[0]) || 'packs';
   const tab = VIEWS[name] ? name : 'packs';
   document.querySelectorAll('[data-tab]').forEach((a) => a.classList.toggle('on', a.dataset.tab === tab));
@@ -419,13 +433,13 @@ function showSheet(id) {
 
 /* ---------- écran Classement ---------- */
 async function viewBoard(main) {
-  main.innerHTML = '<div class="col-head"><div><h1 class="h1">Classement</h1><p>Les plus grandes collections.</p></div></div><div id="board"><div class="center" style="min-height:30dvh"><div class="spin"></div></div></div>';
+  main.innerHTML = '<div class="col-head"><div><h1 class="h1">Classement</h1><p>Les plus grandes collections, et les victoires de chacun.</p></div></div><div id="board"><div class="center" style="min-height:30dvh"><div class="spin"></div></div></div>';
   const data = await guard(() => call('GET', '/api/leaderboard'));
   const box = document.getElementById('board');
   if (!data || !box) return;
-  box.innerHTML = '<table class="board"><thead><tr><th>#</th><th>Joueur</th><th class="num">Cartes</th><th class="num hide-s">Exemplaires</th><th class="num">Packs</th></tr></thead><tbody>'
+  box.innerHTML = '<table class="board"><thead><tr><th>#</th><th>Joueur</th><th class="num">Cartes</th><th class="num">Victoires</th><th class="num hide-s">Défaites</th><th class="num hide-s">Packs</th></tr></thead><tbody>'
     + data.top.map((p, i) => '<tr' + (p.id === data.me ? ' class="me"' : '') + '><td>' + (i + 1) + '</td><td><b>' + esc(p.name) + '</b></td>'
-      + '<td class="num">' + p.cardsUnique + ' / ' + data.totalCards + '</td><td class="num hide-s">' + p.cardsTotal + '</td><td class="num">' + p.packsOpened + '</td></tr>').join('')
+      + '<td class="num">' + p.cardsUnique + ' / ' + data.totalCards + '</td><td class="num">' + p.wins + '</td><td class="num hide-s">' + p.losses + '</td><td class="num hide-s">' + p.packsOpened + '</td></tr>').join('')
     + '</tbody></table>';
 }
 
@@ -433,7 +447,7 @@ async function viewBoard(main) {
 async function viewProfile(main) {
   const p = S.player;
   main.innerHTML = '<div class="col-head"><div><h1 class="h1">' + esc(p.name) + '</h1><p>Joueur depuis le ' + frDate(p.createdAt) + '</p></div></div><div class="panels">'
-    + '<section class="panel"><h3>Mon compte</h3><div class="kv"><span>Packs ouverts</span><b>' + p.packsOpened + '</b><span>Cartes différentes</span><b>' + p.cardsUnique + ' / ' + S.cat.cards.length + '</b><span>Exemplaires</span><b>' + p.cardsTotal + '</b></div>'
+    + '<section class="panel"><h3>Mon compte</h3><div class="kv"><span>Packs ouverts</span><b>' + p.packsOpened + '</b><span>Cartes différentes</span><b>' + p.cardsUnique + ' / ' + S.cat.cards.length + '</b><span>Exemplaires</span><b>' + p.cardsTotal + '</b><span>Parties gagnées</span><b>' + p.wins + ' sur ' + (p.wins + p.losses) + '</b><span>Crédits</span><b>' + p.coins + '</b></div>'
     + '<div class="switch"><span>Animations</span><button type="button" id="fxSwitch" aria-pressed="' + S.fx + '" aria-label="Animations"></button></div>'
     + '<div class="switch"><span>Sons</span><button type="button" id="soundSwitch" aria-pressed="' + soundOn() + '" aria-label="Sons"></button></div>'
     + '<div class="actions"><button class="btn" type="button" id="logout">Se déconnecter</button><button class="btn danger" type="button" id="askDelete">Supprimer mon compte</button></div>'
@@ -443,7 +457,7 @@ async function viewProfile(main) {
     + '<section class="panel"><h3>Chances du pack gratuit</h3><div id="odds"><p class="hint">Chargement…</p></div></section>'
     + '<section class="panel"><h3>À propos</h3>'
     + '<p class="hint">' + esc(GAME_NAME) + ' est un projet de fan gratuit de Bcorps Labs. Les cartes représentent les joueurs et coachs en activité dans les ligues majeures (LCK, LPL, LEC, LCS, LCP, CBLOL), saison ' + S.cat.season + '. Catalogue du ' + frDate(Date.parse(S.cat.generated)) + '.</p>'
-    + '<p class="hint">Effectifs, statistiques et palmarès : <a href="https://lol.fandom.com/" target="_blank" rel="noopener">Leaguepedia</a>, licence CC BY-SA 3.0. Photos des joueurs : portraits officiels des équipes et des ligues, affichés depuis Leaguepedia. Drapeaux : flag-icons (licence MIT).</p>'
+    + '<p class="hint">Effectifs, statistiques et palmarès : <a href="https://lol.fandom.com/" target="_blank" rel="noopener">Leaguepedia</a>, licence CC BY-SA 3.0. Photos des joueurs : portraits officiels des équipes et des ligues, affichés depuis Leaguepedia. Images des champions : Riot Games (Data Dragon). Drapeaux : flag-icons (licence MIT).</p>'
     + '<p class="hint">' + esc(GAME_NAME) + ' was created under Riot Games\' "Legal Jibber Jabber" policy using assets owned by Riot Games. Riot Games does not endorse or sponsor this project. Ce jeu n\'est ni approuvé ni sponsorisé par Riot Games, ni par les équipes et les joueurs cités.</p>'
     + '<div class="actions"><a class="btn" href="../../">Retour à Bcorps Labs</a></div></section></div>';
 

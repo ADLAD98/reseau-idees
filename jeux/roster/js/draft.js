@@ -1,0 +1,340 @@
+/* La draft : bans et picks contre l'équipe adverse, dans l'ordre des compétitions.
+   Le joueur choisit, le serveur vérifie et fait jouer l'adversaire ; cet écran met en scène.
+   Les conseils affichés (méta, confort, duel) suivent les règles du serveur : voir rules.js. */
+import { ApiError } from './api.js';
+import { esc, iconUrl, photoUrl } from './cards.js';
+import { ROLE_LABEL } from './config.js';
+import { CLASS_NAME, DAMAGE_NAME, ORDER, PHASES, ROLES, compState, pickValue, played, signed } from './rules.js';
+import { setSound, sfx, soundOn } from './sound.js';
+
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const icon = (id) => '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#' + id + '"/></svg>';
+const half = (x) => String(x).replace('.', ',');
+const games = (n) => n + (n > 1 ? ' parties' : ' partie');
+
+const HELP = '<div class="dr-help-box panel"><h3>Gagner la draft</h3><ul>'
+  + '<li><b>Méta</b> — les champions les plus disputés chez les pros cette saison valent davantage.</li>'
+  + '<li><b>Confort</b> — un joueur est bien meilleur sur les champions qu\'il a vraiment joués cette saison : l\'étoile indique son nombre de parties. Hors de son répertoire, il perd des points.</li>'
+  + '<li><b>Duel</b> — sur chaque voie, les classes se contrent : Assassin › Mage › Combattant › Tank › Assassin. Entre supports : Tank › Mage › Enchanteur › Tank. Choisir après l\'adversaire permet de le contrer (flèche verte) ; choisir avant t\'expose.</li>'
+  + '<li><b>Composition</b> — mêle dégâts physiques et magiques, et prends au moins un tank : une équipe déséquilibrée perd des points.</li>'
+  + '<li><b>Bans</b> — retire les champions fétiches des joueurs adverses : la grille les classe du plus dangereux au moins dangereux.</li>'
+  + '</ul><p>Le total de chaque joueur s\'ajoute à sa force pendant la partie.</p>'
+  + '<div class="actions"><button class="btn" type="button" data-act="help">Compris</button></div></div>';
+
+/** Joue la draft d'un match. act(body) envoie un choix au serveur ; resync() redemande l'état du match.
+    Renvoie { final } (la réponse du serveur au dernier choix : la partie est jouée) ou { left: true } si le joueur quitte l'écran. */
+export function runDraft({ match, cat, fx, act, resync, toast }) {
+  let m = match;
+  const you = m.you, foe = 1 - you;
+  const champs = Object.entries(cat.champions).filter(([, c]) => c.r.length).sort((a, b) => a[1].n.localeCompare(b[1].n, 'fr'));
+  const champ = (id) => cat.champions[id];
+  const cardOf = (side, i) => { const p = m.teams[side].players[i]; return (p.id && cat.cardById.get(p.id)) || null; };
+  const nameOf = (side, i) => m.teams[side].players[i].name || 'Remplaçant';
+
+  /* ce qui est affiché : la draft rejouée jusqu'à l'action n° « shown » */
+  let shown = 0;
+  const bans = [[], []], picks = [[null, null, null, null, null], [null, null, null, null, null]];
+  let sel = null;        // champion désigné, pas encore verrouillé
+  let role = '';         // poste concerné : celui qu'on choisit (pick), ou le filtre de la grille (ban ; vide = tous)
+  let lastType = '';
+  let query = '';
+  let busy = true, settle = null, fail = null;
+
+  const teamHTML = (side) => {
+    const t = m.teams[side];
+    return '<section class="dr-team s' + side + (side === you ? ' me' : '') + '" data-side="' + side + '">'
+      + '<div class="dr-tname"><b>' + esc(t.short) + '</b><span>' + t.rating + '</span><i>' + (side === you ? 'Toi · ' : '') + (side === 0 ? 'côté bleu' : 'côté rouge') + '</i></div>'
+      + '<div class="dr-bans">' + [0, 1, 2, 3, 4].map((k) => '<span class="dr-ban" data-k="' + k + '" data-champ=""></span>').join('') + '</div>'
+      + '<div class="dr-slots">' + ROLES.map((r, i) => {
+        const card = cardOf(side, i), p = t.players[i];
+        return '<button class="dr-slot" type="button" data-side="' + side + '" data-role="' + r + '" data-champ="" disabled>'
+          + '<span class="dr-pic"><em>' + ROLE_LABEL[r] + '</em></span>'
+          + '<span class="dr-who"><b>' + esc(card ? card.name : 'Remplaçant') + '</b><i>' + ROLE_LABEL[r] + ' · ' + p.ovr + (p.bonus ? ' <u>+' + p.bonus + '</u>' : '') + '</i><span class="dr-cname"></span></span>'
+          + (card && card.photo ? '<img class="dr-face" src="' + photoUrl(card, 96) + '" alt="" loading="lazy" decoding="async" draggable="false">' : '<span class="dr-face"></span>') + '</button>';
+      }).join('') + '</div></section>';
+  };
+  const el = document.createElement('div');
+  el.className = 'dr';
+  el.dataset.you = you;
+  el.innerHTML = '<header class="dr-head"><button class="op-icon" type="button" data-act="leave" aria-label="Quitter la draft">' + icon('i-close') + '</button>'
+    + '<div class="dr-phase"><span class="dr-step"></span><b class="dr-title" aria-live="polite"></b></div>'
+    + '<button class="op-icon" type="button" data-act="help" aria-label="Comment gagner la draft">?</button>'
+    + '<button class="op-icon" type="button" data-act="sound" aria-label="Couper ou remettre le son"></button></header>'
+    + '<div class="dr-track" aria-hidden="true">' + ORDER.map((o, k) => '<i class="s' + o.side + ' ' + o.type + (PHASES.some((p) => p[0] === k && k) ? ' gap' : '') + '"></i>').join('') + '</div>'
+    + '<div class="dr-body">' + teamHTML(0)
+    + '<section class="dr-pool"><div class="dr-tools"><div class="dr-roles"></div><input class="inp dr-q" type="search" placeholder="Chercher…" autocomplete="off" aria-label="Chercher un champion"></div>'
+    + '<p class="dr-hint"></p>'
+    + '<div class="dr-grid">' + champs.map(([id, c]) => '<button class="dr-c" type="button" data-champ="' + id + '" title="' + esc(c.n) + '"><span class="dr-ci"><img src="' + iconUrl(cat, id) + '" alt="" loading="lazy" decoding="async" draggable="false"></span>'
+      + '<span class="dr-cn">' + esc(c.n) + '</span><i class="dr-star"></i><i class="dr-arrow"></i></button>').join('') + '</div></section>'
+    + teamHTML(1) + '</div>'
+    + '<footer class="dr-foot"><div class="dr-sel"></div><button class="btn primary big" type="button" data-act="lock" disabled>Verrouiller</button></footer>'
+    + '<div class="dr-help" hidden>' + HELP + '</div>';
+
+  const $ = (s) => el.querySelector(s);
+  const tiles = new Map(Array.from(el.querySelectorAll('.dr-c'), (b) => [b.dataset.champ, { b, star: b.querySelector('.dr-star'), arrow: b.querySelector('.dr-arrow') }]));
+  const slotEl = (side, i) => el.querySelector('.dr-slot[data-side="' + side + '"][data-role="' + ROLES[i] + '"]');
+  const banEl = (side, k) => el.querySelector('.dr-team[data-side="' + side + '"] .dr-ban[data-k="' + k + '"]');
+  const turn = () => ORDER[shown] || null;
+  /* c'est à moi de jouer : mon tour, et tout ce que le serveur a envoyé est déjà affiché */
+  const myTurn = () => { const t = turn(); return !!t && t.side === you && shown === m.log.length && !busy; };
+  const taken = () => new Set([...bans[0], ...bans[1], ...picks[0].filter(Boolean), ...picks[1].filter(Boolean)]);
+  const soundBtn = $('[data-act="sound"]');
+  const drawSound = () => { soundBtn.innerHTML = icon(soundOn() ? 'i-sound' : 'i-mute'); soundBtn.classList.toggle('off', !soundOn()); };
+  drawSound();
+
+  function apply(a) {
+    if (a.type === 'ban') bans[a.side].push(a.champ);
+    else picks[a.side][ROLES.indexOf(a.role)] = a.champ;
+  }
+  /** Reconstruit l'affichage jusqu'à l'action n° « to », sans animation. */
+  function rebuild(to) {
+    bans[0].length = 0; bans[1].length = 0;
+    picks[0].fill(null); picks[1].fill(null);
+    for (let k = 0; k < to; k++) apply(m.log[k]);
+    shown = to;
+  }
+
+  /* ---------- valeur d'un champion ---------- */
+  /* pour mon joueur du poste r */
+  const mine = (id, r) => { const i = ROLES.indexOf(r); return pickValue(champ(id), id, cardOf(you, i), r, picks[foe][i] ? champ(picks[foe][i]) : null); };
+  /* danger : ce que ce champion vaudrait au mieux pour l'adversaire, sur ses postes encore libres (ou sur le seul poste « only ») */
+  function threat(id, only) {
+    let best = null;
+    ROLES.forEach((r, i) => {
+      if (picks[foe][i] || !champ(id).r.includes(r) || (only && r !== only)) return;
+      const v = pickValue(champ(id), id, cardOf(foe, i), r, picks[you][i] ? champ(picks[you][i]) : null);
+      if (!best || v.total > best.total) best = Object.assign(v, { i });
+    });
+    return best;
+  }
+
+  /* ---------- affichage ---------- */
+  function syncHead() {
+    const t = turn(), phase = PHASES.find((p) => shown >= p[0] && shown < p[1]);
+    $('.dr-step').textContent = phase ? phase[2] : 'Draft terminée';
+    $('.dr-title').textContent = !t ? 'Que la partie commence' : t.side === you ? (t.type === 'ban' ? 'À toi de bannir' : 'À toi de choisir') : m.teams[foe].short + (t.type === 'ban' ? ' bannit…' : ' choisit…');
+    el.dataset.turn = !t ? 'over' : t.side === you ? 'me' : 'foe';
+    el.querySelectorAll('.dr-track i').forEach((tick, k) => { tick.classList.toggle('done', k < shown); tick.classList.toggle('now', k === shown); });
+  }
+  function syncTeams() {
+    const t = turn(), my = myTurn();
+    for (const side of [0, 1]) {
+      el.querySelector('.dr-team[data-side="' + side + '"]').classList.toggle('turn', !!t && t.side === side);
+      for (let k = 0; k < 5; k++) {
+        const b = banEl(side, k), next = !!t && t.type === 'ban' && t.side === side && k === bans[side].length;
+        const preview = next && side === you && my && sel ? sel : '';
+        const id = bans[side][k] || preview;
+        if (b.dataset.champ !== id) { b.dataset.champ = id; b.innerHTML = id ? '<img src="' + iconUrl(cat, id) + '" alt="' + esc(champ(id).n) + '" title="' + esc(champ(id).n) + '" draggable="false">' : ''; }
+        b.classList.toggle('now', next);
+        b.classList.toggle('preview', !!preview);
+      }
+      for (let i = 0; i < 5; i++) {
+        const s = slotEl(side, i), locked = picks[side][i] || '';
+        const open = side === you && my && t.type === 'pick' && !locked;
+        const preview = open && ROLES[i] === role && sel ? sel : '';
+        const id = locked || preview;
+        if (s.dataset.champ !== id) {
+          s.dataset.champ = id;
+          s.querySelector('.dr-pic').innerHTML = id ? '<img src="' + iconUrl(cat, id) + '" alt="" draggable="false">' : '<em>' + ROLE_LABEL[ROLES[i]] + '</em>';
+          s.querySelector('.dr-cname').textContent = id ? champ(id).n : '';
+        }
+        s.classList.toggle('picked', !!locked);
+        s.classList.toggle('preview', !!preview);
+        s.classList.toggle('now', open && ROLES[i] === role);
+        s.disabled = !open;
+      }
+    }
+  }
+  function syncRoles() {
+    const t = turn(), my = myTurn(), box = $('.dr-roles');
+    const picking = !!t && t.type === 'pick' && t.side === you;
+    let html = picking ? '' : '<button type="button" data-r=""' + (role === '' ? ' class="on"' : '') + '>Tous</button>';
+    ROLES.forEach((r, i) => {
+      /* pick : mes postes encore libres, avec le champion d'en face s'il est connu ; ban : les joueurs adverses à viser */
+      const done = picking ? !!picks[you][i] : !!picks[foe][i];
+      const facing = picking && picks[foe][i] ? '<img src="' + iconUrl(cat, picks[foe][i]) + '" alt="face à ' + esc(champ(picks[foe][i]).n) + '">' : '';
+      html += '<button type="button" data-r="' + r + '"' + (done ? ' disabled' : '') + (r === role ? ' class="on"' : '') + '><b>' + ROLE_LABEL[r] + '</b><small>' + esc(nameOf(picking ? you : foe, i)) + '</small>' + facing + '</button>';
+    });
+    box.innerHTML = html;
+    box.classList.toggle('idle', !my);
+    $('.dr-hint').textContent = !t ? '' : picking
+      ? 'Du meilleur choix au moins bon pour ' + (role ? nameOf(you, ROLES.indexOf(role)) : 'ton joueur') + '. ★ : ses parties de la saison sur ce champion.'
+      : 'Du plus dangereux au moins dangereux entre les mains de l\'adversaire. ★ : parties jouées par le joueur visé.';
+  }
+  function syncPool() {
+    const t = turn(), my = myTurn(), used = taken(), q = query.trim().toLowerCase();
+    const picking = !!t && t.type === 'pick' && t.side === you;
+    const ranked = [];
+    for (const [id, c] of champs) {
+      const tile = tiles.get(id);
+      let visible = picking ? c.r.includes(role) : !role || c.r.includes(role);
+      let score = -9, star = '', arrow = '';
+      if (visible && picking) {
+        const v = mine(id, role), g = played(cardOf(you, ROLES.indexOf(role)), id);
+        score = v.total; star = g ? String(g[0]) : ''; arrow = v.counter > 0 ? 'up' : v.counter < 0 ? 'down' : '';
+      } else if (visible) {
+        const v = threat(id, role || null);
+        if (v) { const g = played(cardOf(foe, v.i), id); score = v.total; star = g ? String(g[0]) : ''; }
+      }
+      if (q && !c.n.toLowerCase().includes(q)) visible = false;
+      tile.b.hidden = !visible;
+      tile.b.disabled = used.has(id);
+      tile.b.classList.toggle('on', id === sel);
+      tile.star.textContent = star;
+      tile.arrow.className = 'dr-arrow' + (arrow ? ' ' + arrow : '');
+      if (visible) ranked.push([tile.b, used.has(id) ? -99 : score]);
+    }
+    /* la grille est triée sans recréer ses images : on change seulement l'ordre d'affichage */
+    ranked.sort((a, b) => b[1] - a[1]);
+    ranked.forEach(([b], k) => { b.style.order = k; });
+    $('.dr-grid').classList.toggle('idle', !my);
+  }
+  function compHTML() {
+    const list = picks[you].filter(Boolean).map(champ);
+    if (!list.length) return '';
+    const s = compState(list);
+    return '<p class="dr-comp">Ta composition : <b>' + half(s.ad) + '</b> physique · <b>' + half(s.ap) + '</b> magique · ligne de front <b class="' + (s.front ? 'ok' : 'ko') + '">' + (s.front ? 'oui' : 'pas encore') + '</b></p>';
+  }
+  function syncFoot() {
+    const t = turn(), my = myTurn(), box = $('.dr-sel'), btn = $('[data-act="lock"]');
+    if (!t) { box.innerHTML = '<p class="dr-tip">La draft est terminée.</p>'; btn.hidden = true; return; }
+    btn.textContent = t.type === 'ban' ? 'Bannir' : 'Verrouiller';
+    btn.disabled = !my || !sel;
+    if (!sel || !my) {
+      box.innerHTML = '<p class="dr-tip">' + (t.side !== you ? esc(m.teams[foe].name) + ' réfléchit…' : busy ? 'Un instant…'
+        : t.type === 'ban' ? 'Désigne un champion à interdire aux deux équipes.' : 'Désigne un poste, puis le champion de ton joueur.') + '</p>' + compHTML();
+      return;
+    }
+    const c = champ(sel), chip = (label, v, note, cls) => '<span class="dr-chip ' + (v > 0.05 ? 'up' : v < -0.05 ? 'down' : '') + (cls || '') + '">' + label + ' <b>' + signed(v) + '</b>' + (note ? '<i>' + esc(note) + '</i>' : '') + '</span>';
+    let chips = '', sub = '', total = '';
+    if (t.type === 'pick') {
+      const i = ROLES.indexOf(role), v = mine(sel, role), g = played(cardOf(you, i), sel), facing = picks[foe][i];
+      chips = chip('Méta', v.meta) + chip('Confort', v.comfort, g ? games(g[0]) : 'jamais joué') + (facing ? chip('Duel', v.counter, 'face à ' + champ(facing).n) : '');
+      total = '<em class="dr-total">' + signed(v.total) + '</em>';
+      sub = 'pour ' + nameOf(you, i) + ' · ' + CLASS_NAME[c.t] + ' · ' + DAMAGE_NAME[c.d];
+    } else {
+      const v = threat(sel, null), g = v ? played(cardOf(foe, v.i), sel) : null;
+      chips = v ? chip('Danger', v.total, nameOf(foe, v.i) + (g ? ' · ' + games(g[0]) : ''), ' wide') : '<span class="dr-chip">Peu de danger : l\'adversaire n\'a plus de poste pour lui</span>';
+      sub = CLASS_NAME[c.t] + ' · ' + DAMAGE_NAME[c.d] + (c.g ? ' · joué ' + c.g + ' fois et banni ' + c.b + ' fois par les pros cette saison' : '');
+    }
+    box.innerHTML = '<img class="dr-sel-i" src="' + iconUrl(cat, sel) + '" alt="" draggable="false"><div class="dr-sel-t"><b>' + esc(c.n) + total + '</b><span>' + esc(sub) + '</span><div class="dr-chips">' + chips + '</div></div>';
+  }
+  function syncAll() { syncHead(); syncTeams(); syncRoles(); syncPool(); syncFoot(); }
+  const pop = (node) => { if (!node) return; node.classList.remove('pop'); void node.offsetWidth; node.classList.add('pop'); };
+
+  /* ---------- déroulement ---------- */
+  /** Montre une à une les actions que le serveur a enregistrées et qui ne sont pas encore à l'écran. */
+  async function playLog() {
+    while (shown < m.log.length) {
+      const a = m.log[shown], auto = a.side !== you;
+      if (auto && fx) { syncAll(); await wait(620 + Math.random() * 480); }
+      apply(a);
+      shown++;
+      if (a.type === 'ban') sfx.ban(); else sfx.pick();
+      syncAll();
+      pop(a.type === 'ban' ? banEl(a.side, bans[a.side].length - 1) : slotEl(a.side, ROLES.indexOf(a.role)));
+      if (fx) await wait(auto ? 400 : 280);
+    }
+  }
+  /** Prépare le tour du joueur. */
+  function startTurn() {
+    const t = turn();
+    busy = false;
+    sel = null;
+    if (t && t.side === you) {
+      if (t.type !== lastType || (t.type === 'pick' && (!role || picks[you][ROLES.indexOf(role)]))) role = t.type === 'pick' ? ROLES.find((r, i) => !picks[you][i]) : '';
+      lastType = t.type;
+      if (fx) sfx.turn();
+    }
+    syncAll();
+    $('.dr-grid').scrollTop = 0;
+  }
+  async function lock() {
+    const t = turn();
+    if (!sel || !t || !myTurn()) return;
+    busy = true;
+    const body = { id: m.id, champ: sel };
+    if (t.type === 'pick') body.role = role;
+    syncFoot();
+    let res;
+    try {
+      res = await act(body);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) { close(); fail(e); return; }
+      toast(e instanceof ApiError ? e.message : 'Un problème est survenu.', true);
+      if (!(e instanceof ApiError)) console.error(e);
+      /* le serveur n'est pas d'accord : on repart de ce qu'il a en mémoire (sans réseau, on reste où l'on est) */
+      if (e instanceof ApiError && e.status) {
+        let fresh = null;
+        try { fresh = await resync(); } catch (e2) { fresh = m; }
+        if (!fresh || fresh.id !== m.id) { close(); settle({ left: true }); return; }
+        m = fresh;
+        rebuild(m.log.length);
+      }
+      startTurn();
+      return;
+    }
+    m = res.match;
+    sel = null;
+    query = '';
+    $('.dr-q').value = '';
+    await playLog();
+    if (res.sim) {
+      syncAll();
+      if (fx) await wait(1200);
+      close();
+      settle({ final: res });
+      return;
+    }
+    startTurn();
+  }
+
+  el.addEventListener('click', (e) => {
+    const a = e.target.closest('[data-act]');
+    if (a) {
+      const what = a.dataset.act;
+      if (what === 'sound') { setSound(!soundOn()); drawSound(); sfx.click(); }
+      else if (what === 'help') { $('.dr-help').hidden = !$('.dr-help').hidden; }
+      else if (what === 'leave') { close(); settle({ left: true }); }
+      else if (what === 'lock') lock();
+      return;
+    }
+    if (e.target.classList.contains('dr-help')) { $('.dr-help').hidden = true; return; }
+    if (!myTurn()) return;
+    const t = turn();
+    const r = e.target.closest('[data-r]'), c = e.target.closest('.dr-c'), s = e.target.closest('.dr-slot');
+    if (r && !r.disabled) role = r.dataset.r;
+    else if (s && !s.disabled) role = s.dataset.role;
+    else if (c && !c.disabled) { sel = c.dataset.champ === sel ? null : c.dataset.champ; sfx.click(); }
+    else return;
+    /* en changeant de poste, un champion qui ne s'y joue pas n'est plus désigné */
+    if (t.type === 'pick' && sel && !champ(sel).r.includes(role)) sel = null;
+    syncAll();
+    if (r || s) $('.dr-grid').scrollTop = 0;
+  });
+  $('.dr-q').addEventListener('input', (e) => { query = e.target.value; syncPool(); });
+  function onKey(e) {
+    if (e.key === 'Escape' && !$('.dr-help').hidden) { $('.dr-help').hidden = true; return; }
+    if (e.key === 'Enter' && sel && myTurn()) { e.preventDefault(); lock(); }
+  }
+  const scroll = document.body.style.overflow;
+  function close() {
+    document.removeEventListener('keydown', onKey);
+    el.remove();
+    document.body.style.overflow = scroll;
+  }
+  document.addEventListener('keydown', onKey);
+  document.body.style.overflow = 'hidden';
+  document.body.appendChild(el);
+
+  /* reprise : tout est affiché d'un coup jusqu'à mon dernier choix, puis ce que l'adversaire a joué depuis est rejoué */
+  let lastMine = -1;
+  m.log.forEach((a, k) => { if (a.side === you) lastMine = k; });
+  rebuild(lastMine + 1);
+  syncAll();
+  return new Promise((resolve, reject) => {
+    settle = resolve;
+    fail = reject;
+    playLog().then(startTurn);
+  });
+}

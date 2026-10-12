@@ -145,4 +145,42 @@ export const sfx = {
   /** Toutes les cartes sont retournées. */
   done() { bell(E5, 0, 0.08, 0.9); bell(B5, 0.09, 0.07, 0.9); bell(E6, 0.18, 0.07, 1.2); },
   click() { tone(880, { dur: 0.05, vol: 0.05 }); },
+
+  /* ---------- le combat ---------- */
+  /** C'est au joueur de choisir. */
+  turn() { bell(B5, 0, 0.06, 0.5); bell(E6, 0.09, 0.05, 0.7); },
+  /** Un champion est banni : un coup sourd. */
+  ban() { tone(150, { dur: 0.3, to: 58, vol: 0.3 }); noise({ dur: 0.18, vol: 0.12, type: 'lowpass', freq: 1400, to: 200 }); },
+  /** Un champion est verrouillé : le coup, puis une note qui reste. */
+  pick() { tone(110, { dur: 0.45, to: 55, vol: 0.34 }); bell(E5, 0.01, 0.12, 0.9); bell(B5, 0.06, 0.07, 0.8); noise({ dur: 0.22, vol: 0.05, type: 'highpass', freq: 5000 }); },
+  /** Présentation des deux équipes. */
+  versus() {
+    tone(65.4, { dur: 1.4, vol: 0.28, attack: 0.03 });
+    tone(98, { t: 0.02, dur: 1.3, vol: 0.12, attack: 0.05 });
+    noise({ dur: 0.9, vol: 0.07, freq: 400, to: 3000, swell: true });
+    bell(E5, 0.9, 0.1, 1.3); bell(B5, 0.98, 0.06, 1.2);
+  },
+  /** Une élimination. */
+  kill() { noise({ dur: 0.09, vol: 0.15, freq: 2600, to: 900, q: 1.2 }); tone(240, { dur: 0.16, to: 90, vol: 0.2 }); },
+  /** Une tour s'effondre. */
+  tower() { noise({ dur: 0.5, vol: 0.2, type: 'lowpass', freq: 900, to: 90 }); tone(90, { dur: 0.5, to: 40, vol: 0.3 }); },
+  /** Un objectif est pris ; big : Baron ou dragon ancestral. */
+  objective(big) {
+    [E5 / 2, B5 / 2].forEach((f, k) => tone(f, { t: k * 0.12, dur: 0.7, vol: 0.12, type: 'triangle', attack: 0.03 }));
+    if (big) { tone(82.4, { dur: 1.2, vol: 0.22, attack: 0.03 }); bell(E6, 0.26, 0.08, 1.1); }
+  },
+  /** Début d'un ralenti : tout descend. */
+  slowmo() { tone(520, { dur: 0.7, to: 130, vol: 0.11, type: 'triangle' }); noise({ dur: 0.7, vol: 0.09, freq: 4200, to: 500, q: 0.8 }); },
+  /** Le Nexus explose. */
+  nexus() { tone(140, { dur: 1.1, to: 30, vol: 0.5 }); noise({ dur: 1.2, vol: 0.3, type: 'lowpass', freq: 3000, to: 120 }); noise({ dur: 1.6, vol: 0.05, type: 'highpass', freq: 5000 }); },
+  victory() {
+    [E5, G5, B5, E6, G6, B6].forEach((f, k) => bell(f, k * 0.11, 0.12, 1.4));
+    [E5, B5, E6].forEach((f) => tone(f, { t: 0.7, dur: 2.2, vol: 0.06, attack: 0.06 }));
+    tone(82.4, { t: 0.02, dur: 1.8, vol: 0.2, attack: 0.02 });
+  },
+  /** Trois notes qui descendent, en mineur. */
+  defeat() {
+    [493.88, 392, 329.63].forEach((f, k) => tone(f, { t: k * 0.28, dur: 1, vol: 0.1, type: 'triangle', attack: 0.03 }));
+    tone(61.7, { t: 0.55, dur: 1.9, vol: 0.2, attack: 0.05 });
+  },
 };
