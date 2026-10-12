@@ -178,3 +178,10 @@ export const KITS = {
 "Zoe":["m","Bond dimensionnel",[11,8,5]],
 "Zyra":["m","Ronces étrangleuses",[110,100,90]],
 };
+/* Les sorts d'invocateur : [nom, délai de récupération (secondes), nom de l'image], d'après Data Dragon.
+   F Saut éclair, T Téléportation, B Barrière, C Purge, E Fatigue, G Fantôme, H Soins, I Embrasement, S Châtiment. */
+export const SPELLS = {"B":["Barrière",180,"SummonerBarrier"],"C":["Purge",240,"SummonerBoost"],"I":["Embrasement",180,"SummonerDot"],"E":["Fatigue",240,"SummonerExhaust"],"F":["Saut éclair",300,"SummonerFlash"],"G":["Fantôme",240,"SummonerHaste"],"H":["Soins",240,"SummonerHeal"],"S":["Châtiment",15,"SummonerSmite"],"T":["Téléportation",300,"SummonerTeleport"]};
+/* Les deux sorts que les pros prennent le plus à chaque poste (Leaguepedia, saison 2026 : 2575 parties),
+   puis les champions pour lesquels ils en prennent d'autres, poste par poste. */
+export const SPELL_DEFAULT = {"TOP":"FT","JGL":"FS","MID":"FT","BOT":"FB","SUP":"FH"};
+export const SPELL_PICKS = {"Akali":{"TOP":"FI","BOT":"FT"},"Aphelios":{"BOT":"FG"},"Camille":{"SUP":"FI"},"Cassiopeia":{"BOT":"FG"},"Elise":{"SUP":"FI"},"Jinx":{"BOT":"FC"},"Mel":{"BOT":"FT"},"Naafiri":{"TOP":"FI"},"Olaf":{"TOP":"FG"},"Pantheon":{"SUP":"FI"},"Pyke":{"SUP":"FI"},"Ryze":{"MID":"FG"},"Seraphine":{"BOT":"FT"},"Skarner":{"SUP":"FI"},"Smolder":{"BOT":"FC"},"Syndra":{"BOT":"FT"},"Taliyah":{"BOT":"FT","MID":"FG"},"Tristana":{"TOP":"FE"},"Trundle":{"TOP":"FE"},"Tryndamere":{"TOP":"FI"},"TwistedFate":{"TOP":"FG"},"Varus":{"BOT":"FT","TOP":"FE"},"Vayne":{"TOP":"FE"},"Viktor":{"BOT":"FT"},"Vladimir":{"BOT":"FG"},"Xerath":{"BOT":"FT"},"Yasuo":{"MID":"FE"},"Yuumi":{"SUP":"EH"},"Zeri":{"BOT":"FC"},"Ziggs":{"BOT":"FT"},"Zoe":{"MID":"FI"}};

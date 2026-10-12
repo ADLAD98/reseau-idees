@@ -495,15 +495,50 @@
 .mv-pk b{font:inherit}
 .mv-pk i{font:500 11.5px/1 var(--text);font-style:normal;letter-spacing:.03em;color:var(--mut)}
 .mv-p.dead{filter:grayscale(1);opacity:.42}
-.mv-cast{display:flex;flex-direction:column;gap:7px;flex:none;height:112px;padding-top:12px;overflow:hidden;-webkit-mask-image:linear-gradient(#000 60%,transparent);mask-image:linear-gradient(#000 60%,transparent)}
+/* ---------- le commentaire : un bandeau de retransmission, le fil des actions précédentes et, de temps en temps, la réaction d'un fan ---------- */
+.mv-cast{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,330px);gap:0 22px;flex:none;height:122px;padding-top:12px;overflow:hidden}
+.mv-talk{display:flex;flex-direction:column;gap:8px;min-width:0;overflow:hidden;-webkit-mask-image:linear-gradient(#000 74%,transparent);mask-image:linear-gradient(#000 74%,transparent)}
+.mv-now{--c:var(--gold);display:grid;grid-template-columns:auto auto minmax(0,1fr);align-items:center;gap:0 14px;flex:none;min-height:56px;padding:6px 16px 6px 0;border:1px solid var(--line);border-left:3px solid var(--c);
+  background:linear-gradient(90deg,color-mix(in srgb,var(--c) 15%,rgba(9,20,40,.92)),rgba(6,14,27,.5) 62%)}
+.mv-now.s0{--c:var(--s0)}
+.mv-now.s1{--c:var(--s1)}
+.mv-now-i{display:grid;place-items:center;width:38px;height:38px;margin-left:10px;border:1px solid color-mix(in srgb,var(--c) 55%,transparent);background:rgba(1,10,19,.6);color:var(--c)}
+.mv-now-i svg{width:20px;height:20px}
+.mv-now time{font:700 15px/1 var(--text);color:var(--c);font-variant-numeric:tabular-nums}
+.mv-now p{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;margin:0;font:400 17px/1.28 var(--text);color:var(--ink)}
+.mv-now p b{font-weight:600;color:#fff}
+.mv-now p b.s0{color:var(--s0)}
+.mv-now p b.s1{color:var(--s1)}
+/* le titre d'un temps fort, en étiquette devant la phrase */
+.mv-now p em{display:inline-block;margin-right:10px;padding:3px 7px 2px;font:400 11.5px/1 var(--title);font-style:normal;letter-spacing:.14em;text-transform:uppercase;vertical-align:2px;color:#010a13;background:var(--gold-hi)}
+.mv-now.pop{animation:nowin .38s cubic-bezier(.2,.8,.2,1)}
+@keyframes nowin{from{opacity:0;transform:translateY(9px)}}
+.mv-past{display:flex;flex-direction:column;gap:5px;min-width:0;padding-left:13px}
+.mv-past .mv-line{font-size:13.5px;animation:rise .3s}
+.mv-past .mv-line time{width:40px;font-size:12px}
+.mv-past .mv-line span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* la réaction d'un fan : un message façon réseaux sociaux (compte et texte inventés) */
+.mv-social{min-width:0}
+.mv-post{display:grid;grid-template-columns:auto minmax(0,1fr);gap:5px 11px;padding:10px 13px 9px;border:1px solid var(--line);background:linear-gradient(180deg,rgba(11,24,44,.9),rgba(6,14,27,.7));animation:postin .45s cubic-bezier(.2,.8,.2,1)}
+@keyframes postin{from{opacity:0;transform:translateX(16px)}}
+.mv-post.gone{opacity:0;transition:opacity .8s}
+.mv-post-a{grid-row:1/3;align-self:start;display:grid;place-items:center;width:34px;height:34px;border-radius:50%;font:700 15px/1 var(--text);color:#010a13;background:radial-gradient(circle at 34% 28%,#fff,var(--av) 58%)}
+.mv-post-h{display:flex;align-items:baseline;gap:7px;min-width:0;white-space:nowrap}
+.mv-post-h b{font:600 13.5px/1.2 var(--text);color:var(--ink);overflow:hidden;text-overflow:ellipsis}
+.mv-post-h i{font:400 12px/1.2 var(--text);font-style:normal;color:var(--faint);overflow:hidden;text-overflow:ellipsis}
+.mv-post p{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;margin:0;font:400 13.5px/1.32 var(--text);color:var(--ink)}
+.mv-post p b{font-weight:600;color:#fff}
+.mv-post p b.s0{color:var(--s0)}
+.mv-post p b.s1{color:var(--s1)}
+.mv-post-f{grid-column:2;display:flex;align-items:center;gap:14px;font:500 11.5px/1 var(--text);color:var(--faint);font-variant-numeric:tabular-nums}
+.mv-post-f span{display:inline-flex;align-items:center;gap:5px}
+.mv-post-f svg{width:13px;height:13px}
+.mv-post-f em{margin-left:auto;font-style:normal;font-size:10px;letter-spacing:.08em;text-transform:uppercase;opacity:.7}
 .mv-line{display:flex;align-items:baseline;gap:12px;color:var(--mut);font-size:15px;line-height:1.3}
-.mv-cast .mv-line{animation:rise .3s}
 .mv-line time{flex:none;width:44px;font:600 13px/1.3 var(--text);color:var(--faint);text-align:right;font-variant-numeric:tabular-nums}
 .mv-line.s0 time{color:var(--s0)}
 .mv-line.s1 time{color:var(--s1)}
 .mv-line.hl span{color:var(--gold-hi)}
-.mv-cast .mv-line:first-child{color:var(--ink);font-size:19px}
-.mv-cast .mv-line:first-child time{font-size:15px}
 .mv-ctrl{display:flex;align-items:center;gap:10px;flex:none;padding:8px 0 calc(12px + env(safe-area-inset-bottom));transition:opacity .4s}
 .mv-speed{display:flex;border:1px solid var(--line2)}
 .mv-speed button{width:52px;height:40px;border:0;background:rgba(9,20,40,.7);color:var(--mut);font:400 15px/1 var(--title)}
@@ -582,7 +617,9 @@
   .dr-cname{min-height:0}
   .mv{--map:min(100dvh - 268px,100vw - 520px,700px)}
   .mv-hud{padding:8px 0}
-  .mv-cast{height:92px;padding-top:8px}
+  .mv-cast{height:104px;padding-top:8px}
+  .mv-now{min-height:48px}
+  .mv-now p{font-size:15.5px}
   .mv-p{padding:4px 10px}
 }
 
@@ -737,11 +774,21 @@
   .mv-lv,.mv-side.s0 .mv-lv{left:auto;right:-5px;bottom:-3px;min-width:14px;height:14px;padding:0 2px;font-size:9px;line-height:14px}
   .mv-pk,.mv-side.s0 .mv-pk{align-items:center;gap:2px;font-size:10.5px;color:var(--mut)}
   .mv-pk i{font-size:9.5px;color:var(--faint)}
-  .mv-cast{flex:1;gap:5px;height:auto;min-height:64px;padding-top:8px}
+  /* sur un téléphone : le bandeau, puis la réaction du fan, puis le fil — ce qui ne tient pas dans la hauteur disparaît en fondu */
+  .mv-cast{display:flex;flex-direction:column;gap:7px;flex:1;height:auto;min-height:64px;padding-top:8px;-webkit-mask-image:linear-gradient(#000 80%,transparent);mask-image:linear-gradient(#000 80%,transparent)}
+  .mv-talk{display:contents}
+  .mv-now{order:1;gap:0 10px;min-height:46px;padding:5px 10px 5px 0}
+  .mv-now-i{width:30px;height:30px;margin-left:8px}
+  .mv-now-i svg{width:16px;height:16px}
+  .mv-now time{font-size:13px}
+  .mv-now p{font-size:14.5px;line-height:1.25}
+  .mv-now p em{margin-right:7px;font-size:10px}
+  .mv-social{order:2;flex:none}
+  .mv-post{padding:8px 11px 7px}
+  .mv-post p{-webkit-line-clamp:2;font-size:13px}
+  .mv-past{order:3;padding-left:8px}
   .mv-line{gap:8px;font-size:13.5px}
   .mv-line time{width:36px;font-size:12px}
-  .mv-cast .mv-line:first-child{font-size:15.5px}
-  .mv-cast .mv-line:first-child time{font-size:13px}
   .mv-ctrl{gap:8px;padding:6px 0 calc(8px + env(safe-area-inset-bottom))}
   .mv-ctrl .btn{height:40px;padding:0 13px;letter-spacing:.06em}
   .mv-speed button{width:44px}

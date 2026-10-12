@@ -125,56 +125,89 @@ const linksOf = (text) => {
 export const TRAILS = linksOf(JUNGLE_LINKS).map(([a, b]) => [NODE[a], NODE[b]]);
 const NAMES = Object.keys(NODE), POINTS = NAMES.map((k) => NODE[k]), COUNT = NAMES.length;
 const INDEX = new Map(NAMES.map((k, i) => [k, i]));
-/* plus court chemin entre tous les points de passage (calculé une fois) */
-const D = POINTS.map(() => new Float64Array(COUNT).fill(Infinity)), NEXT = POINTS.map(() => new Int16Array(COUNT).fill(-1));
-for (let i = 0; i < COUNT; i++) { D[i][i] = 0; NEXT[i][i] = i; }
-for (const [a, b] of [...linksOf(LANE_LINKS), ...linksOf(JUNGLE_LINKS), ...linksOf(RIVER_LINKS)]) {
-  const i = INDEX.get(a), j = INDEX.get(b), d = dist(POINTS[i], POINTS[j]);
-  if (d < D[i][j]) { D[i][j] = D[j][i] = d; NEXT[i][j] = j; NEXT[j][i] = i; }
-}
-for (let k = 0; k < COUNT; k++) for (let i = 0; i < COUNT; i++) {
-  const ik = D[i][k];
-  if (ik === Infinity) continue;
-  for (let j = 0; j < COUNT; j++) if (ik + D[k][j] < D[i][j]) { D[i][j] = ik + D[k][j]; NEXT[i][j] = NEXT[i][k]; }
-}
-/* les points de passage les plus proches d'un endroit (cinq au plus, à moins de 260) */
-function nearest(p) {
-  const list = [];
-  for (let i = 0; i < COUNT; i++) {
-    const d = dist(p, POINTS[i]);
-    if (list.length < 5 || d < list[list.length - 1][0]) {
-      let k = list.length;
-      while (k > 0 && list[k - 1][0] > d) k--;
-      list.splice(k, 0, [d, i]);
-      if (list.length > 5) list.pop();
-    }
-  }
-  return list.filter((x, k) => k === 0 || x[0] < 260);
-}
+const ALL_LINKS = [...linksOf(LANE_LINKS), ...linksOf(JUNGLE_LINKS), ...linksOf(RIVER_LINKS)];
 const pathLen = (pts) => { let s = 0; for (let i = 1; i < pts.length; i++) s += dist(pts[i - 1], pts[i]); return s; };
-/** Le chemin d'un endroit à un autre, par les couloirs de la carte. */
-export function route(a, b) {
-  const direct = dist(a, b);
-  if (direct < 110) return [a, b];
-  let best = null;
-  for (const [da, i] of nearest(a)) for (const [db, j] of nearest(b)) {
-    const len = da + D[i][j] + db;
-    if (!best || len < best.len) best = { i, j, len };
+/** De quoi trouver son chemin dans un jeu de couloirs : le plus court chemin entre tous les points de passage est calculé une fois.
+    allow(nom, endroit) : ce point de passage peut-il servir d'entrée (ou de sortie) directe pour cet endroit ? (par défaut, tous)
+    strict(a, b) : entre ces deux endroits, pas de ligne droite, même s'ils sont proches (par défaut, jamais)
+    spare : le jeu de couloirs vers lequel se rabattre quand aucun de ceux-ci ne mène à destination */
+function makeRouter(links, allow, strict, spare) {
+  const D = POINTS.map(() => new Float64Array(COUNT).fill(Infinity)), NEXT = POINTS.map(() => new Int16Array(COUNT).fill(-1));
+  for (let i = 0; i < COUNT; i++) { D[i][i] = 0; NEXT[i][i] = i; }
+  for (const [a, b] of links) {
+    const i = INDEX.get(a), j = INDEX.get(b), d = dist(POINTS[i], POINTS[j]);
+    if (d < D[i][j]) { D[i][j] = D[j][i] = d; NEXT[i][j] = j; NEXT[j][i] = i; }
   }
-  /* tout près : inutile de faire un détour par un point de passage */
-  if (!best || (direct < 230 && best.len > direct * 1.45)) return [a, b];
-  const pts = [a];
-  let k = best.i;
-  pts.push(POINTS[k]);
-  for (let guard = 0; k !== best.j && guard < COUNT; guard++) { k = NEXT[k][best.j]; pts.push(POINTS[k]); }
-  pts.push(b);
-  /* les points confondus sont retirés */
-  const out = [pts[0]];
-  for (let i = 1; i < pts.length; i++) if (dist(out[out.length - 1], pts[i]) > 6 || i === pts.length - 1) out.push(pts[i]);
-  if (out.length > 2 && dist(out[out.length - 2], out[out.length - 1]) <= 6) out.splice(out.length - 2, 1);
-  return out;
+  for (let k = 0; k < COUNT; k++) for (let i = 0; i < COUNT; i++) {
+    const ik = D[i][k];
+    if (ik === Infinity) continue;
+    for (let j = 0; j < COUNT; j++) if (ik + D[k][j] < D[i][j]) { D[i][j] = ik + D[k][j]; NEXT[i][j] = NEXT[i][k]; }
+  }
+  /* les points de passage les plus proches d'un endroit (cinq au plus, à moins de 260) */
+  function nearest(p) {
+    const list = [];
+    for (let i = 0; i < COUNT; i++) {
+      if (allow && !allow(NAMES[i], p)) continue;
+      const d = dist(p, POINTS[i]);
+      if (list.length < 5 || d < list[list.length - 1][0]) {
+        let k = list.length;
+        while (k > 0 && list[k - 1][0] > d) k--;
+        list.splice(k, 0, [d, i]);
+        if (list.length > 5) list.pop();
+      }
+    }
+    return list.filter((x, k) => k === 0 || x[0] < 260);
+  }
+  /** Le chemin d'un endroit à un autre, par les couloirs de la carte. */
+  function route(a, b) {
+    const direct = dist(a, b), around = !!strict && strict(a, b);
+    if (direct < 110 && !around) return [a, b];
+    let best = null;
+    for (const [da, i] of nearest(a)) for (const [db, j] of nearest(b)) {
+      const len = da + D[i][j] + db;
+      if (!best || len < best.len) best = { i, j, len };
+    }
+    /* tout près (ou aucun couloir ne mène là) : inutile de faire un détour par un point de passage */
+    if (spare && (!best || !Number.isFinite(best.len))) return spare.route(a, b);
+    if (!best || !Number.isFinite(best.len) || (!around && direct < 230 && best.len > direct * 1.45)) return [a, b];
+    const pts = [a];
+    let k = best.i;
+    pts.push(POINTS[k]);
+    for (let guard = 0; k !== best.j && guard < COUNT; guard++) { k = NEXT[k][best.j]; pts.push(POINTS[k]); }
+    pts.push(b);
+    /* les points confondus sont retirés */
+    const out = [pts[0]];
+    for (let i = 1; i < pts.length; i++) if (dist(out[out.length - 1], pts[i]) > 6 || i === pts.length - 1) out.push(pts[i]);
+    if (out.length > 2 && dist(out[out.length - 2], out[out.length - 1]) <= 6) out.splice(out.length - 2, 1);
+    return out;
+  }
+  return { route, routeLen: (a, b) => pathLen(route(a, b)) };
 }
-export const routeLen = (a, b) => pathLen(route(a, b));
+/* tous les couloirs, sans restriction : pour se déplacer de son côté de la carte et dans sa propre base */
+const FREE = makeRouter(ALL_LINKS, null, null, null);
+export const route = FREE.route, routeLen = FREE.routeLen;
+/* Dans la base adverse, on n'entre que par une voie dont l'inhibiteur est tombé : ses portes côté jungle ne s'ouvrent qu'à ses défenseurs,
+   et l'on ne passe pas devant un inhibiteur debout. Un jeu de couloirs par cas (base visée, voies ouvertes), calculé à la demande.
+   (La carte est symétrique : la voie du haut arrive dans la base rouge par le reflet de la voie du bas des bleus.) */
+export const INHIB_NODE = [['ti0', 'mi0', 'bi0'], ['bi1', 'mi1', 'ti1']];
+export const HEART = 196;
+const SIEGE = new Map();
+function siegeRouter(def, open) {
+  const key = def + ':' + open.map((o) => (o ? 1 : 0)).join('');
+  if (SIEGE.has(key)) return SIEGE.get(key);
+  const closed = new Set(INHIB_NODE[def].filter((k, l) => !open[l])), gates = new Set(['g2' + def, 'g6' + def]), heart = 'n' + def, fount = 'f' + def;
+  const barred = (k) => gates.has(k) || closed.has(k);
+  const links = ALL_LINKS.filter(([a, b]) => !((a === heart && barred(b)) || (b === heart && barred(a))));
+  const nexus = NEXUS[def];
+  /* un endroit du cœur de la base (à moins de HEART du Nexus : là où se joue l'assaut final) ne se rejoint que par une voie ouverte ;
+     un endroit du dehors ne donne jamais droit dans le cœur */
+  const doors = new Set(INHIB_NODE[def].filter((k, l) => open[l]).concat([heart, fount]));
+  const inside = (p) => dist(p, nexus) < HEART;
+  /* (et l'on ne coupe pas tout droit pour y entrer ou en sortir, même de tout près) */
+  const router = makeRouter(links, (name, p) => (inside(p) ? doors.has(name) : name !== heart && name !== fount), (a, b) => inside(a) !== inside(b), FREE);
+  SIEGE.set(key, router);
+  return router;
+}
 
 /* ---------- les camps de la jungle ---------- */
 /* hold : temps passé à tuer le camp (à l'écran) ; respawn : délai de réapparition ; spawn : première apparition (secondes de jeu).
@@ -437,8 +470,9 @@ export function planMoves(sim, kits = []) {
         const back = Math.atan2(-o[1], -o[0]);
         lose.forEach((i, k) => { const ang = back + (k - (lose.length - 1) / 2) * 0.62; out.set(i, [c[0] + Math.cos(ang) * 58, c[1] + Math.sin(ang) * 58]); });
       } else {
+        /* devant les tours du Nexus : deux rangs serrés, qui tiennent dans le cœur de la base */
         anchor = def ? [830, 170] : [170, 830];
-        faceOff(out, list, anchor, U, 44, 58);
+        faceOff(out, list, anchor, U, 44, 46, 0);
       }
     } else {
       /* dans la rivière ou dans la jungle : du côté du prochain objectif */
@@ -682,6 +716,12 @@ export function planMoves(sim, kits = []) {
     /* la Téléportation du toplaner : passé la phase de lane, prête toutes les cinq minutes de jeu */
     const canTp = (x) => role === 0 && gameAt(x) > LANING_END && gameAt(x) - tpAt >= TP_EVERY;
     const push = (t, p, k = 'h') => { keys.push({ t, x: p[0], y: p[1], k }); cur.t = t; cur.p = p; };
+    /* ses chemins : dans la base adverse, il n'entre que par une voie ouverte — celles dont l'inhibiteur sera tombé quand commencera
+       l'événement où il se rend (aim : l'état de la carte à ce moment-là) */
+    const foe = 1 - side;
+    let aim = state[0];
+    const ways = () => { const s = aim; if (!s.ways) s.ways = [null, null]; return s.ways[side] || (s.ways[side] = siegeRouter(foe, [0, 1, 2].map((l) => s.lost[foe][l] >= 4))); };
+    const route = (a, b) => ways().route(a, b), routeLen = (a, b) => ways().routeLen(a, b);
     const kind = (k) => { keys[keys.length - 1].k = k; };
     const stay = (until, k = 'h') => { if (until > cur.t + 1) { kind(k); push(until, cur.p); } };
     const walkPath = (path, speed, k = 'w') => {
@@ -796,7 +836,8 @@ export function planMoves(sim, kits = []) {
     /** Occupe le joueur jusqu'à « deadline », où il doit se trouver à « target » (ou n'importe où si target est nul). */
     function routine(deadline, target, sneak) {
       queue = [];
-      const tp = !!target && canTp(deadline);
+      /* (on ne se téléporte pas au cœur de la base adverse : il y entrera à pied, par une voie ouverte) */
+      const tp = !!target && canTp(deadline) && dist(target, NEXUS[foe]) >= HEART;
       for (let guard = 0; guard < 600 && cur.t < deadline - 150; guard++) {
         const act = nextAction(deadline, target);
         if (!act) break;
@@ -855,6 +896,7 @@ export function planMoves(sim, kits = []) {
     stay(60 + role * 70 + rnd() * 260, 'h');
     for (const A of appts[i]) {
       const a = at[A.n], e = ev[A.n];
+      aim = state[A.n];
       if (A.spot) {
         /* il arrive en avance de « margin » ; s'il vient de loin, il a jusqu'au début de l'événement */
         const soonest = cur.t + routeLen(cur.p, A.spot) / VFAST;
@@ -887,6 +929,7 @@ export function planMoves(sim, kits = []) {
         if (!next || !next.spot || cur.t + 1000 + routeLen(home, next.spot) / VFAST < at[next.n].tau - next.margin) recall();
       }
     }
+    aim = state[N];
     routine(total, null, false);
     vit.end(total);
     tracks.push(keys); life.push(vit.hp); mana.push(vit.mp);

@@ -2,6 +2,7 @@
    Le serveur a déjà joué toute la partie ; il envoie la suite des événements et cet écran les met en scène. */
 import { cardHTML, esc, iconUrl } from './cards.js';
 import { DDRAGON, ROLE_LABEL, STORE } from './config.js';
+import { createFans } from './fans.js';
 import { createFx } from './fx.js';
 import { KITS, RESOURCES } from './kits.js';
 import { CAMPS, KILL_GAP, NEXUS, NEXUS_TOWERS, PIT, SHOW_LEAD, STRUCT, TRAILS, planMoves, sample } from './moves.js';
@@ -113,14 +114,16 @@ export function runMatch({ data, cat, fx }) {
     + '<div class="mv-map"><div class="mv-map-in">' + mapSVG() + '<svg class="mv-beams" viewBox="0 0 1000 1000" aria-hidden="true"></svg></div>'
     + '<div class="mv-replay"><div class="mv-replay-top"><span>Temps fort</span><b></b></div><div class="mv-replay-foot"></div></div></div>'
     + sideHTML(1) + '</div>'
-    + '<div class="mv-cast" aria-live="polite"></div>'
+    /* le commentaire : l'action en cours dans un bandeau, les précédentes au-dessous ; à côté, de temps en temps, la réaction (inventée) d'un fan */
+    + '<div class="mv-cast"><div class="mv-talk" aria-live="polite"><article class="mv-now"></article><div class="mv-past"></div></div><aside class="mv-social"></aside></div>'
     + '<footer class="mv-ctrl"><button class="op-icon" type="button" data-act="pause" aria-label="Pause ou reprise"></button>'
     + '<div class="mv-speed" role="group" aria-label="Vitesse">' + [1, 2, 4].map((v) => '<button type="button" data-speed="' + v + '">×' + v + '</button>').join('') + '</div>'
     + '<span class="spacer"></span><button class="op-icon" type="button" data-act="sound" aria-label="Couper ou remettre le son"></button>'
     + '<button class="btn" type="button" data-act="skip">Passer</button></footer></section>'
     + '<section class="mv-end"></section>';
   const $ = (sel) => root.querySelector(sel);
-  const mapEl = $('.mv-map'), mapIn = $('.mv-map-in'), beams = $('.mv-beams'), cast = $('.mv-cast'), banner = $('.mv-replay'), endEl = $('.mv-end');
+  const mapEl = $('.mv-map'), mapIn = $('.mv-map-in'), beams = $('.mv-beams'), banner = $('.mv-replay'), endEl = $('.mv-end');
+  const nowEl = $('.mv-now'), pastEl = $('.mv-past'), socialEl = $('.mv-social');
   const H = {};
   root.querySelectorAll('[data-h]').forEach((n) => { H[n.dataset.h] = n; });
   const built = new Map(Array.from(root.querySelectorAll('[data-b]'), (n) => [n.dataset.b, n]));
@@ -366,12 +369,41 @@ export function runMatch({ data, cat, fx }) {
     /* la barre d'or grossit l'écart pour qu'il se voie */
     H.bar.style.width = clamp(50 + (ev.g[0] / (ev.g[0] + ev.g[1]) - 0.5) * 400, 6, 94).toFixed(1) + '%';
   }
+  /* Le commentaire, façon retransmission : l'action en cours dans un bandeau (son pictogramme, son heure, son titre quand c'est un temps fort),
+     les deux précédentes au-dessous. Les noms des joueurs et des équipes ressortent dans le texte. */
+  const EVENT_ICON = { tower: 'i-tower', inhib: 'i-tower', dragon: 'i-drake', elder: 'i-drake', baron: 'i-baron', herald: 'i-herald', grubs: 'i-grubs', nexus: 'mark', start: 'mark' };
+  const rich = (() => {
+    const names = new Map();
+    P.forEach((p) => { if (p.name.length > 1) names.set(esc(p.name), ''); });
+    [0, 1].forEach((s) => { names.set(esc(M.teams[s].short), ' class="s' + s + '"'); names.set(esc(M.teams[s].name), ' class="s' + s + '"'); });
+    let re = null;
+    try {
+      const alt = [...names.keys()].sort((a, b) => b.length - a.length).map((n) => n.replace(/[.*+?^$(){}|[\]\\]/g, '\\$&')).join('|');
+      re = new RegExp('(?<![\\p{L}\\p{N}])(' + alt + ')(?![\\p{L}\\p{N}])', 'gu');
+    } catch (e) { re = null; }   /* un navigateur trop ancien pour cette recherche : le texte reste tel quel */
+    return (txt) => { const safe = esc(txt); return re ? safe.replace(re, (m) => '<b' + (names.get(m) || '') + '>' + m + '</b>') : safe; };
+  })();
+  const lineHTML = (e) => '<p class="mv-line' + (e.s >= 0 ? ' s' + e.s : '') + (e.hl ? ' hl' : '') + '"><time>' + clockText(e.t) + '</time><span>' + esc(e.txt) + '</span></p>';
+  let said = null, fans = null, postAt = -1;
   function say(ev) {
-    const p = document.createElement('p');
-    p.className = 'mv-line' + (ev.s >= 0 ? ' s' + ev.s : '') + (ev.hl ? ' hl' : '');
-    p.innerHTML = '<time>' + clockText(ev.t) + '</time><span>' + esc(ev.txt) + '</span>';
-    cast.prepend(p);
-    while (cast.children.length > 6) cast.lastChild.remove();
+    /* l'action précédente descend dans le fil */
+    if (said) { pastEl.insertAdjacentHTML('afterbegin', lineHTML(said)); while (pastEl.children.length > 3) pastEl.lastChild.remove(); }
+    said = ev;
+    nowEl.className = 'mv-now' + (ev.s >= 0 ? ' s' + ev.s : '') + (ev.hl ? ' hl' : '');
+    nowEl.innerHTML = '<span class="mv-now-i">' + icon(EVENT_ICON[ev.k] || 'i-play') + '</span><time>' + clockText(ev.t) + '</time>'
+      + '<p>' + (ev.hl ? '<em>' + esc(ev.hl) + '</em>' : '') + rich(ev.txt) + '</p>';
+    pop(nowEl);
+    react(ev);
+  }
+  /** De temps en temps, un fan réagit à l'action (fans.js : des messages inventés, de faux comptes). */
+  function react(ev) {
+    const n = events.indexOf(ev), r = n >= 0 && fans ? fans(ev, n, kda) : null;
+    /* une réaction ne reste pas à l'écran quand la partie est passée à autre chose : elle s'efface après quatre actions */
+    if (!r) { if (socialEl.firstChild && n - postAt >= 4) socialEl.firstChild.classList.add('gone'); return; }
+    postAt = n;
+    socialEl.innerHTML = '<article class="mv-post"><span class="mv-post-a" style="--av:' + r.color + '">' + esc(r.name.charAt(0)) + '</span>'
+      + '<div class="mv-post-h"><b>' + esc(r.name) + '</b><i>' + esc(r.handle) + '</i></div><p>' + rich(r.text) + '</p>'
+      + '<div class="mv-post-f"><span>' + icon('i-heart') + r.likes + '</span><span>' + icon('i-repost') + r.shares + '</span><em>réaction fictive</em></div></article>';
   }
   /** Fait tomber (ou relève) un bâtiment de la carte. */
   function fall(key, down, quiet) {
@@ -607,7 +639,10 @@ export function runMatch({ data, cat, fx }) {
     P.forEach((p, i) => { kda[i] = { k: 0, d: 0, a: 0 }; setDead(i, false); drawKda(i); tokens[i].classList.remove('fight', 'ulting', 'hurt'); });
     banner.classList.remove('done');
     draw(true);
-    cast.innerHTML = '<p class="mv-line"><time>0:00</time><span>Bienvenue sur la Faille de l\'invocateur : ' + esc(M.teams[0].name) + ' contre ' + esc(M.teams[1].name) + '.</span></p>';
+    said = null; pastEl.innerHTML = ''; socialEl.innerHTML = ''; postAt = -1;
+    /* les réactions des fans repartent du début : les mêmes, aux mêmes moments, quand on revoit la partie */
+    fans = createFans({ P, teams: M.teams, sim });
+    say({ t: 0, k: 'start', s: -1, kills: [], txt: 'Bienvenue sur la Faille de l\'invocateur : ' + M.teams[0].name + ' contre ' + M.teams[1].name + '.' });
     hud({ sc: [0, 0], g: [2500, 2500], tw: [0, 0], dr: [0, 0], bn: [0, 0] });
     root.classList.remove('slow');
     mapIn.style.transform = 'translate(0%,0%) scale(1)';
