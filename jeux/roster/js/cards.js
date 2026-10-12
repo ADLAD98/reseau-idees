@@ -63,8 +63,19 @@ export const iconUrl = (cat, champId) => DDRAGON + '/' + cat.ddragon + '/img/cha
 export const flagUrl = (code) => 'drapeaux/' + code.toLowerCase() + '.svg';
 export const statsOf = (card) => (card.kind === 'c' ? COACH_STATS : PLAYER_STATS);
 
-const BACK = '<div class="card-face card-back"><svg class="back-mark" viewBox="0 0 100 100" aria-hidden="true"><use href="#mark"/></svg>'
-  + '<span class="back-word">' + GAME_NAME + '</span><div class="card-frame"></div></div>';
+/* Le dos, le même pour toutes les cartes : un médaillon gravé autour de la marque du jeu (deux cercles et leurs soixante graduations,
+   deux losanges, un cœur plein), des axes, deux filets qui suivent la silhouette. Le tout en dorure, sur un fond guilloché. */
+const BACK = '<div class="card-face card-back"><svg class="back-art" viewBox="0 0 100 140" preserveAspectRatio="none" aria-hidden="true">'
+  + '<g fill="none" stroke="url(#cardGold)">'
+  + '<path stroke-width=".42" d="M10.9 7H89.1L93 10.9V125.15L50 132.9 7 125.15V10.9Z"/><path stroke-width=".2" d="M12.3 9.3H87.7L90.7 12.3V123.4L50 130.7 9.3 123.4V12.3Z"/>'
+  + '<circle cx="50" cy="62" r="27.5" stroke-width=".5"/><circle cx="50" cy="62" r="24.2" stroke-width=".22"/><circle cx="50" cy="62" r="25.85" stroke-width="1.5" stroke-dasharray=".32 2.387"/>'
+  + '<path stroke-width=".62" d="M50 41 71 62 50 83 29 62Z"/><path stroke-width=".28" d="M50 46.5 65.5 62 50 77.5 34.5 62Z"/><path stroke-width=".22" d="M35.2 47.2H64.8V76.8H35.2Z"/>'
+  + '<path stroke-width=".28" d="M50 9.3V34.5M50 89.5V96.6M9.3 62H22.5M77.5 62H90.7"/>'
+  + '<path stroke-width=".28" d="M30 100H47M53 100H70"/></g>'
+  + '<g fill="url(#cardGold)" stroke="none"><path d="M50 55.5 56.5 62 50 68.5 43.5 62Z"/>'
+  + '<path d="M50 19 52.6 21.6 50 24.2 47.4 21.6ZM50 32.9 51.6 34.5 50 36.1 48.4 34.5ZM50 87.9 51.6 89.5 50 91.1 48.4 89.5ZM20.9 62 22.5 60.4 24.1 62 22.5 63.6ZM75.9 62 77.5 60.4 79.1 62 77.5 63.6Z'
+  + 'M50 98.3 51.7 100 50 101.7 48.3 100ZM50 122.3 51.9 124.2 50 126.1 48.1 124.2Z"/></g></svg>'
+  + '<span class="back-word">' + GAME_NAME + '</span><span class="back-sub">Cartes e-sport</span><div class="card-frame"></div></div>';
 /* silhouette affichée quand une carte n'a pas de photo, ou que la photo ne se charge pas */
 const SILHOUETTE = '<svg class="card-ph" viewBox="0 0 100 100" aria-hidden="true"><use href="#silhouette"/></svg>';
 
@@ -89,6 +100,8 @@ export function cardHTML(card, cat, opts = {}) {
     + '<div class="card-in"><div class="card-face card-front">'
     + '<div class="card-bg"></div>'
     + (pr > 1 ? '<div class="card-rays"></div>' : '')
+    /* derrière le joueur, l'illustration de son champion fétiche (les full art n'en ont pas : le portrait remplit la carte) */
+    + (card.art && (!v || v === 'holo') ? '<img class="card-art" src="' + DDRAGON + '/img/champion/loading/' + esc(card.art) + '.jpg" alt="" ' + load + '>' : '')
     /* édition KC : le « mur bleu » ; holographique et édition KC : une feuille de métal irisée derrière le joueur, et ses paillettes */
     + (v === 'kc' ? '<div class="card-wall"></div>' : '')
     + (v === 'holo' || v === 'kc' ? '<div class="card-foil"></div><div class="card-spark"></div>' : '')
@@ -136,4 +149,6 @@ export function tiltCard(el, max = 20) {
 document.addEventListener('error', (e) => {
   const img = e.target;
   if (img && img.classList && img.classList.contains('card-photo')) img.outerHTML = SILHOUETTE;
+  /* une illustration qui ne charge pas : la carte garde son décor nu */
+  else if (img && img.classList && img.classList.contains('card-art')) img.remove();
 }, true);

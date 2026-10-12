@@ -148,7 +148,8 @@ export function createDuels(ctx) {
             act: async (body) => { d = (await call('POST', '/api/duel/act', { id: d.id, champ: body.champ, role: body.role, step: body.step, auto: body.auto })).duel; return shape(d); },
             resync: async () => (await fetchDuel()).match,
             live: d.bot ? null : { poll: async () => shape(await fetchDuel()), deadline: d.deadline, now: ctx.now, foe: d.foe.name },
-            confirmLeave: d.bot ? null : () => confirmQuit(d),
+            /* (un serveur plus ancien ne connaît pas le forfait : quitter n'y est pas abandonner) */
+            confirmLeave: d.bot || !('forfeitAt' in d) ? null : () => confirmQuit(d),
           });
           if (out.left) { await giveUp(); break; }
           /* l'adversaire a quitté pendant la draft */
