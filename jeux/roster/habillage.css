@@ -106,6 +106,24 @@ body{background:
 .ms.done{border-left-color:var(--blue)}
 .ms.bonus{border-left-color:var(--gold)}
 
+/* ---------- un écran encore vide : un losange, puis ce qu'il y a à y faire ---------- */
+p.empty{position:relative;padding:36px 26px 30px;border-style:dashed;border-color:var(--line2);background:linear-gradient(180deg,rgba(9,20,40,.55),rgba(4,12,22,.35));font-size:16.5px;line-height:1.5}
+p.empty::before{content:"";display:block;width:13px;height:13px;margin:0 auto 16px;transform:rotate(45deg);border:1px solid var(--gold);background:rgba(200,170,110,.12);box-shadow:0 0 0 5px rgba(200,170,110,.06),0 0 16px rgba(200,170,110,.35)}
+
+/* ---------- la collection : ses chiffres, le classeur ligue par ligue, la barre des filtres ---------- */
+.tally b small{margin-left:1px;font-size:.52em;font-weight:600;color:var(--mut)}
+.lg-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:0 0 14px}
+.lg-strip button{display:grid;grid-template-columns:auto minmax(20px,1fr) auto;align-items:center;gap:10px;min-width:0;height:40px;padding:0 12px;border:1px solid var(--line);
+  background:linear-gradient(90deg,rgba(11,24,44,.85),rgba(6,14,27,.45));color:var(--mut);text-align:left;transition:border-color .15s,color .15s,box-shadow .15s}
+.lg-strip b{font:400 13px/1 var(--title);letter-spacing:.12em;color:var(--ink);white-space:nowrap}
+.lg-strip .bar{height:3px}
+.lg-strip em{font:600 12px/1 var(--text);font-style:normal;font-variant-numeric:tabular-nums;white-space:nowrap}
+.lg-strip button:hover{border-color:var(--gold-lo);color:var(--ink)}
+.lg-strip button.on{border-color:var(--gold);box-shadow:inset 0 0 16px rgba(200,170,110,.12)}
+.lg-strip button.on b{color:var(--gold-hi)}
+.lg-strip button.on .bar i{background:linear-gradient(90deg,var(--gold-lo),var(--gold));box-shadow:0 0 10px var(--gold)}
+.filters{padding:12px;border:1px solid var(--line);background:linear-gradient(180deg,rgba(9,20,40,.7),rgba(4,12,22,.5))}
+
 @media (max-width:1080px){
   .hub{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
   .hub-col{grid-column:1/-1}
@@ -131,4 +149,10 @@ body{background:
   .hub-stats b{font-size:20px}
   .hub-stats span{font-size:9.5px;letter-spacing:.08em}
   .hub-rating b{font-size:50px}
+  .lg-strip{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+  .lg-strip button{grid-template-columns:1fr auto;gap:6px;height:36px;padding:0 9px}
+  .lg-strip .bar{display:none}
+  .lg-strip b{font-size:12px;letter-spacing:.08em}
+  .lg-strip em{font-size:11.5px}
+  .filters{padding:10px}
 }

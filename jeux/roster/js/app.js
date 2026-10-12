@@ -754,7 +754,16 @@ function viewCollection(main) {
   const option = (value, text, current) => '<option value="' + esc(value) + '"' + (String(current) === String(value) ? ' selected' : '') + '>' + esc(text) + '</option>';
   const teams = cat.teams.filter((t) => !f.league || t.league === f.league);
   if (f.team && !teams.some((t) => t.id === f.team)) f.team = '';
-  main.innerHTML = '<div class="col-head"><div><h1 class="h1">Collection</h1><p>' + S.owned.size + ' cartes sur ' + cat.cards.length + ' · ' + S.player.cardsTotal + ' exemplaires en tout</p></div></div>'
+  /* en tête : trois chiffres (cartes, part du classeur, doublons), puis le classeur ligue par ligue — un clic sur une ligue le filtre */
+  const dupes = [...S.owned.values()].reduce((n, o) => n + Math.max(0, o.qty - 1), 0);
+  const leagues = cat.leagues.map((l) => {
+    const all = cat.cards.filter((c) => c.league === l.id), n = all.filter((c) => S.owned.has(c.id)).length;
+    return '<button type="button" data-lg="' + esc(l.id) + '"' + (f.league === l.id ? ' class="on"' : '') + ' title="' + esc(l.name) + ' : ' + n + ' cartes sur ' + all.length + '"><b>' + esc(l.name) + '</b><span class="bar"><i style="width:' + pct(n, all.length) + '%"></i></span><em>' + n + '/' + all.length + '</em></button>';
+  }).join('');
+  main.innerHTML = '<div class="col-head"><div><h1 class="h1">Collection</h1><p>' + S.owned.size + ' cartes sur ' + cat.cards.length + ' · ' + S.player.cardsTotal + ' exemplaires en tout</p></div>'
+    + '<div class="tally"><div><b>' + S.owned.size + '<small>/' + cat.cards.length + '</small></b><span>cartes</span></div><div><b>' + pct(S.owned.size, cat.cards.length) + '<small> %</small></b><span>du classeur</span></div>'
+    + '<div class="gold"><b>' + num(dupes) + '</b><span>' + (dupes > 1 ? 'doublons' : 'doublon') + '</span></div></div></div>'
+    + '<div class="lg-strip" id="lgStrip">' + leagues + '</div>'
     + '<div class="filters">'
     + '<input class="inp" id="fq" type="search" placeholder="Joueur ou équipe…" value="' + esc(f.q) + '" autocomplete="off">'
     /* sur téléphone, les listes de filtres se replient derrière ce bouton */
@@ -806,6 +815,13 @@ function viewCollection(main) {
     e.currentTarget.classList.toggle('on', S.filtersOpen);
     e.currentTarget.setAttribute('aria-expanded', String(S.filtersOpen));
     $('#fbox').classList.toggle('open', S.filtersOpen);
+  });
+  $('#lgStrip').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-lg]');
+    if (!b) return;
+    f.league = f.league === b.dataset.lg ? '' : b.dataset.lg;
+    sfx.click();
+    viewCollection(main);
   });
   const keepGroup = () => { try { localStorage.setItem(STORE + 'classeur', f.group + '/' + f.rsort); } catch (e) { /* réglage non gardé */ } };
   main.querySelectorAll('[data-f]').forEach((sel) => sel.addEventListener('change', () => {
