@@ -432,6 +432,23 @@ body.fx .card.v-full .card-holo,.card.v-full .card-holo{opacity:.5;mix-blend-mod
   linear-gradient(116deg,rgba(255,255,255,0) 28%,rgba(120,205,255,.2) 42%,rgba(255,255,255,0) 56%),
   linear-gradient(180deg,#082273 0%,#04113c 50%,#01050f 100%)}
 .card.v-kc .card-bg::after,.card.v-full .card-bg::after,.card.v-legend .card-bg::after{display:none}
+
+/* ---------- édition Signature : le full art d'un champion du monde, signé à son nom au feutre doré ----------
+   Tout le reste est celui du full art (la carte en porte aussi la classe) ; ses couleurs sont un or pâle, quel que soit le rang. */
+.card.v-sign .card-front{--tc:#f3dc9a;--hi:#fffbe9;--lo:#8a6a22}
+.card-sign{position:absolute;left:2%;right:2%;top:44%;display:flex;flex-direction:column;align-items:center;transform:rotate(-8deg);pointer-events:none}
+.card-sign span{padding:0 5cqw;font:400 min(27cqw,calc(176cqw / var(--n)))/1.15 'Mrs Saint Delafield','Segoe Script','Brush Script MT',cursive;white-space:nowrap;
+  background:linear-gradient(100deg,#fffdf0 0,#f6dc95 28%,#ffffff 48%,#e0b858 70%,#fff6d2 100%) var(--hx,40%) 0/260% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;
+  /* l'encre se détache du décor : une ombre serrée tout autour, une ombre portée, puis un léger halo doré */
+  filter:drop-shadow(0 0 .5cqw rgba(8,6,2,.95)) drop-shadow(0 .7cqw .9cqw rgba(0,0,0,.85)) drop-shadow(0 0 1.8cqw rgba(255,226,140,.4))}
+.card-sign i{width:60%;height:1cqw;margin:-1.2cqw 0 0 12%;border-radius:50%;transform:rotate(-2deg);background:linear-gradient(90deg,rgba(255,240,184,0),#f0d48a 18%,#fff6cf 55%,rgba(255,240,184,0));
+  filter:drop-shadow(0 0 .4cqw rgba(8,6,2,.9)) drop-shadow(0 .5cqw .6cqw rgba(0,0,0,.8))}
+@keyframes signInk{0%,55%{background-position:115% 0}100%{background-position:-45% 0}}
+body.fx .card.v-sign:not(.tilting) .card-sign span{animation:signInk 7s ease-in-out infinite}
+.card.v-sign .card-mark{background:linear-gradient(105deg,#fffbe9,#f3dc9a 34%,#b58a2e 60%,#fff3c4 100%) var(--hx) 0/220% 100%;box-shadow:0 0 2.4cqw rgba(255,226,140,.6)}
+.tiers .v-sign i{background:linear-gradient(135deg,#fffbe9,#f3dc9a 45%,#b58a2e);box-shadow:0 0 9px #f3dc9a}
+.chip.v-sign{border-color:#f3dc9a;color:#fff6d6;background:rgba(243,220,154,.12)}
+b.v-sign,span.v-sign{color:#f3dc9a;font-weight:600}
 .card-wall{position:absolute;inset:0;overflow:hidden;pointer-events:none;
   background:repeating-linear-gradient(90deg,rgba(150,220,255,0) 0,rgba(150,220,255,.3) 1cqw,rgba(150,220,255,0) 2cqw,rgba(150,220,255,0) 8.6cqw);
   -webkit-mask-image:linear-gradient(to bottom,#000 0,#000 42%,transparent 74%);mask-image:linear-gradient(to bottom,#000 0,#000 42%,transparent 74%)}

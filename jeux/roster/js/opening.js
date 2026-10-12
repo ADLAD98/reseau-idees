@@ -27,7 +27,8 @@ const RAINBOW = ['#ff9cc6', '#ffd88a', '#a8ffdc', '#9ccfff', '#d3b4ff', '#ffffff
 const KC_BLUE = ['#39b8ff', '#ffffff', '#0b47ff', '#9be7ff'];
 const DIAMOND = ['#ffffff', '#bfe7ff', '#9cc8ff', '#ffe9c4'];
 const CEO_GOLD = ['#ffd978', '#fff6d6', '#39b8ff', '#f0cd72'];
-const dustOf = (card) => (card.edition === 'ceo' && !card.variant ? CEO_GOLD : card.variant === 'legend' ? DIAMOND : card.variant === 'kc' ? KC_BLUE : card.variant === 'holo' ? RAINBOW
+const SIGN_GOLD = ['#fff6cf', '#f3dc9a', '#ffffff', '#c79a3e'];
+const dustOf = (card) => (card.edition === 'ceo' && !card.variant ? CEO_GOLD : card.variant === 'sign' ? SIGN_GOLD : card.variant === 'legend' ? DIAMOND : card.variant === 'kc' ? KC_BLUE : card.variant === 'holo' ? RAINBOW
   : card.tier === 5 ? PRISM : [TIER_COLOR[card.tier], '#ffffff', '#f0e6d2']);
 /* l'éclat d'une carte, de 1 à 5 : son rang, relevé d'un cran pour une holographique et de deux pour une full art ; le plus fort pour une édition limitée */
 const shineOf = (card) => (card.limited ? 5 : Math.min(5, card.tier + variantRank(card)));
@@ -194,7 +195,7 @@ export async function runOpening({ request, getCat, fx, size, from, look, quick 
   const setInfo = (html, pulse) => { info.innerHTML = html; info.classList.toggle('pulse', !!pulse); };
   /* la lumière de la scène prend la couleur de la carte */
   const setBeam = (card) => {
-    op.style.setProperty('--beam', card.limited && !card.variant ? '#ffd978' : card.variant === 'legend' ? '#dff3ff' : card.variant === 'kc' ? '#39b8ff' : card.tier >= 3 ? TIER_COLOR[card.tier] : '#c8aa6e');
+    op.style.setProperty('--beam', card.limited && !card.variant ? '#ffd978' : card.variant === 'sign' ? '#f3dc9a' : card.variant === 'legend' ? '#dff3ff' : card.variant === 'kc' ? '#39b8ff' : card.tier >= 3 ? TIER_COLOR[card.tier] : '#c8aa6e');
     op.dataset.tier = card.tier; op.dataset.variant = card.variant || '';
   };
   let untilt = null, omenTimer = 0, endApo = null, song = null;

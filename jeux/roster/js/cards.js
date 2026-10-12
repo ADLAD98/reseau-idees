@@ -17,6 +17,8 @@ export const VARIANTS = {
   kc: { suffix: '~k', name: 'Full art KC', mark: 'KC', rank: 3 },
   /* l'édition légendaire : un full art « diamant », avec sa propre note et tous les trophées mondiaux du joueur */
   legend: { suffix: '~l', name: 'Légendaire', mark: 'Légende', rank: 4 },
+  /* l'édition Signature : le full art d'un champion du monde, signé à son nom (une signature dessinée par le jeu, pas son autographe) */
+  sign: { suffix: '~s', name: 'Signature', mark: 'Signature', rank: 5 },
 };
 /** Les années d'un joueur à la Karmine, telles qu'on les écrit sur sa carte : « Karmine Corp · 2023–2024 », « KC Blue · depuis 2025 ». */
 export function karmineEra(cat, card) {
@@ -163,7 +165,9 @@ export function cardHTML(card, cat, opts = {}) {
   const len = Math.max(7, Array.from(card.name).length);
   const load = 'loading="' + (opts.eager ? 'eager' : 'lazy') + '" decoding="async" draggable="false"';
   /* (l'édition légendaire et les cartes hors série gardent leur cadre propre, réglé pour leur photo) */
-  const fr = v === 'legend' || ed ? null : framing(card, v === 'full' ? 'full' : v === 'kc' ? 'kc' : 'std');
+  /* (une Signature est un full art : même cadrage, même champion en bas-relief derrière lui) */
+  const full = v === 'full' || v === 'sign';
+  const fr = v === 'legend' || ed ? null : framing(card, full ? 'full' : v === 'kc' ? 'kc' : 'std');
   const picture = photo
     ? '<div class="card-pic' + (fr ? ' framed" style="' + fr.fade : '') + '"><img class="card-photo' + (fr ? fr.cls + '" style="' + fr.box : '') + '" src="' + photo + '" alt="" ' + load + '></div>'
     : SILHOUETTE;
@@ -175,13 +179,13 @@ export function cardHTML(card, cat, opts = {}) {
   const flag = card.country
     ? '<img class="card-flag" src="' + flagUrl(card.country) + '" alt="' + esc(cat.countries[card.country]) + '" title="' + esc(cat.countries[card.country]) + '" loading="lazy" draggable="false">'
     : '';
-  return '<article class="card t' + card.tier + (card.kind === 'c' ? ' is-coach' : '') + (v ? ' v-' + v : '') + (ed ? ' e-' + ed : '') + (pr ? ' is-prestige' + (pr > 1 ? ' is-icon' : '') : '')
+  return '<article class="card t' + card.tier + (card.kind === 'c' ? ' is-coach' : '') + (v ? ' v-' + v + (v === 'sign' ? ' v-full' : '') : '') + (ed ? ' e-' + ed : '') + (pr ? ' is-prestige' + (pr > 1 ? ' is-icon' : '') : '')
     + (qty ? ' stack' + (qty > 2 ? ' s3' : '') : '') + (opts.cls ? ' ' + opts.cls : '') + '" data-id="' + esc(card.id) + '">'
     + '<div class="card-in"><div class="card-face card-front">'
     + '<div class="card-bg"></div>'
     + (pr > 1 ? '<div class="card-rays"></div>' : '')
     /* derrière le joueur, l'illustration de son champion fétiche (sur un full art : sculptée en bas-relief ; à défaut, le blason de son équipe) */
-    + (card.art && !ed && v !== 'kc' ? '<img class="card-art"' + (v === 'full' ? ' style="filter:url(#basRelief) brightness(.8) contrast(1.08)"' : '') + ' src="' + DDRAGON + '/img/champion/loading/' + esc(card.art) + '.jpg" alt="" ' + load + '>' : v === 'full' ? crestOf(card.team) : '')
+    + (card.art && !ed && v !== 'kc' ? '<img class="card-art"' + (full ? ' style="filter:url(#basRelief) brightness(.8) contrast(1.08)"' : '') + ' src="' + DDRAGON + '/img/champion/loading/' + esc(card.art) + '.jpg" alt="" ' + load + '>' : full ? crestOf(card.team) : '')
     /* édition KC : le « mur bleu » et le blason de la Karmine en relief ; holographique et édition KC : une feuille de métal irisée, et ses paillettes */
     + (v === 'kc' ? '<div class="card-wall"></div>' + crestOf('KC') : '')
     + (v === 'holo' || v === 'kc' ? '<div class="card-foil"></div><div class="card-spark"></div>' : '')
@@ -196,6 +200,8 @@ export function cardHTML(card, cat, opts = {}) {
     /* édition légendaire : devant lui, quelques éclats */
     + (v === 'legend' ? '<div class="card-spark"></div>' : '')
     + '<div class="card-shade"></div>'
+    /* édition Signature : son nom, tracé au feutre doré en travers de la carte, et le trait qui le souligne */
+    + (v === 'sign' ? '<div class="card-sign" style="--n:' + len + '" aria-hidden="true"><span>' + esc(card.name) + '</span><i></i></div>' : '')
     + '<div class="card-side"><span class="card-ovr">' + card.ovr + '</span><span class="card-role">' + esc(card.label || ROLE_LABEL[card.role]) + '</span><i></i>'
     + flag + (club ? '<img class="card-club" src="' + club + '" alt="" ' + load + '>' : '') + '<span class="card-league">' + esc(card.league) + '</span></div>'
     + '<div class="card-plate">'

@@ -903,7 +903,8 @@ function showSheet(id) {
         : card.ovr < 10 ? '<p class="note">Une carte hors série, pour rire : elle sort des packs comme les autres, mais mieux vaut un banc vide que ce coach-là.</p>'
           : '<p class="note">Aucune partie officielle jouée cette saison : la note est celle d\'un remplaçant.</p>')
     + (card.champs && card.champs.length ? '<div><h3 class="h2">Champions fétiches</h3><div class="champs">' + card.champs.map((c) => '<div class="champ"><img src="' + iconUrl(cat, c[0]) + '" alt="" loading="lazy"><div><b>' + esc(champName(cat, c[0])) + '</b><span>' + c[1] + ' parties · ' + pct(c[2], c[1]) + ' %</span></div></div>').join('') + '</div></div>' : '')
-    + (card.variant === 'legend' ? '<p class="note">Édition légendaire de ' + esc(card.name) + ' : la carte la plus rare du jeu. Contrairement aux autres versions, elle a sa propre note et ses propres statistiques, et porte tous ses titres mondiaux. Elle prend parfois la place de la carte bonus d\'un pack.</p>'
+    + (card.variant === 'sign' ? '<p class="note">Édition Signature de ' + esc(card.name) + ' : le full art d\'un champion du monde, signé à son nom. Même joueur, même note que sa carte ordinaire. Elle prend parfois la place de la carte bonus d\'un pack : c\'est l\'une des cartes les plus rares du jeu. (La signature est dessinée par le jeu : ce n\'est pas son autographe.)</p>'
+      : card.variant === 'legend' ? '<p class="note">Édition légendaire de ' + esc(card.name) + ' : la carte la plus rare du jeu. Contrairement aux autres versions, elle a sa propre note et ses propres statistiques, et porte tous ses titres mondiaux. Elle prend parfois la place de la carte bonus d\'un pack.</p>'
       : card.variant ? '<p class="note">' + (card.variant === 'kc' ? 'Édition Karmine Corp de la carte de ' + esc(card.name) + ' (' + esc(karmineEra(cat, card)) + '), réservée à celles et ceux qui portent ou ont porté ses couleurs'
       : 'Version ' + (card.variant === 'holo' ? 'holographique' : 'full art') + ' de la carte de ' + esc(card.name)) + ' : même joueur, même note, un autre habillage. Elle sort parfois d\'un pack à la place de la carte ordinaire, et se collectionne à part.</p>' : '')
     + '<p class="note">Note calculée à partir des statistiques officielles de la saison ' + cat.season + ' (ligue, tournois internationaux, palmarès). Données : Leaguepedia.</p>'
@@ -1061,7 +1062,7 @@ async function viewProfile(main) {
       + [5, 4, 3].map((t) => line('un ' + tierName(t), 'var(--t' + t + ')', (c) => c.tiers[t - 1])).join('')
       + [3, 4, 5].map((t) => line('un ' + tierName(t) + ' holographique', 'var(--t' + t + ')', (c) => c.holo[t - 1], 'sub')).join('')
       + [4, 5].map((t) => line('un ' + tierName(t) + ' full art', 'var(--t' + t + ')', (c) => c.full[t - 1], 'sub')).join('')
-      + line('un full art KC', '#4cc3ff', (c) => c.kc, 'sub') + line('une légendaire', '#f0e6d2', (c) => c.legend, 'sub')
+      + line('un full art KC', '#4cc3ff', (c) => c.kc, 'sub') + line('une légendaire', '#f0e6d2', (c) => c.legend, 'sub') + line('une Signature', '#f3dc9a', (c) => c.sign || 0, 'sub')
       + '</tbody></table>'
       + '<p class="hint">Chaque pack est un tirage au hasard, indépendant des précédents : « 1 pack sur 150 » est une moyenne, pas un compteur — on peut en trouver deux de suite, ou aucun pendant longtemps. Plus une carte est forte, plus sa version spéciale est rare.</p>'
     : '';
@@ -1071,6 +1072,8 @@ async function viewProfile(main) {
       const from = S.cat.tiers.filter((t) => t.id >= v.minTier).map((t) => t.name);
       /* (les éditions limitées sont annoncées plus bas, avec ce qu'il en reste) */
       /* l'édition légendaire ne remplace pas une carte tirée : elle prend parfois la place de la carte bonus */
+      /* l'édition Signature se tire de la même façon : la carte signée d'un champion du monde, à la place de la carte bonus */
+      if (v.id === 'sign') return '<p class="hint"><b class="v-sign">' + esc(v.name) + '</b> — la carte bonus est la carte signée d\'un champion du monde dans ' + data.packs.map((p) => 'un ' + (p.price ? 'booster à crédits' : 'pack gratuit') + ' sur ' + Math.round(1 / (p.sign || v.pack))).join(', ') + ' (' + v.cards + (v.cards > 1 ? ' cartes' : ' carte') + ').</p>';
       if (v.id === 'legend') return '<p class="hint"><b class="v-legend">' + esc(v.name) + '</b> — la carte bonus est une carte légendaire dans ' + data.packs.map((p) => 'un ' + (p.price ? 'booster à crédits' : 'pack gratuit') + ' sur ' + Math.round(1 / (p.legend || v.pack))).join(', ') + ' (' + v.cards + (v.cards > 1 ? ' cartes' : ' carte') + ').</p>';
       /* l'édition KC ne dépend pas du rang : elle concerne les joueurs et les coachs passés par la Karmine */
       if (v.id === 'kc') return '<p class="hint"><b class="v-kc">' + esc(v.name) + '</b> — ' + (byTier(v) || show(v.chance)) + ' passés par la Karmine Corp (' + v.cards + ' cartes) sortent dans cette édition.</p>';
