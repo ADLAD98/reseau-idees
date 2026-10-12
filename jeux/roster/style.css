@@ -292,11 +292,34 @@ body.fx .card.v-full .card-holo,.card.v-full .card-holo{opacity:.5;mix-blend-mod
 .sel option{background:#091428;color:var(--ink)}
 .filters-row{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom:24px}
 .filters-row .seg{min-width:340px}
+.filters-row .seg.small{min-width:250px}
 .count{color:var(--mut);font-size:14.5px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(184px,1fr));gap:8px 4px;margin:0 -8px}
 .grid .tile{padding:10px 8px;content-visibility:auto;contain-intrinsic-size:auto 184px auto 256px}
 .grid .badge{top:2px;right:0}
 .grid .badge.qty{top:auto;bottom:2px}
+/* le classeur par roster : une page par équipe */
+.ros-league{margin:34px 0 4px}
+.ros-league:first-child{margin-top:6px}
+.ros-league small{font:600 12px/1 var(--text);letter-spacing:.12em;color:var(--mut)}
+.ros{border-top:1px solid var(--line)}
+.ros-league+.ros{border-top:0}
+.ros-head{display:flex;align-items:center;gap:8px 18px;padding:18px 0 8px;cursor:pointer;list-style:none}
+.ros-head::-webkit-details-marker{display:none}
+.ros-head::before{content:"";flex:none;width:8px;height:8px;margin:0 3px;border-right:1.5px solid var(--gold);border-bottom:1.5px solid var(--gold);transform:rotate(45deg) translate(-2px,-2px);transition:transform .2s}
+.ros:not([open]) .ros-head::before{transform:rotate(-45deg)}
+.ros:not([open]) .ros-head{padding-bottom:18px}
+.ros-name{flex:1;display:flex;align-items:baseline;gap:12px;min-width:0}
+.ros-name b{min-width:0;font:400 23px/1.1 var(--title);letter-spacing:.07em;text-transform:uppercase;color:var(--gold-hi);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ros-name i{flex:none;font:600 12px/1 var(--text);font-style:normal;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);white-space:nowrap}
+.ros-name u{flex:none;align-self:center;padding:4px 8px 3px;border:1px solid var(--gold);font:700 10.5px/1 var(--text);letter-spacing:.16em;text-indent:.16em;text-transform:uppercase;text-decoration:none;color:var(--gold)}
+.ros-meter{flex:none;display:flex;align-items:center;gap:14px;color:var(--mut);font-size:14.5px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ros-meter b{font:400 21px/1 var(--title);color:var(--gold-hi)}
+.ros-meter em{display:flex;align-items:center;gap:6px;font-style:normal;color:#a8e6ff}
+.ros-meter em::before{content:"";width:7px;height:7px;transform:rotate(45deg);background:linear-gradient(135deg,#ff9cc6,#ffd88a,#a8ffdc,#9ccfff)}
+.ros-meter .bar{width:130px}
+.ros.done .ros-meter .bar i{background:linear-gradient(90deg,var(--gold-lo),var(--gold));box-shadow:0 0 10px var(--gold)}
+.ros:hover .ros-name b{color:#fff}
 
 /* ---------- fiche d'une carte ---------- */
 .sheet{position:fixed;inset:0;z-index:40;display:grid;place-items:center;padding:24px;background:rgba(1,6,12,.9);overflow:auto;animation:fade .2s}
@@ -402,7 +425,14 @@ body.fx .card.v-full .card-holo,.card.v-full .card-holo{opacity:.5;mix-blend-mod
   .filters-toggle.on{color:var(--gold-hi);border-image:linear-gradient(#f0e6d2,#c8aa6e) 1}
   .filters-more{display:none;grid-column:1/-1;grid-template-columns:repeat(2,1fr);gap:10px}
   .filters-more.open{display:grid}
-  .filters-row .seg{min-width:0;width:100%}
+  .filters-row .seg,.filters-row .seg.small{min-width:0;width:100%}
+  .filters-row{gap:10px 18px}
+  .ros-head{flex-wrap:wrap;padding-top:14px}
+  .ros-name{flex-basis:calc(100% - 30px);flex-wrap:wrap;gap:6px 10px}
+  .ros-name b{font-size:19px}
+  .ros-meter{margin-left:22px;gap:10px}
+  .ros-meter .bar{width:92px}
+  .ros-league{margin-top:26px}
   .grid{grid-template-columns:repeat(3,1fr);gap:6px 0;margin:0 -5px}
   .grid .tile{padding:8px 5px;contain-intrinsic-size:auto 118px auto 168px}
   .badge{top:-6px;right:-5px;padding:4px 6px 3px;font-size:10px}

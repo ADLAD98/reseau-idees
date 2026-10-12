@@ -25,7 +25,8 @@ const S = {
   skew: 0,                // heure du serveur − heure de cet appareil
   cat: null,              // catalogue des cartes
   owned: new Map(),       // identifiant de carte → { qty, at }
-  filters: { q: '', league: '', team: '', role: '', tier: '', variant: '', own: '', sort: 'ovr' },
+  /* group : '' (toutes les cartes à la suite) ou 'roster' (une page par équipe) ; rsort : ordre des rosters */
+  filters: { q: '', league: '', team: '', role: '', tier: '', variant: '', own: '', sort: 'ovr', group: '', rsort: 'league' },
   fx: true,               // animations
   filtersOpen: false,     // listes de filtres dépliées (téléphone)
   opening: false,
@@ -99,6 +100,11 @@ async function loadGame() {
 }
 async function boot() {
   try { S.fx = localStorage.getItem(STORE + 'fx') !== '0'; } catch (e) { S.fx = true; }
+  try {
+    const kept = (localStorage.getItem(STORE + 'classeur') || '').split('/');
+    S.filters.group = kept[0] === 'roster' ? 'roster' : '';
+    if (['league', 'done', 'rating'].includes(kept[1])) S.filters.rsort = kept[1];
+  } catch (e) { /* réglage non gardé */ }
   document.body.classList.toggle('fx', S.fx);
   S.session = loadSession();
   if (!S.session) return showAuth();
@@ -331,12 +337,62 @@ function filteredCards() {
   };
   return list.sort(sorts[f.sort] || sorts.ovr);
 }
+/* Le classeur rangé par roster : une page par équipe, ses joueurs dans l'ordre des postes puis son coach.
+   L'avancement d'un roster compte toutes ses cartes, même celles que les filtres cachent. */
+function rosterGroups(list) {
+  const cat = S.cat, shown = new Map();
+  for (const c of list) { const g = shown.get(c.team); if (g) g.push(c); else shown.set(c.team, [c]); }
+  const byRole = (a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role) || b.ovr - a.ovr || a.name.localeCompare(b.name) || variantRank(a) - variantRank(b);
+  const groups = [];
+  for (const [id, cards] of shown) {
+    const team = cat.teamById.get(id) || { id, name: id, short: id, league: cards[0].league };
+    const all = cat.base.filter((c) => c.team === id), special = cat.cards.filter((c) => c.variant && c.team === id);
+    /* note du roster : le meilleur joueur de chaque poste */
+    const best = ['TOP', 'JGL', 'MID', 'BOT', 'SUP'].map((r) => Math.max(0, ...all.filter((c) => c.role === r).map((c) => c.ovr))).filter(Boolean);
+    groups.push({
+      team, cards: cards.sort(byRole), total: all.length, have: all.filter((c) => S.owned.has(c.id)).length,
+      special: special.length, haveSpecial: special.filter((c) => S.owned.has(c.id)).length,
+      rating: best.length ? Math.round(best.reduce((a, b) => a + b, 0) / best.length) : 0,
+    });
+  }
+  const leagueRank = (g) => { const i = cat.leagues.findIndex((l) => l.id === g.team.league); return i < 0 ? 99 : i; };
+  const byName = (a, b) => a.team.name.localeCompare(b.team.name, 'fr', { sensitivity: 'base' });
+  const orders = {
+    league: (a, b) => leagueRank(a) - leagueRank(b) || byName(a, b),
+    done: (a, b) => b.have / b.total - a.have / a.total || b.have - a.have || b.haveSpecial - a.haveSpecial || byName(a, b),
+    rating: (a, b) => b.rating - a.rating || byName(a, b),
+  };
+  return groups.sort(orders[S.filters.rsort] || orders.league);
+}
+function rostersHTML(groups) {
+  const cat = S.cat, byLeague = S.filters.rsort === 'league';
+  let html = '', league = null;
+  for (const g of groups) {
+    if (byLeague && g.team.league !== league) {
+      league = g.team.league;
+      const info = cat.leagues.find((l) => l.id === league), mine = groups.filter((x) => x.team.league === league);
+      const full = mine.filter((x) => x.have === x.total).length;
+      html += '<h2 class="h2 ros-league">' + esc(info ? info.name : league) + '<small>' + (info ? esc(info.region) + ' · ' : '') + (full ? full + (full > 1 ? ' rosters complets' : ' roster complet') : mine.reduce((sum, x) => sum + x.have, 0) + ' cartes') + '</small></h2>';
+    }
+    const done = g.have === g.total;
+    html += '<details class="ros' + (done ? ' done' : '') + '" open data-team="' + esc(g.team.id) + '"><summary class="ros-head">'
+      + '<span class="ros-name"><b>' + esc(g.team.name) + '</b>' + (done ? '<u>Complet</u>' : '') + '<i>' + esc(g.team.league) + ' · note ' + g.rating + '</i></span>'
+      + '<span class="ros-meter"><span><b>' + g.have + '</b> / ' + g.total + '</span>'
+      + (g.special ? '<em title="Versions spéciales">' + g.haveSpecial + ' / ' + g.special + '</em>' : '')
+      + '<span class="bar"><i style="width:' + pct(g.have, g.total) + '%"></i></span></span></summary>'
+      + '<div class="grid">' + g.cards.map((c) => tile(c)).join('') + '</div></details>';
+  }
+  return html;
+}
 function drawGrid() {
   const grid = document.getElementById('grid');
   if (!grid) return;
-  const list = filteredCards();
-  $('#gridCount').textContent = list.length + (list.length > 1 ? ' cartes affichées' : ' carte affichée') + ' · ' + list.filter((c) => S.owned.has(c.id)).length + ' possédées';
-  grid.innerHTML = list.length ? list.map((c) => tile(c)).join('') : '';
+  const list = filteredCards(), roster = S.filters.group === 'roster';
+  const groups = roster ? rosterGroups(list) : [];
+  $('#gridCount').textContent = list.length + (list.length > 1 ? ' cartes affichées' : ' carte affichée') + ' · ' + list.filter((c) => S.owned.has(c.id)).length + ' possédées'
+    + (roster && groups.length ? ' · ' + groups.length + (groups.length > 1 ? ' rosters' : ' roster') : '');
+  grid.className = roster ? 'rosters' : 'grid';
+  grid.innerHTML = !list.length ? '' : roster ? rostersHTML(groups) : list.map((c) => tile(c)).join('');
   $('#gridEmpty').hidden = list.length > 0;
 }
 function viewCollection(main) {
@@ -357,9 +413,14 @@ function viewCollection(main) {
     + '<select class="sel" data-f="role" aria-label="Poste">' + option('', 'Tous les postes', f.role) + ROLE_ORDER.map((r) => option(r, ROLE_NAME[r], f.role)).join('') + '</select>'
     + '<select class="sel" data-f="tier" aria-label="Rang">' + option('', 'Tous les rangs', f.tier) + [...cat.tiers].reverse().map((t) => option(t.id, t.name, f.tier)).join('') + '</select>'
     + '<select class="sel" data-f="variant" aria-label="Version">' + option('', 'Toutes les versions', f.variant) + option('base', 'Ordinaires', f.variant) + Object.entries(VARIANTS).map(([id, v]) => option(id, v.name + (id === 'holo' ? 's' : ''), f.variant)).join('') + '</select>'
-    + '<select class="sel" data-f="sort" aria-label="Tri">' + [['ovr', 'Tri : note'], ['name', 'Tri : nom'], ['team', 'Tri : équipe'], ['recent', 'Tri : récentes'], ['qty', 'Tri : exemplaires']].map((s) => option(s[0], s[1], f.sort)).join('') + '</select>'
+    /* par roster, les cartes d'une équipe suivent l'ordre des postes : la liste de tri range alors les rosters entre eux */
+    + (f.group === 'roster'
+      ? '<select class="sel" data-f="rsort" aria-label="Ordre des rosters">' + [['league', 'Rosters : par ligue'], ['done', 'Rosters : les plus complets'], ['rating', 'Rosters : les mieux notés']].map((s) => option(s[0], s[1], f.rsort)).join('') + '</select>'
+      : '<select class="sel" data-f="sort" aria-label="Tri">' + [['ovr', 'Tri : note'], ['name', 'Tri : nom'], ['team', 'Tri : équipe'], ['recent', 'Tri : récentes'], ['qty', 'Tri : exemplaires']].map((s) => option(s[0], s[1], f.sort)).join('') + '</select>')
     + '</div></div><div class="filters-row"><div class="seg" id="fown">'
     + [['all', 'Toutes'], ['owned', 'Possédées'], ['missing', 'Manquantes']].map((o) => '<button type="button" data-own="' + o[0] + '"' + (f.own === o[0] ? ' class="on"' : '') + '>' + o[1] + '</button>').join('')
+    + '</div><div class="seg small" id="fgroup" role="group" aria-label="Rangement du classeur">'
+    + [['', 'À la suite'], ['roster', 'Par roster']].map((o) => '<button type="button" data-group="' + o[0] + '"' + (f.group === o[0] ? ' class="on"' : '') + '>' + o[1] + '</button>').join('')
     + '</div><span class="count" id="gridCount"></span></div>'
     + '<div class="grid" id="grid"></div><p class="empty" id="gridEmpty" hidden>Aucune carte ne correspond à ces filtres.</p>';
   drawGrid();
@@ -371,10 +432,19 @@ function viewCollection(main) {
     e.currentTarget.setAttribute('aria-expanded', String(S.filtersOpen));
     $('#fbox').classList.toggle('open', S.filtersOpen);
   });
+  const keepGroup = () => { try { localStorage.setItem(STORE + 'classeur', f.group + '/' + f.rsort); } catch (e) { /* réglage non gardé */ } };
   main.querySelectorAll('[data-f]').forEach((sel) => sel.addEventListener('change', () => {
     f[sel.dataset.f] = sel.value;
+    if (sel.dataset.f === 'rsort') keepGroup();
     if (sel.dataset.f === 'league') viewCollection(main); else drawGrid();
   }));
+  $('#fgroup').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-group]');
+    if (!b || b.dataset.group === f.group) return;
+    f.group = b.dataset.group;
+    keepGroup();
+    viewCollection(main);
+  });
   $('#fown').addEventListener('click', (e) => {
     const b = e.target.closest('[data-own]');
     if (!b) return;

@@ -113,14 +113,25 @@
 /* ---------- la draft ---------- */
 .dr{position:fixed;inset:0;z-index:45;display:flex;flex-direction:column;overflow:hidden;animation:fade .25s;
   background:radial-gradient(90% 70% at 50% 40%,#0b2136 0,#04121f 58%,#010810 100%);-webkit-user-select:none;user-select:none;touch-action:manipulation}
+/* couleur de l'action en cours : turquoise quand on choisit un champion, rouge quand on en interdit un */
+.dr{--act:var(--blue);--act-hi:var(--blue-hi);--act-glow:rgba(10,200,185,.6)}
+.dr[data-mode="ban"]{--act:#ff5468;--act-hi:#ffd9de;--act-glow:rgba(255,84,104,.65)}
+/* le fond rouge des bans et son liseré se fondent en douceur d'une phase à l'autre */
+.dr::before{content:"";position:absolute;inset:0;z-index:-1;opacity:0;pointer-events:none;transition:opacity .5s;
+  background:radial-gradient(90% 70% at 50% 40%,#3d0f1a 0,#1d070d 56%,#0a0205 100%)}
+.dr::after{content:"";position:absolute;inset:0;z-index:4;opacity:0;pointer-events:none;transition:opacity .5s;
+  box-shadow:inset 0 0 0 2px rgba(255,84,104,.6),inset 0 0 110px rgba(255,84,104,.2)}
+.dr[data-mode="ban"]::before,.dr[data-mode="ban"]::after{opacity:1}
 .dr[data-you="0"]{--foe:var(--s1)}
 .dr[data-you="1"]{--foe:var(--s0)}
 .dr-head{display:flex;align-items:center;gap:10px;height:66px;padding:0 max(16px,env(safe-area-inset-left));flex:none}
 .dr .op-icon,.mv .op-icon{font:400 19px/1 var(--title)}
 .dr-phase{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;min-width:0;text-align:center}
-.dr-step{font:600 12px/1 var(--text);letter-spacing:.2em;text-transform:uppercase;color:var(--blue)}
+.dr-step{padding:4px 10px 3px;font:600 12px/1 var(--text);letter-spacing:.2em;text-indent:.2em;text-transform:uppercase;color:var(--act);transition:color .3s,background .3s}
+.dr[data-mode="ban"] .dr-step{background:var(--act);color:#1b0409}
 .dr-title{font:400 24px/1 var(--title);letter-spacing:.14em;text-indent:.14em;text-transform:uppercase;color:var(--gold);white-space:nowrap;transition:color .2s}
-.dr[data-turn="me"] .dr-title{color:#fff;text-shadow:0 0 18px rgba(10,200,185,.65)}
+.dr[data-mode="ban"] .dr-title{color:#ff9aa7}
+.dr[data-turn="me"] .dr-title{color:#fff;text-shadow:0 0 18px var(--act-glow)}
 .dr-track{display:flex;justify-content:center;align-items:center;gap:4px;height:8px;margin-bottom:12px;flex:none}
 .dr-track i{--c:var(--s0);width:16px;height:4px;background:color-mix(in srgb,var(--c) 26%,transparent);transition:background .2s,box-shadow .2s}
 .dr-track i.s1{--c:var(--s1)}
@@ -177,6 +188,8 @@
 .dr-roles button:hover{color:var(--gold-hi)}
 .dr-roles button:disabled{opacity:.32;cursor:default}
 .dr-roles button.on{border-color:var(--gold);color:var(--gold-hi);background:linear-gradient(#1e2328,#383222)}
+.dr[data-mode="ban"] .dr-roles button{border-color:rgba(255,84,104,.3)}
+.dr[data-mode="ban"] .dr-roles button.on{border-color:var(--act);color:var(--act-hi);background:linear-gradient(#2b1118,#4a1722)}
 .dr-roles.idle{opacity:.45;pointer-events:none}
 .dr-q{flex:none;width:170px;height:46px!important}
 .dr-hint{min-height:17px;color:var(--faint);font-size:13px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -187,8 +200,13 @@
 .dr-ci img{display:block;width:100%;height:100%;object-fit:cover;transform:scale(1.12)}
 .dr-cn{max-width:100%;font:400 12.5px/1.15 var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dr-c:hover .dr-ci{border-color:var(--gold-hi)}
-.dr-c.on .dr-ci{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue),0 0 16px rgba(10,200,185,.6)}
-.dr-c.on .dr-cn{color:var(--blue-hi)}
+.dr-c.on .dr-ci{border-color:var(--act);box-shadow:0 0 0 1px var(--act),0 0 16px var(--act-glow)}
+.dr-c.on .dr-cn{color:var(--act-hi)}
+/* bans : cadres rouges, et le champion désigné est barré comme il le sera une fois interdit */
+.dr[data-mode="ban"] .dr-ci{position:relative;border-color:#6b2a35}
+.dr[data-mode="ban"] .dr-c:not(:disabled):hover .dr-ci{border-color:var(--act)}
+.dr[data-mode="ban"] .dr-c.on .dr-ci::after,.dr[data-mode="ban"] .dr-sel-i-box::after{content:"";position:absolute;inset:0;background:linear-gradient(to top right,transparent 46%,var(--act) 46% 54%,transparent 54%)}
+.dr[data-mode="ban"] .dr-c.on img{filter:grayscale(.5) brightness(.8)}
 .dr-c:disabled{cursor:default}
 .dr-c:disabled .dr-ci{border-color:#1a2330}
 .dr-c:disabled img{filter:grayscale(1) brightness(.32)}
@@ -203,7 +221,15 @@
 .dr-arrow.down::before{content:"▼";color:var(--alert)}
 .dr-foot{display:flex;align-items:center;gap:18px;min-height:94px;padding:12px max(16px,env(safe-area-inset-left)) calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:rgba(1,10,19,.72);flex:none}
 .dr-sel{flex:1;display:flex;align-items:center;gap:6px 16px;min-width:0}
-.dr-sel-i{flex:none;width:64px;height:64px;object-fit:cover;box-shadow:0 0 0 1px var(--gold)}
+.dr-sel-i-box{position:relative;flex:none;display:block;width:64px;height:64px;box-shadow:0 0 0 1px var(--gold)}
+.dr-sel-i{display:block;width:100%;height:100%;object-fit:cover}
+.dr[data-mode="ban"] .dr-sel-i-box{box-shadow:0 0 0 1px var(--act),0 0 14px var(--act-glow)}
+.dr[data-mode="ban"] .dr-sel-i{filter:grayscale(.5) brightness(.8)}
+.dr[data-mode="ban"] .dr-foot{border-top-color:rgba(255,84,104,.5);background:rgba(22,4,9,.8)}
+.dr[data-mode="ban"] .dr-foot .btn.primary{border-image:linear-gradient(#ff7d8d,#a31c31) 1;background:linear-gradient(#5a1322,#2b0810);color:#ffe3e7;text-shadow:0 0 12px rgba(255,84,104,.7)}
+.dr[data-mode="ban"] .dr-foot .btn.primary:hover{border-image:linear-gradient(#ffd9de,#ff5468) 1;background:linear-gradient(#7a1a2e,#3a0b16);color:#fff;box-shadow:0 0 24px rgba(255,84,104,.45)}
+.dr[data-mode="ban"] .dr-sel-t>b{color:#ffd9de}
+.dr[data-mode="ban"] .dr-q:focus{border-color:var(--act);box-shadow:0 0 0 3px rgba(255,84,104,.16)}
 .dr-sel-t{display:flex;flex-direction:column;gap:6px;min-width:0}
 .dr-sel-t>b{display:flex;align-items:baseline;gap:14px;font:400 21px/1 var(--title);letter-spacing:.08em;text-transform:uppercase;color:var(--gold-hi)}
 .dr-sel-t>span{color:var(--mut);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -537,7 +563,7 @@
   .dr-arrow{right:2px}
   .dr-foot{gap:10px;min-height:68px;padding:8px 10px calc(8px + env(safe-area-inset-bottom))}
   .dr-sel{flex-wrap:wrap;gap:2px 10px}
-  .dr-sel-i{width:46px;height:46px}
+  .dr-sel-i-box{width:46px;height:46px}
   .dr-sel-t{flex:1;gap:5px}
   .dr-sel-t>b{font-size:16px}
   .dr-sel-t>span,.dr-chip i{display:none}

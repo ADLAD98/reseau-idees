@@ -115,6 +115,8 @@ export function runDraft({ match, cat, fx, act, resync, toast, help }) {
     $('.dr-step').textContent = phase ? phase[2] : 'Draft terminée';
     $('.dr-title').textContent = !t ? 'Que la partie commence' : t.side === you ? (t.type === 'ban' ? 'À toi de bannir' : 'À toi de choisir') : m.teams[foe].short + (t.type === 'ban' ? ' bannit…' : ' choisit…');
     el.dataset.turn = !t ? 'over' : t.side === you ? 'me' : 'foe';
+    /* phase de bans : toute l'interface passe au rouge */
+    el.dataset.mode = !t ? 'over' : t.type;
     el.querySelectorAll('.dr-track i').forEach((tick, k) => { tick.classList.toggle('done', k < shown); tick.classList.toggle('now', k === shown); });
   }
   function syncTeams() {
@@ -218,7 +220,7 @@ export function runDraft({ match, cat, fx, act, resync, toast, help }) {
       chips = v ? chip('Danger', v.total, nameOf(foe, v.i) + (g ? ' · ' + games(g[0]) : ''), ' wide') : '<span class="dr-chip">Peu de danger : l\'adversaire n\'a plus de poste pour lui</span>';
       sub = CLASS_NAME[c.t] + ' · ' + DAMAGE_NAME[c.d] + (c.g ? ' · joué ' + c.g + ' fois et banni ' + c.b + ' fois par les pros cette saison' : '');
     }
-    box.innerHTML = '<img class="dr-sel-i" src="' + iconUrl(cat, sel) + '" alt="" draggable="false"><div class="dr-sel-t"><b>' + esc(c.n) + total + '</b><span>' + esc(sub) + '</span><div class="dr-chips">' + chips + '</div></div>';
+    box.innerHTML = '<span class="dr-sel-i-box"><img class="dr-sel-i" src="' + iconUrl(cat, sel) + '" alt="" draggable="false"></span><div class="dr-sel-t"><b>' + esc(c.n) + total + '</b><span>' + esc(sub) + '</span><div class="dr-chips">' + chips + '</div></div>';
   }
   function syncAll() { syncHead(); syncTeams(); syncRoles(); syncPool(); syncFoot(); }
   const pop = (node) => { if (!node) return; node.classList.remove('pop'); void node.offsetWidth; node.classList.add('pop'); };
