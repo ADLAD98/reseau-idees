@@ -284,7 +284,7 @@
 .dr-help-box p{color:var(--ink);font-size:15.5px}
 
 /* ---------- le match : présentation, partie, résultat ---------- */
-.mv{--map:min(100dvh - 306px,100vw - 520px,700px);position:fixed;inset:0;z-index:45;display:flex;flex-direction:column;overflow:hidden;animation:fade .3s;
+.mv{--map:min(100dvh - 338px,100vw - 520px,700px);position:fixed;inset:0;z-index:45;display:flex;flex-direction:column;overflow:hidden;animation:fade .3s;
   background:radial-gradient(90% 70% at 50% 42%,#0b2136 0,#04121f 58%,#010810 100%);-webkit-user-select:none;user-select:none;touch-action:manipulation}
 .mv-fx{position:absolute;inset:0;z-index:30;width:100%;height:100%;pointer-events:none}
 .mv-flash{position:absolute;inset:0;z-index:29;opacity:0;pointer-events:none;
@@ -349,6 +349,15 @@
 .mv-gold{justify-self:center;width:150px;height:5px;background:var(--s1);overflow:hidden}
 .mv-gold i{display:block;width:50%;height:100%;background:var(--s0);box-shadow:2px 0 0 #010a13;transition:width .6s}
 .mv-hud .pop{animation:tickup .45s ease-out}
+/* l'écart d'or poste par poste, comme sur une retransmission : la flèche pointe vers celui qui mène, à sa couleur */
+.mv-diff{grid-column:1/-1;justify-self:center;display:flex;gap:6px}
+.mv-diff span{display:flex;align-items:center;gap:8px;min-width:98px;height:22px;padding:0 9px;border:1px solid var(--line);background:rgba(6,14,27,.6);font:600 12px/1 var(--text);font-variant-numeric:tabular-nums}
+.mv-diff i{font:400 11px/1 var(--title);font-style:normal;letter-spacing:.1em;color:var(--mut)}
+.mv-diff b{flex:1;text-align:center;font-weight:600;color:var(--faint);white-space:nowrap}
+.mv-diff .s0 b{color:var(--s0)}
+.mv-diff .s1 b{color:var(--s1)}
+.mv-diff .s0 b::before{content:"◀";margin-right:5px;font-size:8px;vertical-align:1px}
+.mv-diff .s1 b::after{content:"▶";margin-left:5px;font-size:8px;vertical-align:1px}
 @keyframes tickup{0%{transform:scale(1.5);filter:brightness(1.8)}100%{transform:none}}
 .mv-mid{flex:1;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:18px;min-height:0}
 .mv-map{position:relative;width:var(--map);height:var(--map);overflow:hidden;background:#030c16;border:1px solid var(--gold-lo);box-shadow:0 0 0 1px #010a13,0 0 0 2px rgba(200,170,110,.22),0 20px 50px rgba(0,0,0,.5)}
@@ -503,11 +512,20 @@
 /* le nom de l'ultime qui a servi */
 .mv-kill em.r{font:600 11.5px/1 var(--text);letter-spacing:.04em;text-transform:none;color:var(--blue-hi)}
 .mv-kill em.r::before{content:"R";display:inline-block;margin-right:5px;padding:2px 4px;border:1px solid currentColor;font-size:9.5px;line-height:1}
-.mv-side{--c:var(--s0);display:flex;flex-direction:column;gap:8px;min-width:0;transition:opacity .4s}
+.mv-side{--c:var(--s0);display:flex;flex-direction:column;gap:6px;min-width:0;transition:opacity .4s}
 .mv-side.s1{--c:var(--s1)}
 .mv-p{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;grid-template-areas:"pw sp pn pk" "pw sp bars bars";align-items:center;gap:6px 9px;padding:6px 10px;border:1px solid var(--line);background:linear-gradient(90deg,rgba(11,24,44,.8),rgba(6,14,27,.4));transition:filter .3s,opacity .3s}
 .mv-side.s0 .mv-p{grid-template-columns:auto minmax(0,1fr) auto auto;grid-template-areas:"pk pn sp pw" "bars bars sp pw";text-align:right;border-right:2px solid var(--c);background:linear-gradient(270deg,rgba(11,24,44,.8),rgba(6,14,27,.4))}
 .mv-pw{grid-area:pw}.mv-pn{grid-area:pn}.mv-pk{grid-area:pk}
+/* sous ses barres : ses objets (six emplacements) et l'or qu'il a gagné */
+.mv-p{grid-template-areas:"pw sp pn pk" "pw sp bars bars" "it it it gd"}
+.mv-side.s0 .mv-p{grid-template-areas:"pk pn sp pw" "bars bars sp pw" "gd it it it"}
+.mv-it{grid-area:it;display:flex;gap:3px;min-width:0}
+.mv-side.s0 .mv-it{justify-content:flex-end}
+.mv-it img,.mv-it i{flex:none;display:block;width:21px;height:21px;background:#07111e;box-shadow:0 0 0 1px #2c3b4e}
+.mv-it img.new{animation:itemIn .7s cubic-bezier(.2,.8,.3,1.25)}
+@keyframes itemIn{from{transform:scale(1.9);filter:brightness(2.4)}}
+.mv-gd{grid-area:gd;font:600 13px/1 var(--text);color:var(--gold);font-variant-numeric:tabular-nums;white-space:nowrap}
 /* les deux sorts d'invocateur, l'un sous l'autre contre le portrait : grisés, avec les secondes qui restent, tant qu'ils ne sont pas revenus */
 .mv-sp{grid-area:sp;display:flex;flex-direction:column;gap:3px}
 .mv-sum{position:relative;display:block;width:20px;height:20px;overflow:hidden;box-shadow:0 0 0 1px #2c3b4e}
@@ -649,6 +667,10 @@
 .sb td.num b{display:inline;color:var(--gold-hi)}
 .sb td.cs i{margin-top:3px;font-size:11px}
 .sb tr.mvp td{background:rgba(200,170,110,.08)}
+/* le tableau des scores : l'or de chacun, et ses objets de fin de partie sur la ligne du dessous */
+.sb td.gd{color:var(--gold)}
+.sb tr.sb-it td{padding:0 8px 8px;border-top:0}
+.sb .mv-it img,.sb .mv-it i{width:24px;height:24px;border-radius:0}
 .sb tfoot td{padding-top:10px;color:var(--mut);font-size:13.5px}
 .end-box .more .note{margin-top:12px}
 .end-feed{display:grid;gap:7px;margin-top:16px}
@@ -665,12 +687,15 @@
   .dr-foot{min-height:78px;padding-top:8px;padding-bottom:8px}
   .dr-who{gap:3px}
   .dr-cname{min-height:0}
-  .mv{--map:min(100dvh - 268px,100vw - 520px,700px)}
-  .mv-hud{padding:8px 0}
-  .mv-cast{height:104px;padding-top:8px}
+  /* un écran bas : les lignes des joueurs se resserrent (objets plus petits), le commentaire garde deux lignes */
+  .mv{--map:min(100dvh - 272px,100vw - 520px,700px)}
+  .mv-side{gap:4px}
+  .mv-it img,.mv-it i{width:16px;height:16px}
+  .mv-hud{gap:6px 22px;padding:6px 0}
+  .mv-cast{height:82px;padding-top:8px}
   .mv-now{min-height:48px}
   .mv-now p{font-size:15.5px}
-  .mv-p{padding:4px 10px}
+  .mv-p{gap:3px 9px;padding:3px 10px}
 }
 
 /* ---------- téléphone ---------- */
@@ -779,7 +804,12 @@
   .dr-help-box{padding:20px 16px}
   .dr-help-box ul,.dr-help-box p{font-size:14.5px}
 
-  .mv{--map:min(100vw - 20px,46dvh)}
+  .mv{--map:min(100vw - 20px,41dvh)}
+  .mv-diff{width:100%;gap:3px}
+  .mv-diff span{flex:1;min-width:0;height:20px;gap:3px;padding:0 3px;font-size:10.5px}
+  .mv-diff i{font-size:9px;letter-spacing:.02em}
+  .mv-diff .s0 b::before{margin-right:2px;font-size:7px}
+  .mv-diff .s1 b::after{margin-left:2px;font-size:7px}
   .vs{gap:8px;padding:10px 10px calc(12px + env(safe-area-inset-bottom))}
   .vs-team{gap:6px}
   .vs-head{gap:8px}
@@ -822,6 +852,11 @@
   .mv-hp{height:4px}
   .mv-mp{height:2px}
   .mv-pn{display:none}
+  /* sur un téléphone : l'or sous ses sbires, puis ses objets en deux rangées de trois */
+  .mv-side .mv-p,.mv-side.s0 .mv-p,.mv-side.s1 .mv-p{grid-template-areas:"pw" "bars" "sp" "pk" "gd" "it"}
+  .mv-it,.mv-side.s0 .mv-it{display:grid;grid-template-columns:repeat(3,11px);gap:1px;justify-content:center}
+  .mv-it img,.mv-it i{width:11px;height:11px}
+  .mv-gd{font-size:10.5px}
   .mv-pi{width:30px;height:30px}
   .mv-r,.mv-side.s0 .mv-r{top:-3px;left:auto;right:-4px;width:11px;height:11px}
   .mv-lv,.mv-side.s0 .mv-lv{left:auto;right:-5px;bottom:-3px;min-width:14px;height:14px;padding:0 2px;font-size:9px;line-height:14px}

@@ -4,6 +4,7 @@ import { cardHTML, esc, iconUrl, logoHTML } from './cards.js';
 import { DDRAGON, ROLE_LABEL, STORE } from './config.js';
 import { createFans } from './fans.js';
 import { createFx } from './fx.js';
+import { BUILDS, BUILD_DEFAULT, ITEMS, SUPPORT_ITEM } from './items.js';
 import { KITS, RESOURCES, SPELLS, SPELL_DEFAULT, SPELL_PICKS } from './kits.js';
 import { CAMPS, KILL_GAP, NEXUS, NEXUS_TOWERS, PIT, SHOW_LEAD, STRUCT, TRAILS, planMoves, sample } from './moves.js';
 import { cheer } from './music.js';
@@ -13,6 +14,9 @@ import { closeVolume, toggleVolume } from './volume.js';
 
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 const clockText = (sec) => Math.floor(sec / 60) + ':' + String(Math.floor(sec % 60)).padStart(2, '0');
+const num = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '\u202f');
+/* le build d'un champion dont on ne connaît pas celui des pros à ce poste : celui du champion de la même classe (et des mêmes dégâts) le plus joué à ce poste */
+const defaultBuild = (role, info) => { const d = BUILD_DEFAULT[role] || {}; return d[(info.t || '') + '/' + (info.d || '')] || d[info.t || ''] || d[''] || []; };
 const kilo = (g) => (Math.round(g / 100) / 10).toFixed(1).replace('.', ',') + 'k';
 const icon = (id) => '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#' + id + '"/></svg>';
 const SIDE_COLORS = [['#4ea3ff', '#bfe0ff', '#ffffff'], ['#f0586a', '#ffc2c9', '#ffffff']];
@@ -72,7 +76,11 @@ export function runMatch({ data, cat, fx }) {
         /* un champion de duel (combattant, assassin) : au milieu, il ira tenir une voie de côté en fin de partie */
         split: info.t === 'Fighter' || info.t === 'Assassin',
         /* ses deux sorts d'invocateur : ceux que les pros prennent sur ce champion à ce poste, sinon ceux du poste */
-        sums: ((SPELL_PICKS[champ] && SPELL_PICKS[champ][ROLES[r]]) || SPELL_DEFAULT[ROLES[r]] || '').split('').filter((l) => SPELLS[l]) });
+        sums: ((SPELL_PICKS[champ] && SPELL_PICKS[champ][ROLES[r]]) || SPELL_DEFAULT[ROLES[r]] || '').split('').filter((l) => SPELLS[l]),
+        /* ce qu'il achète : le build que les pros prennent sur ce champion à ce poste (objet de départ, bottes, objets complets) ; pour un
+           support, la forme finale de son objet de quête */
+        build: (BUILDS[champ] && BUILDS[champ][ROLES[r]]) || defaultBuild(ROLES[r], info),
+        sup: SUPPORT_ITEM.final[champ] || SUPPORT_ITEM.final[''] });
     });
   }
   const short = (s) => M.teams[s].short;
@@ -96,6 +104,11 @@ export function runMatch({ data, cat, fx }) {
     + '<div class="vs-strips">' + [0, 1, 2, 3, 4].map((r) => strip(s * 5 + r)).join('') + '</div></div>';
   const stat = (sym, key, value) => '<span class="mv-s">' + icon(sym) + '<b data-h="' + key + '">' + value + '</b></span>';
   const hudTeam = (s) => '<div class="mv-t s' + s + '"><span class="mv-tn">' + crest(s) + esc(short(s)) + (s === you ? '<em>toi</em>' : '') + '</span><b data-h="k' + s + '">0</b></div>';
+  /* son duel de draft face à son vis-à-vis (positif : il lui est favorable) : il joue sur son farm */
+  const edgeOf = (i) => { const pk = data.report && data.report.picks; return pk && pk[P[i].side][i % 5] && pk[1 - P[i].side][i % 5] ? (pk[P[i].side][i % 5].counter || 0) - (pk[1 - P[i].side][i % 5].counter || 0) : 0; };
+  const itemTitle = (id) => (ITEMS[id] ? ITEMS[id][0] + ' — ' + num(ITEMS[id][1]) + ' PO' + (ITEMS[id][3] ? '\n' + ITEMS[id][3] : '') : '');
+  const itemsHTML = (ids, fresh) => ids.map((id) => '<img' + (fresh && fresh.has(id) ? ' class="new"' : '') + ' src="' + DDRAGON + '/' + cat.ddragon + '/img/item/' + id + '.png" alt="" title="' + esc(itemTitle(id)) + '" draggable="false">').join('')
+    + '<i></i>'.repeat(Math.max(0, 6 - ids.length));
   const hudObj = (s) => '<div class="mv-o s' + s + '">' + stat('i-coin', 'g' + s, '2,5k') + stat('i-tower', 'tw' + s, '0')
     + '<span class="mv-s">' + icon('i-drake') + '<span class="mv-dr" data-dr="' + s + '"><i></i><i></i><i></i><i></i></span></span>' + stat('i-baron', 'bn' + s, '0') + '</div>';
   const sideHTML = (s) => '<aside class="mv-side s' + s + '">' + [0, 1, 2, 3, 4].map((r) => {
@@ -111,7 +124,9 @@ export function runMatch({ data, cat, fx }) {
       + '<span class="mv-pk"><b data-kda="' + i + '">0/0/0</b><i data-cs="' + i + '" title="Sbires tués">0 CS</i></span>'
       /* sa vie, et sa ressource quand son champion en a une (mana, énergie, rage…) */
       + '<span class="mv-bars"><i class="mv-hp" title="Vie"><u data-hpl="' + i + '"></u><b data-hp="' + i + '"></b></i>'
-      + (p.res === 'n' ? '' : '<i class="mv-mp r-' + p.res + '" title="' + esc(RESOURCES[p.res] || 'Ressource') + '"><b data-mp="' + i + '"></b></i>') + '</span></div>';
+      + (p.res === 'n' ? '' : '<i class="mv-mp r-' + p.res + '" title="' + esc(RESOURCES[p.res] || 'Ressource') + '"><b data-mp="' + i + '"></b></i>') + '</span>'
+      /* ses objets (achetés à la boutique, au vrai prix) et l'or qu'il a gagné depuis le début */
+      + '<span class="mv-it" data-it="' + i + '"></span><b class="mv-gd" data-gd="' + i + '" title="Or gagné depuis le début de la partie">0,5k</b></div>';
   }).join('') + '</aside>';
 
   const root = document.createElement('div');
@@ -122,7 +137,9 @@ export function runMatch({ data, cat, fx }) {
     + '<section class="vs">' + vsTeam(0) + '<div class="vs-mid"><i></i><b>VS</b><i></i></div>' + vsTeam(1)
     + '<div class="vs-foot"><button class="btn primary big" type="button" data-act="start">' + (fx ? 'Lancer la partie' : 'Voir le résultat') + '</button></div></section>'
     + '<section class="mv-game"><header class="mv-hud">' + hudTeam(0) + '<div class="mv-clock"><b data-h="clock">0:00</b><span data-h="lead">égalité</span></div>' + hudTeam(1)
-    + hudObj(0) + '<div class="mv-gold"><i data-h="bar"></i></div>' + hudObj(1) + '</header>'
+    + hudObj(0) + '<div class="mv-gold"><i data-h="bar"></i></div>' + hudObj(1)
+    /* l'écart d'or poste par poste, comme sur une retransmission : la flèche pointe vers celui qui mène */
+    + '<div class="mv-diff" title="Écart d\'or entre les deux joueurs de chaque poste">' + ROLES.map((r, k) => '<span data-df="' + k + '"><i>' + ROLE_LABEL[r] + '</i><b>—</b></span>').join('') + '</div></header>'
     + '<div class="mv-mid">' + sideHTML(0)
     + '<div class="mv-map"><div class="mv-map-in">' + mapSVG() + '<svg class="mv-beams" viewBox="0 0 1000 1000" aria-hidden="true"></svg></div>'
     + '<div class="mv-replay"><div class="mv-replay-top"><span>Temps fort</span><b></b></div><div class="mv-replay-foot"></div></div></div>'
@@ -160,6 +177,8 @@ export function runMatch({ data, cat, fx }) {
   const hpRows = P.map((p, i) => root.querySelector('[data-hp="' + i + '"]')), mpRows = P.map((p, i) => root.querySelector('[data-mp="' + i + '"]'));
   const hpLag = P.map((p, i) => root.querySelector('[data-hpl="' + i + '"]'));
   const sumEls = P.map((p, i) => p.sums.map((l, k) => root.querySelector('[data-sum="' + i + '-' + k + '"]')));
+  const itEls = P.map((p, i) => root.querySelector('[data-it="' + i + '"]')), gdEls = P.map((p, i) => root.querySelector('[data-gd="' + i + '"]'));
+  const dfEls = ROLES.map((r, k) => root.querySelector('[data-df="' + k + '"]'));
   const scroll = document.body.style.overflow;
   document.body.style.overflow = 'hidden';
   document.body.appendChild(root);
@@ -173,7 +192,9 @@ export function runMatch({ data, cat, fx }) {
   const pos = P.map(() => [500, 500]), kda = P.map(() => ({ k: 0, d: 0, a: 0 })), score = [0, 0];
   /* Les déplacements de toute la partie sont calculés d'avance (moves.js). tau : l'instant affiché, en millisecondes à vitesse ×1. */
   const plan = planMoves(sim, P.map((p) => ({ res: p.res === 'm' ? 'mana' : p.res === 'e' ? 'energy' : p.res === 'n' ? 'none' : 'build', cd: p.ultCd, early: p.ultEarly, split: p.split,
-    sums: p.sums.map((l) => [l, SPELLS[l][1]]) })));
+    sums: p.sums.map((l) => [l, SPELLS[l][1]]),
+    /* pour son or (gold.js) : ses sbires par minute cette saison, son duel de draft, son build */
+    cspm: (p.card && p.card.real && p.card.real.cspm) || 0, edge: edgeOf(P.indexOf(p)), build: p.build, sup: p.sup })));
   let tau = 0, lastDraw = 0;
   const cursor = P.map(() => 0), shown = P.map(() => null), look = P.map(() => '?');
 
@@ -210,24 +231,40 @@ export function runMatch({ data, cat, fx }) {
       sumEls[i][k].lastChild.textContent = left > 0 ? left : '';
     }
   }
-  const frac = (x) => x - Math.floor(x), jitter = (i) => frac(Math.sin((sim.duration + 7) * (i + 1) * 12.9898) * 43758.5453);
-  /* sbires par minute : ceux du joueur cette saison quand on les connaît, sinon l'ordinaire de son poste */
-  const CS_RATE = { TOP: 7.8, JGL: 5.6, MID: 8.4, BOT: 9.1, SUP: 1.2 };
-  const csRate = P.map((p, i) => ((p.card && p.card.real && p.card.real.cspm) || CS_RATE[p.role]) * (0.93 + 0.14 * jitter(i)) * (p.side === sim.winner ? 1.03 : 0.97));
-  const downs = plan.deaths.map((list) => list.map(([a, b]) => [plan.gameAt(a), plan.gameAt(b)]));
-  const campsBy = P.map((p, i) => plan.camps.flatMap((c) => c.down.filter((d) => d[2] === i).map((d) => d[0])).sort((a, b) => a - b));
-  /** Sbires tués par le joueur i quand l'horloge du jeu marque g secondes (x : l'instant de la mise en scène). On ne farme pas quand on est mort. */
-  function csAt(i, g, x) {
-    let alive = g;
-    for (const [a, b] of downs[i]) if (a < g) alive -= Math.min(b, g) - a;
-    if (P[i].role === 'JGL') {
-      /* le jungler : quatre par camp qu'on le voit tuer, plus un peu de farm sur les voies une fois la phase de lane passée */
-      let camps = 0;
-      for (const t of campsBy[i]) { if (t <= x) camps++; else break; }
-      return camps * 4 + Math.floor((Math.max(0, alive - 840) / 60) * 1.5);
+  /* L'or, les sbires et les objets de chacun (gold.js, par moves.js) : le serveur ne compte que l'or des deux équipes ; le jeu en tire, avec les
+     vraies valeurs du jeu, ce que gagne chaque joueur — et l'or des équipes affiché est la somme de celui de leurs joueurs. */
+  const itLook = P.map(() => null), gdLook = P.map(() => -1), dfLook = ROLES.map(() => null);
+  let goldLook = '';
+  function drawGold() {
+    const g = P.map((p, i) => plan.goldAt(i, tau));
+    for (let i = 0; i < 10; i++) {
+      const v = Math.round(g[i] / 100);
+      if (v !== gdLook[i]) { gdLook[i] = v; gdEls[i].textContent = kilo(g[i]); }
+      /* ses objets : ils ne changent qu'à la boutique ; celui qu'il vient d'acheter se pose avec un éclat */
+      const ids = plan.itemsAt(i, tau), sig = ids.join(',');
+      if (sig !== itLook[i]) {
+        const had = itLook[i] === null ? null : new Set(itLook[i].split(',').filter(Boolean).map(Number));
+        itLook[i] = sig;
+        itEls[i].innerHTML = itemsHTML(ids, had ? new Set(ids.filter((id) => !had.has(id))) : null);
+      }
     }
-    /* les sbires partent à 0:30 et arrivent sur les voies vers 0:55 */
-    return Math.floor((csRate[i] * Math.max(0, alive - 55)) / 60);
+    /* l'écart poste par poste */
+    for (let r = 0; r < 5; r++) {
+      const d = Math.round((g[r] - g[5 + r]) / 100);
+      if (d === dfLook[r]) continue;
+      dfLook[r] = d;
+      dfEls[r].className = d > 0 ? 's0' : d < 0 ? 's1' : '';
+      dfEls[r].lastChild.textContent = d ? kilo(Math.abs(g[r] - g[5 + r])) : '—';
+    }
+    const a = g[0] + g[1] + g[2] + g[3] + g[4], b = g[5] + g[6] + g[7] + g[8] + g[9], sig = Math.round(a / 100) + ':' + Math.round(b / 100);
+    if (sig === goldLook) return;
+    goldLook = sig;
+    H.g0.textContent = kilo(a); H.g1.textContent = kilo(b);
+    const lead = a - b;
+    H.lead.textContent = Math.abs(lead) < 150 ? 'égalité' : '+' + kilo(Math.abs(lead));
+    H.lead.className = Math.abs(lead) < 150 ? '' : 's' + (lead > 0 ? 0 : 1);
+    /* la barre d'or grossit l'écart pour qu'il se voie */
+    H.bar.style.width = clamp(50 + (a / (a + b) - 0.5) * 400, 6, 94).toFixed(1) + '%';
   }
   /* Les monstres épiques, avec les vrais délais du jeu (saison 2026). La fosse du haut accueille tour à tour les larves du Néant (8:00 ; parties à 14:45
      si personne ne les a prises), le Héraut de la Faille (15:00 ; parti à 19:45) puis le Baron Nashor (20:00, de retour 6:00 après sa mort) ; celle du
@@ -262,12 +299,13 @@ export function runMatch({ data, cat, fx }) {
   function drawLive() {
     const g = clockT;
     for (let i = 0; i < 10; i++) {
-      const cs = csAt(i, g, tau), ult = plan.ultReady(i, tau), lv = plan.levelAt(i, tau);
+      const cs = plan.csAt(i, tau), ult = plan.ultReady(i, tau), lv = plan.levelAt(i, tau);
       if (cs !== csLook[i]) { csLook[i] = cs; csEls[i].textContent = cs + ' CS'; }
       if (lv !== lvLook[i]) { if (lvLook[i] && lv > lvLook[i]) pop(lvEls[i]); lvLook[i] = lv; lvEls[i].textContent = lv; }
       if (ult !== ultLook[i]) { ultLook[i] = ult; ultEls[i].classList.toggle('on', ult); }
       setSums(i);
     }
+    drawGold();
     /* pendant un temps fort, c'est l'action qui règle les barres de vie */
     if (!root.classList.contains('slow')) for (let i = 0; i < 10; i++) { setHp(i, plan.hpAt(i, tau)); setMp(i, plan.resAt(i, tau)); }
     for (const name of ['drake', 'baron']) {
@@ -390,15 +428,11 @@ export function runMatch({ data, cat, fx }) {
   function hud(ev) {
     for (const s of [0, 1]) {
       score[s] = ev.sc[s];
-      set('k' + s, ev.sc[s]); set('g' + s, kilo(ev.g[s])); set('tw' + s, ev.tw[s]); set('bn' + s, ev.bn[s]);
+      /* (l'or des équipes suit celui de leurs joueurs, au fil de la partie : drawGold) */
+      set('k' + s, ev.sc[s]); set('tw' + s, ev.tw[s]); set('bn' + s, ev.bn[s]);
       root.querySelectorAll('[data-dr="' + s + '"] i').forEach((pip, k) => pip.classList.toggle('on', k < ev.dr[s]));
       root.querySelector('[data-dr="' + s + '"]').classList.toggle('soul', ev.dr[s] >= 4);
     }
-    const lead = ev.g[0] - ev.g[1];
-    H.lead.textContent = Math.abs(lead) < 150 ? 'égalité' : '+' + kilo(Math.abs(lead));
-    H.lead.className = Math.abs(lead) < 150 ? '' : 's' + (lead > 0 ? 0 : 1);
-    /* la barre d'or grossit l'écart pour qu'il se voie */
-    H.bar.style.width = clamp(50 + (ev.g[0] / (ev.g[0] + ev.g[1]) - 0.5) * 400, 6, 94).toFixed(1) + '%';
   }
   /* Le commentaire, façon retransmission : l'action en cours dans un bandeau (son pictogramme, son heure, son titre quand c'est un temps fort),
      les deux précédentes au-dessous. Les noms des joueurs et des équipes ressortent dans le texte. */
@@ -697,6 +731,7 @@ export function runMatch({ data, cat, fx }) {
     setClock(0);
     tau = 0;
     cursor.fill(0); look.fill('?'); campLook.fill('?'); csLook.fill(-1); ultLook.fill(null); lvLook.fill(0); hpLook.fill(-1); mpLook.fill(-1); sumLook.forEach((l) => l.fill(-1));
+    itLook.fill(null); gdLook.fill(-1); dfLook.fill(null); goldLook = '';
     P.forEach((p, i) => { kda[i] = { k: 0, d: 0, a: 0 }; setDead(i, false); drawKda(i); tokens[i].classList.remove('fight', 'ulting', 'hurt'); });
     banner.classList.remove('done');
     draw(true);
@@ -750,11 +785,14 @@ export function runMatch({ data, cat, fx }) {
     const row = (i) => {
       const p = P[i], s = sim.players[i];
       /* le farm de la partie, et par minute comme sur le tableau des scores du jeu */
-      const cs = csAt(i, sim.duration, plan.total);
-      return '<tr' + (i === sim.mvp ? ' class="mvp"' : '') + '><td><img src="' + iconUrl(cat, p.champ) + '" alt="" loading="lazy"></td><td><b>' + esc(p.name) + (i === sim.mvp ? ' <em>MVP</em>' : '') + '</b><i>' + ROLE_LABEL[p.role] + ' · ' + esc(p.champName) + '</i></td>'
-        + '<td class="num">' + s.k + '</td><td class="num">' + s.d + '</td><td class="num">' + s.a + '</td><td class="num cs">' + cs + '<i>' + (cs / (sim.duration / 60)).toFixed(1).replace('.', ',') + ' / min</i></td></tr>';
+      const cs = plan.csAt(i, plan.total), gold = plan.goldAt(i, plan.total), mvpRow = i === sim.mvp ? ' mvp' : '';
+      return '<tr class="sb-p' + mvpRow + '"><td><img src="' + iconUrl(cat, p.champ) + '" alt="" loading="lazy"></td><td><b>' + esc(p.name) + (i === sim.mvp ? ' <em>MVP</em>' : '') + '</b><i>' + ROLE_LABEL[p.role] + ' · ' + esc(p.champName) + '</i></td>'
+        + '<td class="num">' + s.k + '</td><td class="num">' + s.d + '</td><td class="num">' + s.a + '</td><td class="num cs">' + cs + '<i>' + (cs / (sim.duration / 60)).toFixed(1).replace('.', ',') + ' / min</i></td>'
+        /* son or, et par minute ; dessous, ses objets de fin de partie */
+        + '<td class="num cs gd">' + kilo(gold) + '<i>' + Math.round(gold / (sim.duration / 60)) + ' / min</i></td></tr>'
+        + '<tr class="sb-it' + mvpRow + '"><td></td><td colspan="6"><span class="mv-it">' + itemsHTML(plan.itemsAt(i, plan.total)) + '</span></td></tr>';
     };
-    const board = (s) => '<table class="sb s' + s + '"><thead><tr><th colspan="2">' + esc(M.teams[s].name) + (s === w ? ' <em>vainqueur</em>' : '') + '</th><th class="num">K</th><th class="num">D</th><th class="num">A</th><th class="num">CS</th></tr></thead>'
+    const board = (s) => '<table class="sb s' + s + '"><thead><tr><th colspan="2">' + esc(M.teams[s].name) + (s === w ? ' <em>vainqueur</em>' : '') + '</th><th class="num">K</th><th class="num">D</th><th class="num">A</th><th class="num">CS</th><th class="num">Or</th></tr></thead>'
       + '<tbody>' + [0, 1, 2, 3, 4].map((r) => row(s * 5 + r)).join('') + '</tbody></table>';
     const line = (label, a, b) => '<tr><td class="num">' + a + '</td><th>' + label + '</th><td class="num">' + b + '</td></tr>';
     const pickRow = (s, r) => {
@@ -780,7 +818,7 @@ export function runMatch({ data, cat, fx }) {
       + '<div><span>MVP de la partie</span><b>' + esc(mvp.name) + '</b><i>' + ms.k + ' / ' + ms.d + ' / ' + ms.a + ' sur ' + esc(mvp.champName) + '</i></div></div>'
       + '<div class="end-side">' + prize
       + '<table class="end-stats"><thead><tr><td class="num s0">' + esc(short(0)) + '</td><th></th><td class="num s1">' + esc(short(1)) + '</td></tr></thead><tbody>'
-      + line('Éliminations', sim.kills[0], sim.kills[1]) + line('Or', kilo(sim.gold[0]), kilo(sim.gold[1])) + line('Tours', sim.towers[0], sim.towers[1])
+      + line('Éliminations', sim.kills[0], sim.kills[1]) + line('Or', kilo(plan.teamGoldAt(0, plan.total)), kilo(plan.teamGoldAt(1, plan.total))) + line('Tours', sim.towers[0], sim.towers[1])
       + line('Dragons', sim.dragons[0], sim.dragons[1]) + line('Barons', sim.barons[0], sim.barons[1]) + '</tbody></table></div></div>'
       + '<div class="end-actions actions"><button class="btn primary big" type="button" data-go="' + (rewards.pack ? 'packs' : 'jouer') + '">' + (rewards.pack ? 'Ouvrir mon pack' : esc(rewards.next || 'Continuer')) + '</button>'
       + (rewards.pack ? '<button class="btn big" type="button" data-go="jouer">Continuer</button>' : '')

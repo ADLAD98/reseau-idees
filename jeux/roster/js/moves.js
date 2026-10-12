@@ -9,7 +9,10 @@
    Chaque joueur a aussi son niveau, son ultime (disponible ou non), sa vie et sa ressource : ce que le serveur ne compte pas, la mise
    en scène le déduit de ce qu'il fait, avec les vrais délais du jeu (temps de mort, camps, récupération des ultimes).
    Tout passe par les couloirs de la carte (voies, sentiers de la jungle, rivière), jamais à travers les murs.
+   L'or de chacun, ses sbires, sa quête de rôle et ses achats sont comptés par gold.js : quand un joueur a de quoi faire un bel achat, il
+   rentre à la base — ses objets n'apparaissent que là, à la boutique.
    Rien ici ne touche à la page : match.js lit ces trajets image par image. */
+import { planGold } from './gold.js';
 
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
@@ -252,10 +255,12 @@ const TP_MIN = 520, TP_COST = 560;
     kits : pour chacun des dix joueurs, ce qu'on sait de son champion — { res: 'mana' | 'energy' | 'build' | 'none' (sa ressource),
     cd: [délais de son ultime par rang], early: l'ultime sert dès le niveau 1, split: champion de duel, qui tient une voie de côté,
     sums: ses deux sorts d'invocateur, [[lettre, délai de récupération], …] — F Saut éclair, T Téléportation, S Châtiment, I Embrasement,
-    H Soins, B Barrière, E Fatigue, C Purge, G Fantôme }. Sans « kits », seul le toplaner se téléporte. */
+    H Soins, B Barrière, E Fatigue, C Purge, G Fantôme ; et pour son or (gold.js) — cspm : ses sbires par minute cette saison, edge : son
+    duel de draft, build : ce qu'il achète, sup : la forme finale de son objet de support }. Sans « kits », seul le toplaner se téléporte. */
 export function planMoves(sim, kits = []) {
   const ev = sim.events, N = ev.length;
-  const rnd = mulberry32((Math.round(sim.duration) * 7919 + N * 104729 + (sim.kills ? sim.kills[0] * 31 + sim.kills[1] : 0)) >>> 0);
+  const seed = (Math.round(sim.duration) * 7919 + N * 104729 + (sim.kills ? sim.kills[0] * 31 + sim.kills[1] : 0)) >>> 0;
+  const rnd = mulberry32(seed);
   const rand = (a, b) => a + rnd() * (b - a);
   const pick = (list) => list[Math.floor(rnd() * list.length)];
 
@@ -743,6 +748,10 @@ export function planMoves(sim, kits = []) {
     return b[0] <= a[0] ? b[1] : a[1] + (b[1] - a[1]) * ((x - a[0]) / (b[0] - a[0]));
   };
 
+  /* ---------- l'or de chacun ---------- */
+  /* (compté avant les trajets : ce qu'un joueur a en poche décide de ses retours à la base) */
+  const econ = planGold({ ev, at, casts, state, deaths, gameAt, tauOfGame, levelAtGame, kits, duration: sim.duration, total, seed });
+
   /* ---------- 8. le trajet de chaque joueur ---------- */
   const tracks = [], life = [], mana = [];
   const stats = { camps: [0, 0], rushes: 0, late: 0, recalls: 0, tps: 0 };
@@ -754,6 +763,8 @@ export function planMoves(sim, kits = []) {
     const pace = 0.93 + rnd() * 0.14;
     let queue = [], cleared = 0, lastHover = null, opened = false, tpAt = -Infinity;
     const vit = vitalsOf(i);
+    /* à la fontaine, avant de partir : son objet de départ */
+    econ.shop(i, 0);
     /* la Téléportation, pour qui l'a prise (sans « kits » : le toplaner, toutes les cinq minutes de jeu). Passé la phase de lane, elle sert à
        rejoindre une action lointaine ; avant, à regagner sa voie */
     const hasTp = sums[i].length ? !!sumOf(i, 'T') : role === 0;
@@ -836,7 +847,16 @@ export function planMoves(sim, kits = []) {
       queue = best ? best.seq.map((c) => mine[c]) : [];
       if (queue.length) opened = true;
     }
+    /* Faut-il rentrer acheter ? Oui s'il a de quoi faire un bel achat et le temps d'être revenu là où on l'attend (spot) — au pas de course
+       s'il a beaucoup d'or sur lui : on ne se promène pas avec trois mille pièces d'or en poche. */
+    const shopTrip = (deadline, spot) => {
+      if (!econ.wants(i, cur.t)) return false;
+      const rich = econ.pocketAt(i, cur.t) >= 2200;
+      return cur.t + 1000 + (spot ? routeLen(home, spot) / (rich ? VRUSH : VFAST) : 900) < deadline - (rich ? 60 : 250);
+    };
     function jungleAction(deadline, target) {
+      /* (il reprendra ses camps ensuite) */
+      if (shopTrip(deadline, target)) { queue = []; return { recall: true, cost: 1000, sure: true }; }
       if (!queue.length) planCamps(deadline, target);
       const camp = queue.shift();
       if (camp) {
@@ -866,8 +886,9 @@ export function planMoves(sim, kits = []) {
       return { p, speed: V * 0.9, dwell: rand(800, 1400), kind: 'h' };
     }
     /* --- voie : de petits pas autour de sa place, de temps en temps une balise posée dans la rivière --- */
-    function laneAction(duty, s) {
+    function laneAction(duty, s, deadline, target) {
       const f = s.front[duty.lane];
+      if (shopTrip(deadline, target || laneAt(duty.lane, f + sg * duty.back, duty.lat))) return { recall: true, cost: 1000, sure: true };
       if (role === 4 && s.phase !== 'late' && s.t0 > 280 && rnd() < (s.phase === 'lane' ? 0.13 : 0.3)) {
         const low = s.phase === 'lane' ? true : s.obj === 'bot';
         const p = pick(low ? [NODE.r7, NODE.r8, NODE.r6, NODE[(side ? 'tb' : 'ub') + side]] : [NODE.r2, NODE.r3, NODE.r4, NODE[(side ? 'ub' : 'tb') + side]]);
@@ -879,7 +900,7 @@ export function planMoves(sim, kits = []) {
     }
     function nextAction(deadline, target) {
       const s = sOf(cur.t), duty = dutyOf(role, s, side);
-      return duty ? laneAction(duty, s) : jungleAction(deadline, target);
+      return duty ? laneAction(duty, s, deadline, target) : jungleAction(deadline, target);
     }
     /** Rentrer à la base : une incantation sur place, puis le joueur réapparaît à la fontaine. */
     function recall() {
@@ -887,6 +908,8 @@ export function planMoves(sim, kits = []) {
       stay(cur.t + 250, 'g');
       jump(home);
       vit.full(cur.t);
+      /* à la boutique : il achète ce qu'il peut */
+      econ.shop(i, cur.t);
       stay(cur.t + 300, 'h');
       cleared = 0;
       stats.recalls++;
@@ -900,7 +923,7 @@ export function planMoves(sim, kits = []) {
         const act = nextAction(deadline, target);
         if (!act) break;
         if (act.recall) {
-          if (cur.t + act.cost + (target ? routeLen(home, target) / VFAST : 0) > deadline - 100) break;
+          if (!act.sure && cur.t + act.cost + (target ? routeLen(home, target) / VFAST : 0) > deadline - 100) break;
           recall();
           continue;
         }
@@ -967,6 +990,8 @@ export function planMoves(sim, kits = []) {
         kind('x');
         push(back, cur.p);
         jump(home);
+        /* il réapparaît à la fontaine : un passage à la boutique */
+        econ.shop(i, cur.t);
         cleared = 0;
         {
           const next = appts[i][appts[i].indexOf(A) + 1];
@@ -995,10 +1020,14 @@ export function planMoves(sim, kits = []) {
     vit.end(total);
     tracks.push(keys); life.push(vit.hp); mana.push(vit.mp);
   }
+  econ.finish();
   /** La part de vie (de 0 à 1) du joueur i à l'instant tau, et celle de sa ressource. */
   const hpAt = (i, x) => valueAt(life[i], x), resAt = (i, x) => valueAt(mana[i], x);
 
-  return { total, at, anchors, casts, tracks, deaths, camps: CAMPS.map((c) => ({ id: c.id, p: c.p, side: c.side, kind: c.kind, hold: c.hold, down: campDown.get(c.id) })), gameAt, tauOfGame, stats, ults, ultReady, levels, levelAt, life, mana, hpAt, resAt, sums, sumLeft };
+  return { total, at, anchors, casts, tracks, deaths, camps: CAMPS.map((c) => ({ id: c.id, p: c.p, side: c.side, kind: c.kind, hold: c.hold, down: campDown.get(c.id) })), gameAt, tauOfGame, stats, ults, ultReady, levels, levelAt, life, mana, hpAt, resAt, sums, sumLeft,
+    /* l'or (gold.js) : goldAt(i, tau) ce qu'il a gagné, pocketAt ce qu'il lui reste, csAt ses sbires, itemsAt ses objets, teamGoldAt(camp, tau),
+       buys ses achats [instant, objet, prix], quests l'instant où chacun finit sa quête de rôle, plates les plaques de tourelle tombées */
+    goldAt: econ.goldAt, pocketAt: econ.pocketAt, csAt: econ.csAt, itemsAt: econ.itemsAt, teamGoldAt: econ.teamGoldAt, buys: econ.buys, quests: econ.quests, plates: econ.plateLog };
 }
 
 /** Où se trouve un joueur à l'instant tau : { x, y, k } (k : ce qu'il fait — w marche, d court, h attend, f combat, c tue un camp, r rentre, g parti, t se téléporte, x mort). */

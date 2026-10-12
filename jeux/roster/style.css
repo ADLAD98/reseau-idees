@@ -397,7 +397,10 @@ body.fx .card.v-holo .card-front .card-frame::after{animation:spin 9s linear inf
 .card.v-full .card-art{top:0;left:-8%;width:116%;height:82%;object-position:50% 10%;opacity:.5;
   -webkit-mask-image:linear-gradient(to bottom,#000 44%,rgba(0,0,0,0) 95%);mask-image:linear-gradient(to bottom,#000 44%,rgba(0,0,0,0) 95%);
   transform:translate(calc((var(--hx) - 50%) * .05),calc((var(--hy) - 50%) * .035))}
-@container (min-width:140px){.card.v-full .card-art{filter:url(#basRelief) brightness(.8) contrast(1.08);opacity:.72}}
+.card.v-full .card-art{opacity:.72}
+/* (le filtre du bas-relief est posé sur l'image elle-même, par cards.js : dans une feuille de style séparée, Safari ne retrouverait pas le
+   filtre défini dans la page. Une petite carte s'en passe.) */
+@container (max-width:139.9px){.card.v-full .card-art{filter:grayscale(1) contrast(1.2)!important;opacity:.5}}
 /* (un full art d'un coach : le blason de son équipe, en grand, autour de lui) */
 .card.v-full .card-crest{top:5%;left:-14%;width:128%;-webkit-mask-position:center top;mask-position:center top}
 .card.v-full .card-crest::before,.card.v-full .card-crest::after{-webkit-mask-position:center top;mask-position:center top}

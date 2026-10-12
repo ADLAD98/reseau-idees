@@ -181,7 +181,7 @@ export function cardHTML(card, cat, opts = {}) {
     + '<div class="card-bg"></div>'
     + (pr > 1 ? '<div class="card-rays"></div>' : '')
     /* derrière le joueur, l'illustration de son champion fétiche (sur un full art : sculptée en bas-relief ; à défaut, le blason de son équipe) */
-    + (card.art && !ed && v !== 'kc' ? '<img class="card-art" src="' + DDRAGON + '/img/champion/loading/' + esc(card.art) + '.jpg" alt="" ' + load + '>' : v === 'full' ? crestOf(card.team) : '')
+    + (card.art && !ed && v !== 'kc' ? '<img class="card-art"' + (v === 'full' ? ' style="filter:url(#basRelief) brightness(.8) contrast(1.08)"' : '') + ' src="' + DDRAGON + '/img/champion/loading/' + esc(card.art) + '.jpg" alt="" ' + load + '>' : v === 'full' ? crestOf(card.team) : '')
     /* édition KC : le « mur bleu » et le blason de la Karmine en relief ; holographique et édition KC : une feuille de métal irisée, et ses paillettes */
     + (v === 'kc' ? '<div class="card-wall"></div>' + crestOf('KC') : '')
     + (v === 'holo' || v === 'kc' ? '<div class="card-foil"></div><div class="card-spark"></div>' : '')
