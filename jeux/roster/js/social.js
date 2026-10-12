@@ -7,6 +7,8 @@ import { confirmSheet, openSheet, plural, sheetTitle, since } from './ui.js';
 const $ = (sel, root) => (root || document).querySelector(sel);
 const NAME_RULE = /^[A-Za-z0-9][A-Za-z0-9_-]{2,15}$/;
 const FORMATS = [[1, '1 partie'], [3, 'BO3'], [5, 'BO5']];
+/** L'initiale d'un pseudo, pour le losange qui le précède. */
+const initial = (name) => esc(String(name).charAt(0).toUpperCase());
 
 /* G : ce que l'application prête à cet écran — S (état), call, guard, toast, applyState, icon, refresh, now, owned(id, qty), duel */
 let G = null;
@@ -50,7 +52,12 @@ function draw(main) {
   const asks = so.friends ? so.friends.requests.length : S.pulse ? S.pulse.inbox.friends : 0;
   const offers = so.trades ? so.trades.received.length : S.pulse ? S.pulse.inbox.trades : 0;
   const tab = (id, label, n) => '<button type="button" data-st="' + id + '"' + (so.tab === id ? ' class="on"' : '') + '>' + label + (n ? '<em>' + n + '</em>' : '') + '</button>';
-  main.innerHTML = '<div id="soc"><div class="col-head"><div><h1 class="h1">Joueurs</h1><p class="soc-online"><i class="dot on"></i>' + (online > 1 ? online + ' joueurs en ligne' : online === 1 ? 'Toi seul en ligne pour l\'instant' : 'Connexion…') + '</p></div></div>'
+  /* en tête : mes amis, ceux qui sont là, mon palmarès des défis */
+  const F = so.friends, P = S.player;
+  main.innerHTML = '<div id="soc"><div class="col-head"><div><h1 class="h1">Joueurs</h1><p class="soc-online"><i class="dot on"></i>' + (online > 1 ? online + ' joueurs en ligne' : online === 1 ? 'Toi seul en ligne pour l\'instant' : 'Connexion…') + '</p></div>'
+    + '<div class="tally"><div><b>' + (F ? F.friends.length : '–') + '</b><span>' + (F && F.friends.length > 1 ? 'amis' : 'ami') + '</span></div>'
+    + '<div><b>' + (F ? F.friends.filter((f) => f.online).length : '–') + '</b><span>amis en ligne</span></div>'
+    + (S.live ? '<div class="gold"><b>' + (P.duelWins || 0) + '<small> V</small> ' + (P.duelLosses || 0) + '<small> D</small></b><span>défis en direct</span></div>' : '') + '</div></div>'
     + '<div class="seg soc-tabs" id="socTabs">' + tab('amis', 'Amis', asks) + tab('echanges', 'Échanges', offers) + tab('classement', 'Classement', 0) + '</div>'
     + '<div id="socBody">' + (so.tab === 'amis' ? friendsHTML() : so.tab === 'echanges' ? tradesHTML() : boardHTML()) + '</div></div>';
   $('#socTabs').addEventListener('click', async (e) => {
@@ -70,13 +77,13 @@ function friendsHTML() {
   const so = G.S.social, F = so.friends;
   if (!F) return spinner;
   const now = G.now();
-  const row = (f) => '<div class="soc-row' + (f.online ? ' on' : '') + '"><i class="dot' + (f.online ? ' on' : '') + '"></i>'
+  const row = (f) => '<div class="soc-row' + (f.online ? ' on' : '') + '"><i class="soc-av' + (f.online ? ' on' : '') + '"><span>' + initial(f.name) + '</span></i>'
     + '<button class="soc-who" type="button" data-open="' + f.id + '"><b>' + esc(f.name) + (f.titles ? '<u title="Mondiaux remportés">' + f.titles + ' ★</u>' : '') + '</b>'
     + '<i>' + (f.online ? 'En ligne' : 'Vu ' + since(now - f.seenAt)) + ' · équipe ' + f.rating + ' · ' + f.cards + ' cartes' + (f.duelWins + f.duelLosses ? ' · défis ' + f.duelWins + ' V – ' + f.duelLosses + ' D' : '') + '</i></button>'
     + '<span class="soc-acts"><button class="btn primary" type="button" data-open="' + f.id + '" data-focus="duel">Défier</button><button class="btn" type="button" data-trade="' + f.id + '" data-name="' + esc(f.name) + '">Échanger</button></span></div>';
-  const ask = (r) => '<div class="soc-row ask"><i class="dot"></i><span class="soc-who"><b>' + esc(r.name) + '</b><i>veut devenir ton ami · ' + since(now - r.at) + '</i></span>'
+  const ask = (r) => '<div class="soc-row ask"><i class="soc-av"><span>' + initial(r.name) + '</span></i><span class="soc-who"><b>' + esc(r.name) + '</b><i>veut devenir ton ami · ' + since(now - r.at) + '</i></span>'
     + '<span class="soc-acts"><button class="btn primary" type="button" data-answer="' + r.id + '" data-yes="1">Accepter</button><button class="btn" type="button" data-answer="' + r.id + '">Refuser</button></span></div>';
-  const sent = (r) => '<div class="soc-row"><i class="dot"></i><span class="soc-who"><b>' + esc(r.name) + '</b><i>demande envoyée ' + since(now - r.at) + '</i></span>'
+  const sent = (r) => '<div class="soc-row"><i class="soc-av"><span>' + initial(r.name) + '</span></i><span class="soc-who"><b>' + esc(r.name) + '</b><i>demande envoyée ' + since(now - r.at) + '</i></span>'
     + '<span class="soc-acts"><button class="btn" type="button" data-remove="' + r.id + '">Annuler</button></span></div>';
   const duel = (d) => '<div class="hist-row ' + (d.won ? 'win' : 'lose') + '"><b>' + (d.won ? 'Victoire' : 'Défaite') + '</b><span class="hist-foe">contre ' + esc(d.foe) + (d.bot ? ' (son équipe, dirigée par l\'ordinateur)' : '') + '</span>'
     + '<span class="hist-score">' + (d.format > 1 ? 'BO' + d.format + ' · ' : '') + d.wins[0] + ' – ' + d.wins[1] + (d.forfeit ? ' · forfait' : '') + '</span><span class="hist-coins">+' + d.coins + '</span><span></span></div>';
@@ -116,9 +123,14 @@ function boardHTML() {
   const B = G.S.social.board, F = G.S.social.friends;
   if (!B) return spinner;
   const known = new Set(F ? F.friends.map((f) => f.id).concat(F.asked.map((f) => f.id), F.requests.map((f) => f.id)) : []);
-  return '<table class="board"><thead><tr><th>#</th><th>Joueur</th><th class="num">Cartes</th><th class="num">Victoires</th><th class="num">Défis</th><th class="num hide-s">Mondiaux</th><th></th></tr></thead><tbody>'
-    + B.top.map((p, i) => '<tr' + (p.id === B.me ? ' class="me"' : '') + '><td>' + (i + 1) + '</td><td><b>' + esc(p.name) + '</b></td>'
-      + '<td class="num">' + p.cardsUnique + ' / ' + B.totalCards + '</td><td class="num">' + p.wins + '</td><td class="num">' + (p.duelWins || 0) + '</td><td class="num hide-s">' + (p.titles || 0) + '</td>'
+  /* les trois premiers sur un podium, puis tout le classement */
+  const podium = B.top.length >= 3 ? '<div class="podium">' + B.top.slice(0, 3).map((p, i) => '<div class="pod pod-' + (i + 1) + (p.id === B.me ? ' me' : '') + '"><em>' + (i + 1) + '</em><i class="soc-av"><span>' + initial(p.name) + '</span></i><b>' + esc(p.name) + '</b>'
+    + '<span>' + plural(p.cardsUnique, 'carte', 'cartes') + ' · ' + plural(p.wins, 'victoire', 'victoires') + '</span></div>').join('') + '</div>' : '';
+  /* (sur un téléphone, les chiffres passent sous le pseudo : le tableau tient dans l'écran) */
+  return podium + '<table class="board"><thead><tr><th>#</th><th>Joueur</th><th class="num hide-s">Cartes</th><th class="num hide-s">Victoires</th><th class="num hide-s">Défis</th><th class="num hide-s">Mondiaux</th><th></th></tr></thead><tbody>'
+    + B.top.map((p, i) => '<tr' + (p.id === B.me ? ' class="me"' : '') + '><td>' + (i + 1) + '</td><td><b>' + esc(p.name) + '</b><small class="show-s">' + plural(p.cardsUnique, 'carte', 'cartes') + ' · ' + plural(p.wins, 'victoire', 'victoires')
+      + (p.duelWins ? ' · ' + plural(p.duelWins, 'défi gagné', 'défis gagnés') : '') + (p.titles ? ' · ' + p.titles + ' ★' : '') + '</small></td>'
+      + '<td class="num hide-s">' + p.cardsUnique + ' / ' + B.totalCards + '</td><td class="num hide-s">' + p.wins + '</td><td class="num hide-s">' + (p.duelWins || 0) + '</td><td class="num hide-s">' + (p.titles || 0) + '</td>'
       + '<td class="num">' + (p.id === B.me || known.has(p.id) ? '' : '<button class="btn slim" type="button" data-ask="' + esc(p.name) + '" title="Demander en ami">+ Ami</button>') + '</td></tr>').join('')
     + '</tbody></table>';
 }

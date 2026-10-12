@@ -942,7 +942,13 @@ async function quickSell(card, qty, sure) {
 /* ---------- écran Profil ---------- */
 async function viewProfile(main) {
   const p = S.player;
-  main.innerHTML = '<div class="col-head"><div><h1 class="h1">' + esc(p.name) + '</h1><p>Joueur depuis le ' + frDate(p.createdAt) + '</p></div></div><div class="panels">'
+  /* en tête : le losange du joueur, son équipe, puis ses chiffres */
+  const games = p.wins + p.losses, titles = p.titles || 0;
+  main.innerHTML = '<div class="col-head"><div class="pf-id"><i class="who-av pf-av"><span>' + esc(p.name.charAt(0).toUpperCase()) + '</span></i><div><h1 class="h1">' + esc(p.name) + '</h1>'
+    + '<p>Joueur depuis le ' + frDate(p.createdAt) + (p.team ? ' · équipe <b>' + esc(p.team.name) + '</b> (' + esc(p.team.short) + ')' : '') + '</p></div></div>'
+    + '<div class="tally"><div><b>' + num(p.wins) + '</b><span>' + (p.wins > 1 ? 'victoires' : 'victoire') + '</span></div><div><b>' + (games ? pct(p.wins, games) + '<small> %</small>' : '–') + '</b><span>de réussite</span></div>'
+    + '<div><b>' + p.cardsUnique + '<small>/' + S.cat.cards.length + '</small></b><span>cartes</span></div>'
+    + (S.live ? '<div class="gold"><b>' + titles + '</b><span>' + (titles > 1 ? 'Mondiaux' : 'Mondial') + '</span></div>' : '') + '</div></div><div class="panels">'
     + '<section class="panel"><h3>Mon compte</h3><div class="kv"><span>Packs ouverts</span><b>' + p.packsOpened + '</b><span>Cartes différentes</span><b>' + p.cardsUnique + ' / ' + S.cat.cards.length + '</b><span>Exemplaires</span><b>' + p.cardsTotal + '</b><span>Parties gagnées</span><b>' + p.wins + ' sur ' + (p.wins + p.losses) + '</b>'
     + (S.live ? '<span>Défis entre joueurs</span><b>' + (p.duelWins || 0) + ' V – ' + (p.duelLosses || 0) + ' D</b><span>Mondiaux remportés</span><b>' + (p.titles || 0) + '</b>' : '')
     + '<span>Crédits</span><b>' + p.coins + '</b></div>'

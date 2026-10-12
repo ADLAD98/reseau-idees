@@ -41,8 +41,12 @@ const reload = async () => { await load(); if (onTab()) draw($('#main')); };
 function draw(main) {
   const S = G.S, m = S.market, sales = S.pulse ? S.pulse.inbox.sales : 0;
   const rules = (m.data && m.data.rules) || (m.mine && m.mine.rules) || { fee: 0.05 };
+  /* en tête : ce que le marché propose, ce que j'ai à y vendre, mes crédits */
+  const dupes = [...S.owned.values()].reduce((n, o) => n + Math.max(0, o.qty - 1), 0);
   main.innerHTML = '<div id="mk"><div class="col-head"><div><h1 class="h1">Marché</h1><p>Achète et vends des cartes entre joueurs. Une commission de ' + Math.round(rules.fee * 100) + ' % est retenue sur chaque vente.</p></div>'
-    + '<div class="tally"><div class="gold"><b>' + num(S.player.coins) + '</b><span>crédits</span></div></div></div>'
+    + '<div class="tally">' + (m.data ? '<div><b>' + num(m.data.open) + '</b><span>' + (m.data.open > 1 ? 'annonces' : 'annonce') + '</span></div>' : '')
+    + '<div><b>' + num(dupes) + '</b><span>' + (dupes > 1 ? 'doublons' : 'doublon') + '</span></div>'
+    + '<div class="gold"><b>' + num(S.player.coins) + '</b><span>crédits</span></div></div></div>'
     + '<div class="mk-bar"><div class="seg" id="mkTabs"><button type="button" data-mt="acheter"' + (m.tab === 'acheter' ? ' class="on"' : '') + '>Acheter</button>'
     + '<button type="button" data-mt="ventes"' + (m.tab === 'ventes' ? ' class="on"' : '') + '>Mes ventes' + (sales ? '<em>' + sales + '</em>' : '') + '</button></div>'
     + '<button class="btn primary" type="button" id="mkSell"' + (S.owned.size ? '' : ' disabled') + '>Vendre une carte</button></div>'
@@ -82,7 +86,8 @@ function buyHTML() {
   if (!D) return html + spinner;
   html += '<p class="count mk-count">' + (D.total ? plural(D.total, 'carte en vente', 'cartes en vente') : 'Aucune carte en vente') + (D.total !== D.open ? ' pour ces filtres (' + D.open + ' en tout)' : '') + '</p>';
   if (!D.listings.length) {
-    return html + '<p class="empty">' + (D.open ? 'Aucune annonce ne correspond à ces filtres.' : 'Le marché est vide pour l\'instant. Sois le premier à vendre : touche « Vendre une carte ».') + '</p>';
+    return html + '<p class="empty">' + (D.open ? 'Aucune annonce ne correspond à ces filtres.' : 'Le marché est vide pour l\'instant. Sois le premier à vendre : touche « Vendre une carte ».') + '</p>'
+      + (D.open ? '' : howHTML(D.rules || { fee: 0.05 })) + shelfHTML();
   }
   html += '<div class="mk-grid">' + D.listings.map((l) => {
     const card = cat.cardById.get(l.card);
@@ -96,7 +101,25 @@ function buyHTML() {
   }).join('') + '</div>';
   if (D.pages > 1) html += '<div class="mk-pages"><button class="btn slim" type="button" data-page="' + (D.page - 1) + '"' + (D.page ? '' : ' disabled') + '>‹ Précédent</button><span>page ' + (D.page + 1) + ' / ' + D.pages + '</span>'
     + '<button class="btn slim" type="button" data-page="' + (D.page + 1) + '"' + (D.page + 1 < D.pages ? '' : ' disabled') + '>Suivant ›</button></div>';
-  return html;
+  return html + shelfHTML();
+}
+/** Le marché en trois temps, tant qu'aucune annonce n'y est. */
+const howHTML = (rules) => '<div class="mk-how">' + [
+  ['Mets une carte en vente', 'Choisis un doublon et fixe ton prix. La carte quitte ta collection le temps de l\'annonce.'],
+  ['Un joueur l\'achète', 'Elle part chez lui aussitôt, et la vente s\'affiche dans « Mes ventes ».'],
+  ['Tu touches tes crédits', 'Le prix, moins ' + Math.round(rules.fee * 100) + ' % de commission. Pas encore vendue ? Retire l\'annonce : la carte revient.'],
+].map((s, i) => '<div><i class="who-av"><span>' + (i + 1) + '</span></i><b>' + s[0] + '</b><p>' + s[1] + '</p></div>').join('') + '</div>';
+/** Mes doublons, les mieux notés d'abord : un bouton pour mettre chacun en vente. */
+function shelfHTML() {
+  const S = G.S, cat = S.cat;
+  const mine = [...S.owned.entries()].map(([id, o]) => [cat.cardById.get(id), o.qty]).filter((x) => x[0] && x[1] > 1)
+    .sort((a, b) => b[0].ovr - a[0].ovr || a[0].name.localeCompare(b[0].name));
+  if (!mine.length) return '';
+  const shown = mine.slice(0, 6);
+  return '<section class="mk-shelf"><h2 class="h2">Tes doublons à vendre · ' + mine.length + '</h2><div class="mk-grid">'
+    + shown.map(([c, qty]) => '<div class="mk-dupe"><button class="tile" type="button" data-card="' + esc(c.id) + '" aria-label="' + esc(c.name) + '">' + cardHTML(c, cat) + '<span class="badge qty">×' + qty + '</span></button>'
+      + '<button class="btn slim" type="button" data-sell="' + esc(c.id) + '">Vendre</button></div>').join('') + '</div>'
+    + (mine.length > shown.length ? '<p class="count">Et ' + plural(mine.length - shown.length, 'autre carte en double', 'autres cartes en double') + ' : touche « Vendre une carte ».</p>' : '') + '</section>';
 }
 function bindFilters(root) {
   const m = G.S.market, f = m.filters;
@@ -173,6 +196,8 @@ async function onClick(e) {
     m.filters.card = '';
     m.page = 0;
     reload();
+  } else if (d.sell) {
+    sellCard(d.sell);
   }
 }
 
