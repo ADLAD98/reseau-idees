@@ -101,7 +101,8 @@ body{background:
 .hub-stats b{font:600 23px/1 var(--text);color:var(--gold-hi);font-variant-numeric:tabular-nums}
 .hub-stats span{font:600 10.5px/1.2 var(--text);letter-spacing:.13em;text-transform:uppercase;color:var(--mut)}
 .hub-stats .gold b{color:var(--blue-hi)}
-/* les missions : une rangée de plus de tenue */
+/* les missions : une rangée de plus de tenue, et de l'air avant la section suivante */
+.missions{margin-bottom:38px}
 .ms{position:relative;border-left:2px solid var(--gold-lo)}
 .ms.done{border-left-color:var(--blue)}
 .ms.bonus{border-left-color:var(--gold)}
