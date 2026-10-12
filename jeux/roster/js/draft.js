@@ -4,7 +4,8 @@
 import { ApiError } from './api.js';
 import { esc, iconUrl, photoUrl } from './cards.js';
 import { ROLE_LABEL, STORE } from './config.js';
-import { CLASS_NAME, DAMAGE_NAME, ORDER, PHASES, ROLES, compState, pickValue, played, signed } from './rules.js';
+import { KITS } from './kits.js';
+import { CLASS_NAME, DAMAGE_NAME, ORDER, PASSIVE_LABEL, PHASES, ROLES, ULT_LABEL, compState, duoGain, duoOf, kitCombos, pickValue, played, signed } from './rules.js';
 import { sfx, soundOn } from './sound.js';
 import { closeVolume, toggleVolume } from './volume.js';
 
@@ -13,11 +14,14 @@ const icon = (id) => '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><us
 const half = (x) => String(x).replace('.', ',');
 const games = (n) => n + (n > 1 ? ' parties' : ' partie');
 
-const HELP = '<div class="dr-help-box panel"><h3>Gagner la draft</h3><ul>'
+/* (les duos de pros et les kits ne sont expliqués que si le serveur les compte : il les donne alors dans son catalogue) */
+const helpHTML = (cat) => '<div class="dr-help-box panel"><h3>Gagner la draft</h3><ul>'
   + '<li><b>Méta</b> — les champions les plus disputés chez les pros cette saison valent davantage.</li>'
   + '<li><b>Confort</b> — un joueur est bien meilleur sur les champions qu\'il a vraiment joués cette saison : l\'étoile indique son nombre de parties. Hors de son répertoire, il perd des points.</li>'
   + '<li><b>Duel</b> — sur chaque voie, les classes se contrent : Assassin › Mage › Combattant › Tank › Assassin. Entre supports : Tank › Mage › Enchanteur › Tank. Choisir après l\'adversaire permet de le contrer (flèche verte) ; choisir avant t\'expose.</li>'
+  + (cat.duos ? '<li><b>Duo</b> — deux champions que les pros associent vraiment cette saison (Xayah et Rakan, Kalista et Renata…) valent un bonus à leurs deux joueurs : le maillon doré les signale dans la grille.</li>' : '')
   + '<li><b>Composition</b> — mêle dégâts physiques et magiques, et prends au moins un tank : une équipe déséquilibrée perd des points.</li>'
+  + (cat.kits ? '<li><b>Ultimes et passifs</b> — ils jouent pour de bon pendant la partie : un ultime qui immobilise ouvre les combats d\'équipe, des dégâts de zone derrière lui font très mal, un autre sauve un allié ou traverse la carte ; certains champions sont faibles au début et redoutables à la fin. Chaque ultime met son vrai temps à revenir.</li>' : '')
   + '<li><b>Bans</b> — retire les champions fétiches des joueurs adverses : la grille les classe du plus dangereux au moins dangereux.</li>'
   + '</ul><p>Le total de chaque joueur s\'ajoute à sa force pendant la partie.</p>'
   + '<div class="actions"><button class="btn" type="button" data-act="help">Compris</button></div></div>';
@@ -85,7 +89,7 @@ export function runDraft({ match, cat, fx, act, resync, toast, help, head, live,
     + '<section class="dr-pool"><div class="dr-tools"><div class="dr-roles"></div><input class="inp dr-q" type="search" placeholder="Chercher…" autocomplete="off" aria-label="Chercher un champion"></div>'
     + '<p class="dr-hint"></p>'
     + '<div class="dr-grid">' + champs.map(([id, c]) => '<button class="dr-c" type="button" data-champ="' + id + '" title="' + esc(c.n) + '"><span class="dr-ci"><img src="' + iconUrl(cat, id) + '" alt="" loading="lazy" decoding="async" draggable="false"></span>'
-      + '<span class="dr-cn">' + esc(c.n) + '</span><i class="dr-star"></i><i class="dr-arrow"></i></button>').join('') + '</div></section>'
+      + '<span class="dr-cn">' + esc(c.n) + '</span><i class="dr-star"></i><i class="dr-arrow"></i><i class="dr-duo" title="Duo de pros avec un champion déjà choisi"></i></button>').join('') + '</div></section>'
     + teamHTML(1) + '</div>'
     + '<p class="dr-away" hidden></p>'
     + '<footer class="dr-foot"><div class="dr-sel"></div>'
@@ -95,7 +99,7 @@ export function runDraft({ match, cat, fx, act, resync, toast, help, head, live,
     + (canAuto && !live ? '<button class="btn dr-sim" type="button" data-act="sim" title="Ton coach termine la draft d\'un trait, sans attendre : on passe à la partie."><b>Simuler</b><i class="hide-s">la draft</i></button>' : '')
     + '<button class="btn primary big" type="button" data-act="lock" disabled>Verrouiller</button></footer>'
     + '<p class="dr-fast" hidden>Ton coach termine la draft…</p>'
-    + '<div class="dr-help"' + (help ? '' : ' hidden') + '>' + HELP + '</div>';
+    + '<div class="dr-help"' + (help ? '' : ' hidden') + '>' + helpHTML(cat) + '</div>';
 
   const $ = (s) => el.querySelector(s);
   const tiles = new Map(Array.from(el.querySelectorAll('.dr-c'), (b) => [b.dataset.champ, { b, star: b.querySelector('.dr-star'), arrow: b.querySelector('.dr-arrow') }]));
@@ -125,13 +129,19 @@ export function runDraft({ match, cat, fx, act, resync, toast, help, head, live,
 
   /* ---------- valeur d'un champion ---------- */
   /* pour mon joueur du poste r */
-  const mine = (id, r) => { const i = ROLES.indexOf(r); return pickValue(champ(id), id, cardOf(you, i), r, picks[foe][i] ? champ(picks[foe][i]) : null); };
+  /* (avec un serveur qui compte les duos de pros : ce que vaut le duo qu'il formerait avec un champion déjà choisi) */
+  const withDuo = (v, side, i, id) => {
+    if (!cat.duos) return v;
+    const d = duoGain(cat.duos, picks[side], i, id);
+    return Object.assign(v, { duo: d.value, partner: d.partner, duoGames: d.games, total: v.total + d.value });
+  };
+  const mine = (id, r) => { const i = ROLES.indexOf(r); return withDuo(pickValue(champ(id), id, cardOf(you, i), r, picks[foe][i] ? champ(picks[foe][i]) : null), you, i, id); };
   /* danger : ce que ce champion vaudrait au mieux pour l'adversaire, sur ses postes encore libres (ou sur le seul poste « only ») */
   function threat(id, only) {
     let best = null;
     ROLES.forEach((r, i) => {
       if (picks[foe][i] || !champ(id).r.includes(r) || (only && r !== only)) return;
-      const v = pickValue(champ(id), id, cardOf(foe, i), r, picks[you][i] ? champ(picks[you][i]) : null);
+      const v = withDuo(pickValue(champ(id), id, cardOf(foe, i), r, picks[you][i] ? champ(picks[you][i]) : null), foe, i, id);
       if (!best || v.total > best.total) best = Object.assign(v, { i });
     });
     return best;
@@ -199,14 +209,15 @@ export function runDraft({ match, cat, fx, act, resync, toast, help, head, live,
     for (const [id, c] of champs) {
       const tile = tiles.get(id);
       let visible = picking ? c.r.includes(role) : !role || c.r.includes(role);
-      let score = -9, star = '', arrow = '';
+      let score = -9, star = '', arrow = '', duo = false;
       if (visible && picking) {
         const v = mine(id, role), g = played(cardOf(you, ROLES.indexOf(role)), id);
-        score = v.total; star = g ? String(g[0]) : ''; arrow = v.counter > 0 ? 'up' : v.counter < 0 ? 'down' : '';
+        score = v.total; star = g ? String(g[0]) : ''; arrow = v.counter > 0 ? 'up' : v.counter < 0 ? 'down' : ''; duo = v.duo > 0;
       } else if (visible) {
         const v = threat(id, role || null);
-        if (v) { const g = played(cardOf(foe, v.i), id); score = v.total; star = g ? String(g[0]) : ''; }
+        if (v) { const g = played(cardOf(foe, v.i), id); score = v.total; star = g ? String(g[0]) : ''; duo = v.duo > 0; }
       }
+      tile.b.classList.toggle('duo', duo);
       if (q && !c.n.toLowerCase().includes(q)) visible = false;
       tile.b.hidden = !visible;
       tile.b.disabled = used.has(id) || gone.has(id);
@@ -226,7 +237,20 @@ export function runDraft({ match, cat, fx, act, resync, toast, help, head, live,
     const list = picks[you].filter(Boolean).map(champ);
     if (!list.length) return '';
     const s = compState(list);
-    return '<p class="dr-comp">Ta composition : <b>' + half(s.ad) + '</b> physique · <b>' + half(s.ap) + '</b> magique · ligne de front <b class="' + (s.front ? 'ok' : 'ko') + '">' + (s.front ? 'oui' : 'pas encore') + '</b></p>';
+    /* ses duos de pros, et ce que ses kits promettent ensemble (quand le serveur les compte) */
+    const extra = [];
+    if (cat.duos) for (let i = 0; i < 5; i++) for (let j = i + 1; j < 5; j++) if (duoOf(cat.duos, i, picks[you][i], j, picks[you][j])) extra.push('Duo de pros : ' + champ(picks[you][i]).n + ' et ' + champ(picks[you][j]).n);
+    extra.push(...kitCombos(cat.kits, picks[you], (id) => champ(id).n));
+    return '<div class="dr-comps"><p class="dr-comp">Ta composition : <b>' + half(s.ad) + '</b> physique · <b>' + half(s.ap) + '</b> magique · ligne de front <b class="' + (s.front ? 'ok' : 'ko') + '">' + (s.front ? 'oui' : 'pas encore') + '</b></p>'
+      + (extra.length ? '<p class="dr-comp dr-combo">' + extra.slice(0, 3).map(esc).join(' · ') + '</p>' : '') + '</div>';
+  }
+  /* le kit d'un champion, en une ligne : son ultime et son passif, avec ce que la partie en fera */
+  function kitHTML(id) {
+    const k = cat.kits && cat.kits[id];
+    if (!k) return '';
+    const said = (text, table) => text.split(' ').map((t) => table[t]).filter(Boolean).slice(0, 2).join(', ');
+    const u = said(k[0], ULT_LABEL), p = said(k[2], PASSIVE_LABEL), cd = KITS[id] && KITS[id][2] ? KITS[id][2][0] : 0;
+    return '<span class="dr-kit"><b>R</b> ' + esc(KITS[id] ? KITS[id][1] : 'Ultime') + (u ? ' : ' + u : '') + (cd > 45 ? ' (' + cd + ' s)' : '') + '<i> · </i><b>P</b> ' + esc(k[1]) + (p ? ' : ' + p : '') + '</span>';
   }
   function syncFoot() {
     const t = turn(), my = myTurn(), box = $('.dr-sel'), btn = $('[data-act="lock"]');
@@ -245,7 +269,8 @@ export function runDraft({ match, cat, fx, act, resync, toast, help, head, live,
     let chips = '', sub = '', total = '';
     if (t.type === 'pick') {
       const i = ROLES.indexOf(role), v = mine(sel, role), g = played(cardOf(you, i), sel), facing = picks[foe][i];
-      chips = chip('Méta', v.meta) + chip('Confort', v.comfort, g ? games(g[0]) : 'jamais joué') + (facing ? chip('Duel', v.counter, 'face à ' + champ(facing).n) : '');
+      chips = chip('Méta', v.meta) + chip('Confort', v.comfort, g ? games(g[0]) : 'jamais joué') + (facing ? chip('Duel', v.counter, 'face à ' + champ(facing).n) : '')
+        + (v.duo > 0 ? chip('Duo', v.duo, 'avec ' + champ(v.partner).n + ' · ' + games(v.duoGames) + ' chez les pros') : '');
       total = '<em class="dr-total">' + signed(v.total) + '</em>';
       sub = 'pour ' + nameOf(you, i) + ' · ' + CLASS_NAME[c.t] + ' · ' + DAMAGE_NAME[c.d];
     } else {
@@ -253,7 +278,7 @@ export function runDraft({ match, cat, fx, act, resync, toast, help, head, live,
       chips = v ? chip('Danger', v.total, nameOf(foe, v.i) + (g ? ' · ' + games(g[0]) : ''), ' wide') : '<span class="dr-chip">Peu de danger : l\'adversaire n\'a plus de poste pour lui</span>';
       sub = CLASS_NAME[c.t] + ' · ' + DAMAGE_NAME[c.d] + (c.g ? ' · joué ' + c.g + ' fois et banni ' + c.b + ' fois par les pros cette saison' : '');
     }
-    box.innerHTML = '<span class="dr-sel-i-box"><img class="dr-sel-i" src="' + iconUrl(cat, sel) + '" alt="" draggable="false"></span><div class="dr-sel-t"><b>' + esc(c.n) + total + '</b><span>' + esc(sub) + '</span><div class="dr-chips">' + chips + '</div></div>';
+    box.innerHTML = '<span class="dr-sel-i-box"><img class="dr-sel-i" src="' + iconUrl(cat, sel) + '" alt="" draggable="false"></span><div class="dr-sel-t"><b>' + esc(c.n) + total + '</b><span>' + esc(sub) + '</span>' + kitHTML(sel) + '<div class="dr-chips">' + chips + '</div></div>';
   }
   function syncAll() { syncHead(); syncTeams(); syncRoles(); syncPool(); syncFoot(); }
   const pop = (node) => { if (!node) return; node.classList.remove('pop'); void node.offsetWidth; node.classList.add('pop'); };

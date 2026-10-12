@@ -39,6 +39,26 @@ const LINES = {
     (c) => 'LE CONTRE-GANK 🤯 ' + c.w + ' avait tout lu',
     (c) => 'Ils attendaient dans le buisson depuis combien de temps ?! Contre-gank de ' + c.w,
   ],
+  /* ce que les kits font de spectaculaire (le serveur le signale) : un ultime qui conclut de l'autre bout de la carte, un autre qui amène
+     son lanceur sur place, un allié sauvé de justesse, une seconde vie. w2 : l'équipe qui croyait tenir son élimination. */
+  far: [
+    (c) => 'L\'ultime de ' + c.k + ' traverse TOUTE la carte pour finir ' + c.v + ' 😱',
+    (c) => c.v + ' se croyait en sécurité. ' + c.k + ' n\'était même pas à l\'écran.',
+    (c) => 'Élimination à distance pour ' + c.k + ' sur ' + c.kc + ', la carte est trop petite',
+  ],
+  join: [
+    (c) => c.k + ' débarque de l\'autre bout de la carte avec son ultime, ' + c.v + ' n\'a rien vu venir',
+    (c) => 'Personne ne surveille ' + c.k + ' ?! Son ultime vient de coûter une vie à ' + c.l,
+  ],
+  save: [
+    (c) => 'QUEL SAUVETAGE de ' + c.k + ' 🙏 ' + c.v + ' lui doit une vie',
+    (c) => c.v + ' était mort. ' + c.k + ' a dit non.',
+    (c) => 'L\'ultime de ' + c.k + ' pile au bon moment, ' + c.w2 + ' repart sans rien',
+  ],
+  life: [
+    (c) => c.v + ' et sa seconde vie 😅 ' + c.w2 + ' pensait l\'avoir',
+    (c) => 'Ils avaient oublié le passif de ' + c.vc + '. ' + c.v + ' est toujours là.',
+  ],
   pick: [
     (c) => c.v + ' tout seul sans vision à ce moment de la partie… ça coûte cher',
     (c) => c.k + ' qui attrape ' + c.v + ' : une balise aurait suffi 👀',
@@ -147,6 +167,10 @@ export function createFans({ P, teams, sim }) {
     else if (hl === 'Ace') { kind = 'ace'; odds = 0.95; }
     else if (hl === 'Contre-gank') { kind = 'counter'; odds = 0.9; }
     else if (first) { kind = 'first'; odds = 0.9; }
+    else if (ev.x === 'far') { kind = 'far'; odds = 0.85; }
+    else if (ev.x === 'join') { kind = 'join'; odds = 0.7; }
+    else if (ev.x === 'save') { kind = 'save'; odds = 0.6; }
+    else if (ev.x === 'life') { kind = 'life'; odds = 0.6; }
     else if (ev.k === 'elder') { kind = 'elder'; odds = 0.9; }
     else if (ev.k === 'dragon' && (ev.dr[0] >= 4 || ev.dr[1] >= 4)) { kind = 'soul'; odds = 0.9; }
     else if (best >= 3) { kind = 'triple'; odds = 0.8; }
@@ -156,7 +180,7 @@ export function createFans({ P, teams, sim }) {
     else if (ev.k === 'gank' && fought) { kind = 'gank'; odds = 0.3; }
     else if (ev.k === 'kill' && hl) { kind = 'solo'; odds = 0.6; }
     else if (ev.k === 'kill') { kind = /isolé|placement|piège|vision/.test(ev.txt) ? 'pick' : 'solo'; odds = 0.22; }
-    else if (ev.k === 'tower' && /Première tour/.test(ev.txt)) { kind = 'tower1'; odds = 0.4; }
+    else if (ev.k === 'tower' && /première tour/i.test(ev.txt)) { kind = 'tower1'; odds = 0.4; }
     else if (ev.k === 'herald') { kind = 'herald'; odds = 0.2; }
     else if (ev.k === 'dragon') { kind = 'dragon'; odds = 0.15; }
     /* de temps en temps, un simple mot d'admiration pour celui qui porte la partie */
@@ -179,6 +203,18 @@ export function createFans({ P, teams, sim }) {
     };
     /* le gank : c'est du jungler qu'on parle ; le contre-gank : de celui qui attendait */
     if (kind === 'gank' && ev.who.length) ctx.j = P[ev.who[0]].name;
+    /* un ultime venu de loin : c'est de son lanceur qu'on parle */
+    const from = kind === 'far' ? ev.fr : kind === 'join' ? ev.jn : null;
+    if (from && from.length) { ctx.k = P[from[0]].name; ctx.kc = P[from[0]].champName; }
+    /* un joueur sauvé (par un allié, ou par son passif) : lui, celui qui l'a sauvé, et l'équipe qui croyait le tenir */
+    if (kind === 'save' || kind === 'life') {
+      const vi = ev.who[ev.k === 'gank' ? 2 : 1], vs = vi < 5 ? 0 : 1;
+      if (vi === undefined) return null;
+      const saver = (ev.u || []).find((i) => i !== vi && (i < 5 ? 0 : 1) === vs);
+      if (kind === 'save' && saver === undefined) return null;
+      ctx.v = P[vi].name; ctx.vc = P[vi].champName; ctx.w2 = teams[1 - vs].short;
+      if (saver !== undefined) { ctx.k = P[saver].name; ctx.kc = P[saver].champName; }
+    }
     let line = pick(LINES[kind]);
     if (line === lastLine && LINES[kind].length > 1) line = LINES[kind][(LINES[kind].indexOf(line) + 1) % LINES[kind].length];
     let who2 = Math.floor(rnd() * ACCOUNTS.length);

@@ -190,8 +190,25 @@ function drawPulse() {
     }
   } else if (bar) bar.remove();
 }
-setInterval(pulse, PULSE_MS);
-document.addEventListener('visibilitychange', () => { if (!document.hidden) pulse(); });
+/* Le rythme du pouls suit le joueur : toutes les 20 secondes tant qu'il joue ; toutes les minutes après deux minutes sans rien toucher ;
+   toutes les cinq minutes après dix. Un onglet laissé ouvert toute une journée ne pèse ainsi presque rien sur le serveur (dont l'offre
+   gratuite compte les appels), et le premier geste relance le pouls aussitôt. Onglet caché : aucun appel. */
+const IDLE_SLOW = 2 * 60000, IDLE_SLEEP = 10 * 60000, PULSE_SLOW = 60000, PULSE_SLEEP = 5 * 60000;
+let lastActive = Date.now(), lastPulse = 0, pulseTimer = 0;
+const pulseDelay = () => { const idle = Date.now() - lastActive; return idle >= IDLE_SLEEP ? PULSE_SLEEP : idle >= IDLE_SLOW ? PULSE_SLOW : PULSE_MS; };
+function beat() {
+  clearTimeout(pulseTimer);
+  pulseTimer = setTimeout(() => { lastPulse = Date.now(); pulse().finally(beat); }, pulseDelay());
+}
+function awake() {
+  const dozing = Date.now() - lastActive >= IDLE_SLOW;
+  lastActive = Date.now();
+  /* il revient après une absence : des nouvelles tout de suite (si le dernier pouls date), puis le rythme ordinaire */
+  if (dozing) { if (Date.now() - lastPulse >= PULSE_MS) { lastPulse = Date.now(); pulse(); } beat(); }
+}
+for (const type of ['pointerdown', 'click', 'keydown', 'input', 'wheel', 'touchstart']) document.addEventListener(type, awake, { passive: true, capture: true });
+beat();
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { lastPulse = Date.now(); pulse(); beat(); } });
 async function boot() {
   try { S.fx = localStorage.getItem(STORE + 'fx') !== '0'; } catch (e) { S.fx = true; }
   try { S.pack = localStorage.getItem(STORE + 'booster') === 'credits' ? 'credits' : 'free'; } catch (e) { S.pack = 'free'; }

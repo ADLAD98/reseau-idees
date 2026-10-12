@@ -223,6 +223,19 @@
 .dr-c:disabled img{filter:grayscale(1) brightness(.32)}
 .dr-c:disabled .dr-cn{color:var(--faint);text-decoration:line-through}
 .dr-star,.dr-arrow{position:absolute;top:4px;padding:2px 4px;background:rgba(1,10,19,.88);font:700 11px/1 var(--text);font-style:normal;pointer-events:none}
+/* un duo de pros avec un champion déjà choisi : deux maillons dorés, au pied du portrait */
+.dr-duo{display:none;position:absolute;left:50%;top:calc(100% - 37px);width:22px;height:11px;transform:translateX(-50%);pointer-events:none}
+.dr-c.duo:not(:disabled) .dr-duo{display:block}
+.dr-duo::before,.dr-duo::after{content:"";position:absolute;top:0;width:11px;height:9px;border:2px solid var(--gold-hi);border-radius:6px;background:rgba(1,10,19,.8);box-shadow:0 0 6px rgba(240,230,210,.35)}
+.dr-duo::before{left:0}
+.dr-duo::after{right:0}
+/* le kit du champion désigné : son ultime et son passif, sur une ligne */
+.dr-sel-t>.dr-kit{font-size:13px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dr-kit b{display:inline-block;min-width:15px;padding:1px 3px;margin-right:2px;font:700 10.5px/1.2 var(--text);text-align:center;color:#010a13;background:var(--gold)}
+.dr-kit i{font-style:normal;color:var(--faint)}
+.dr-comps{display:flex;flex-direction:column;align-items:flex-end;gap:4px;min-width:0;margin-left:auto}
+.dr-comps .dr-comp{margin-left:0}
+.dr-comp.dr-combo{max-width:62ch;font-size:13px;line-height:1.3;white-space:normal;text-align:right;color:var(--gold-hi)}
 .dr-star{left:4px;color:var(--t3)}
 .dr-star:empty,.dr-c:disabled .dr-star,.dr-c:disabled .dr-arrow{display:none}
 .dr-star::before{content:"★ "}
@@ -346,6 +359,15 @@
 .mv-dr i{width:8px;height:8px;transform:rotate(45deg);border:1px solid var(--gold-lo);transition:background .3s}
 .mv-dr i.on{background:var(--c);border-color:transparent}
 .mv-dr.soul i{box-shadow:0 0 8px var(--c)}
+/* les dragons par élément (quand le serveur les donne) : chaque pastille prend la couleur du sien ; l'âme les fait briller de la sienne */
+.mv-dr i[data-el="inf"],.m-pit[data-el="inf"]{--e:#ff7043}
+.mv-dr i[data-el="mtn"],.m-pit[data-el="mtn"]{--e:#b9905f}
+.mv-dr i[data-el="ocn"],.m-pit[data-el="ocn"]{--e:#35c9c0}
+.mv-dr i[data-el="cld"],.m-pit[data-el="cld"]{--e:#cfdcee}
+.mv-dr i[data-el="hex"],.m-pit[data-el="hex"]{--e:#52b4ff}
+.mv-dr i[data-el="chm"],.m-pit[data-el="chm"]{--e:#93d94e}
+.mv-dr i.on[data-el]:not([data-el=""]){background:var(--e);box-shadow:0 0 0 1px rgba(1,10,19,.55)}
+.mv-dr.soul i.on[data-el]:not([data-el=""]){box-shadow:0 0 9px var(--e)}
 .mv-gold{justify-self:center;width:150px;height:5px;background:var(--s1);overflow:hidden}
 .mv-gold i{display:block;width:50%;height:100%;background:var(--s0);box-shadow:2px 0 0 #010a13;transition:width .6s}
 .mv-hud .pop{animation:tickup .45s ease-out}
@@ -394,6 +416,10 @@
 .m-pit[data-off="1"] use{opacity:.3}
 /* le Dragon ancestral : blanc, plus marqué */
 .m-pit[data-who="elder"] use{color:#f3eeff;stroke-width:1.7}
+/* le dragon qui attend dans la fosse, à la couleur de son élément */
+.m-pit[data-who="drake"][data-el]:not([data-el=""]) use{color:var(--e)}
+.m-pit[data-who="drake"][data-el]:not([data-el=""]) circle{stroke:color-mix(in srgb,var(--e) 62%,transparent)}
+.m-pit[data-who="drake"][data-off="1"][data-el]:not([data-el=""]) circle{stroke:color-mix(in srgb,var(--e) 30%,transparent)}
 .m-pit[data-who="elder"] circle{stroke:rgba(214,200,255,.6)}
 .m-pit[data-off="1"] circle{stroke:rgba(200,170,110,.24)}
 .m-timer{font:700 30px/1 var(--text);font-variant-numeric:tabular-nums;letter-spacing:.02em;fill:var(--gold-hi);stroke:#010a13;stroke-width:7;paint-order:stroke;stroke-linejoin:round}
@@ -574,6 +600,12 @@
 .mv-now-i svg{width:20px;height:20px}
 .mv-now time{font:700 15px/1 var(--text);color:var(--c);font-variant-numeric:tabular-nums}
 .mv-now p{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;margin:0;font:400 17px/1.28 var(--text);color:var(--ink)}
+.mv-now-t{min-width:0}
+/* ce que les kits ont changé au combat : une ligne plus discrète, sous le commentaire ; le nom d'un ultime ou d'un passif ressort */
+.mv-now p.mv-kit{-webkit-line-clamp:2;margin-top:3px;font-size:14px;line-height:1.25;color:var(--mut)}
+.mv-q{quotes:none;font-weight:600;color:var(--gold)}
+.mv-q::before,.mv-q::after{content:none}
+.mv-line .mv-kit{font-style:normal;color:var(--faint)}
 .mv-now p b{font-weight:600;color:#fff}
 .mv-now p b.s0{color:var(--s0)}
 .mv-now p b.s1{color:var(--s1)}
@@ -672,6 +704,8 @@
 .sb tr.sb-it td{padding:0 8px 8px;border-top:0}
 .sb .mv-it img,.sb .mv-it i{width:24px;height:24px;border-radius:0}
 .sb tfoot td{padding-top:10px;color:var(--mut);font-size:13.5px}
+/* les duos de pros et ce que les kits de la composition promettent : une ligne chacun */
+.dr-note{display:block;margin-top:5px;padding-left:11px;border-left:2px solid var(--gold-lo);color:var(--ink);line-height:1.3}
 .end-box .more .note{margin-top:12px}
 .end-feed{display:grid;gap:7px;margin-top:16px}
 
@@ -788,6 +822,13 @@
   .dr-chip.wide i{display:inline}
   .dr-tip{flex-basis:100%;font-size:13.5px;line-height:1.3}
   .dr-comp{margin:0;font-size:12px;white-space:normal}
+  .dr-comps{align-items:flex-start;gap:2px;margin:0}
+  .dr-comp.dr-combo{font-size:11.5px;text-align:left}
+  /* sur un téléphone, le pied de la draft tient sur deux rangs : ce qu'on désigne (son kit, ses valeurs), puis les boutons */
+  .dr-foot{flex-wrap:wrap;gap:8px}
+  .dr-sel{flex:1 0 100%}
+  .dr-foot .btn.primary.big{flex:1}
+  .dr-sel-t>.dr-kit{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;font-size:11.5px;line-height:1.35;white-space:normal}
   .dr-foot .btn.big{flex:none;height:48px;padding:0 16px;font-size:14px;letter-spacing:.08em}
   .dr-auto{height:48px;min-width:58px;padding:0 8px}
   .dr-auto b{font-size:11px;letter-spacing:.08em}
@@ -870,6 +911,7 @@
   .mv-now-i svg{width:16px;height:16px}
   .mv-now time{font-size:13px}
   .mv-now p{font-size:14.5px;line-height:1.25}
+  .mv-now p.mv-kit{margin-top:2px;font-size:12.5px;line-height:1.22}
   .mv-now p em{margin-right:7px;font-size:10px}
   .mv-social{order:2;flex:none}
   .mv-post{padding:8px 11px 7px}

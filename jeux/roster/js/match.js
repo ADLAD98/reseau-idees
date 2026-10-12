@@ -22,6 +22,15 @@ const icon = (id) => '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><us
 const SIDE_COLORS = [['#4ea3ff', '#bfe0ff', '#ffffff'], ['#f0586a', '#ffc2c9', '#ffffff']];
 const GOLD = ['#f0e6d2', '#c8aa6e', '#ffe7a8', '#ffffff'];
 const STREAK = ['', '', 'Doublé', 'Triplé', 'Quadruplé', 'Pentakill'];
+/* Les dragons par élément (quand le serveur les donne) : son nom, celui de son âme, ce qu'il apporte vraiment (wiki officiel, saison 2026). */
+const DRAKES = {
+  inf: ['Dragon infernal', 'Âme des Enfers', '+3 % de dégâts d\'attaque et de puissance'],
+  mtn: ['Dragon des montagnes', 'Âme des Montagnes', '+5 % d\'armure et de résistance magique'],
+  ocn: ['Dragon des océans', 'Âme des Océans', 'rend 2 % de la vie manquante toutes les 5 secondes'],
+  cld: ['Dragon des nuages', 'Âme des Nuages', '+5 % de vitesse hors combat, résistance aux ralentissements'],
+  hex: ['Dragon Hextech', 'Âme Hextech', '+5 d\'accélération de compétence, +5 % de vitesse d\'attaque'],
+  chm: ['Dragon Chemtech', 'Âme Chemtech', '+6 % de ténacité, de soins et de boucliers'],
+};
 
 /* La carte est un carré de 1000 de côté, base bleue en bas à gauche, base rouge en haut à droite.
    Sa géométrie (bâtiments, fosses, camps, sentiers) et les trajets des joueurs sont dans moves.js. */
@@ -110,7 +119,7 @@ export function runMatch({ data, cat, fx }) {
   const itemsHTML = (ids, fresh) => ids.map((id) => '<img' + (fresh && fresh.has(id) ? ' class="new"' : '') + ' src="' + DDRAGON + '/' + cat.ddragon + '/img/item/' + id + '.png" alt="" title="' + esc(itemTitle(id)) + '" draggable="false">').join('')
     + '<i></i>'.repeat(Math.max(0, 6 - ids.length));
   const hudObj = (s) => '<div class="mv-o s' + s + '">' + stat('i-coin', 'g' + s, '2,5k') + stat('i-tower', 'tw' + s, '0')
-    + '<span class="mv-s">' + icon('i-drake') + '<span class="mv-dr" data-dr="' + s + '"><i></i><i></i><i></i><i></i></span></span>' + stat('i-baron', 'bn' + s, '0') + '</div>';
+    + '<span class="mv-s">' + icon('i-drake') + '<span class="mv-dr" data-dr="' + s + '" title="Dragons"><i></i><i></i><i></i><i></i></span></span>' + stat('i-baron', 'bn' + s, '0') + '</div>';
   const sideHTML = (s) => '<aside class="mv-side s' + s + '">' + [0, 1, 2, 3, 4].map((r) => {
     const i = s * 5 + r, p = P[i];
     /* la pastille ronde sur le portrait : verte quand l'ultime (R) est disponible, comme dans le jeu */
@@ -282,19 +291,34 @@ export function runMatch({ data, cat, fx }) {
     for (const t of taken('baron')) { stays.baron.push(['baron', early(from, t), t]); from = t + 360; }
     stays.baron.push(['baron', from, Infinity]);
     from = 300;
+    /* l'élément du dragon qui attend dans la fosse (le serveur donne ceux de la partie : les deux premiers, puis celui de la Faille) */
+    let count = 0;
+    const next = () => (who === 'drake' && sim.els ? sim.els[Math.min(2, count)] || '' : '');
     for (const e of events) {
       if (e.k !== 'dragon' && e.k !== 'elder') continue;
-      stays.drake.push([e.k === 'elder' ? 'elder' : 'drake', early(from, e.t), e.t]);
+      stays.drake.push([e.k === 'elder' ? 'elder' : 'drake', early(from, e.t), e.t, e.k === 'dragon' ? e.el || next() : '']);
+      if (e.k === 'dragon') count++;
       who = e.k === 'elder' || e.dr[0] >= 4 || e.dr[1] >= 4 ? 'elder' : 'drake';
       from = e.t + (who === 'elder' ? 360 : 300);
     }
-    stays.drake.push([who, from, Infinity]);
+    stays.drake.push([who, from, Infinity, next()]);
   }
-  /** L'occupant d'une fosse quand l'horloge marque g : [qui, secondes avant son arrivée (0 : il est là)]. */
+  /** L'occupant d'une fosse quand l'horloge marque g : [qui, secondes avant son arrivée (0 : il est là), son élément pour un dragon]. */
   const pitAt = (name, g) => {
-    for (const [who, from, to] of stays[name]) if (g < to) return [who, Math.max(0, from - g)];
-    return [stays[name][stays[name].length - 1][0], 0];
+    for (const [who, from, to, el] of stays[name]) if (g < to) return [who, Math.max(0, from - g), el || ''];
+    const last = stays[name][stays[name].length - 1];
+    return [last[0], 0, last[3] || ''];
   };
+  /* les dragons de chaque équipe après chaque action, par élément, et l'âme quand elle est prise */
+  const drakesAt = [];
+  {
+    const own = [[], []];
+    let soul = ['', ''];
+    for (const e of events) {
+      if (e.k === 'dragon' && e.s >= 0 && e.el) { own[e.s] = own[e.s].concat(e.el); if (e.soul) { soul = soul.slice(); soul[e.s] = e.soul; } }
+      drakesAt.push({ own: [own[0], own[1]], soul });
+    }
+  }
   /** Met à jour le farm, les pastilles d'ultime et les comptes à rebours, quand ils changent. */
   function drawLive() {
     const g = clockT;
@@ -309,12 +333,13 @@ export function runMatch({ data, cat, fx }) {
     /* pendant un temps fort, c'est l'action qui règle les barres de vie */
     if (!root.classList.contains('slow')) for (let i = 0; i < 10; i++) { setHp(i, plan.hpAt(i, tau)); setMp(i, plan.resAt(i, tau)); }
     for (const name of ['drake', 'baron']) {
-      const [who, left] = pitAt(name, g), text = left > 0 ? clockText(Math.ceil(left)) : '', sig = who + text;
+      const [who, left, el] = pitAt(name, g), text = left > 0 ? clockText(Math.ceil(left)) : '', sig = who + text + el;
       if (sig === timerLook[name]) continue;
       timerLook[name] = sig;
       timerEls[name].textContent = text;
       pitEls[name].dataset.off = text ? '1' : '';
       pitEls[name].dataset.who = who;
+      pitEls[name].dataset.el = el;
       pitUse[name].setAttribute('href', '#' + PIT_SYM[who]);
     }
   }
@@ -426,12 +451,21 @@ export function runMatch({ data, cat, fx }) {
   }
   function drawKda(i) { kdaEls[i].textContent = kda[i].k + '/' + kda[i].d + '/' + kda[i].a; }
   function hud(ev) {
+    const d = drakesAt[events.indexOf(ev)] || null;
     for (const s of [0, 1]) {
       score[s] = ev.sc[s];
       /* (l'or des équipes suit celui de leurs joueurs, au fil de la partie : drawGold) */
       set('k' + s, ev.sc[s]); set('tw' + s, ev.tw[s]); set('bn' + s, ev.bn[s]);
-      root.querySelectorAll('[data-dr="' + s + '"] i').forEach((pip, k) => pip.classList.toggle('on', k < ev.dr[s]));
-      root.querySelector('[data-dr="' + s + '"]').classList.toggle('soul', ev.dr[s] >= 4);
+      /* les dragons : une pastille par dragon, à la couleur de son élément quand le serveur le donne ; l'âme les fait briller */
+      const box = root.querySelector('[data-dr="' + s + '"]'), els = d ? d.own[s] : [], soul = d ? d.soul[s] : '';
+      box.querySelectorAll('i').forEach((pip, k) => {
+        pip.classList.toggle('on', k < ev.dr[s]);
+        pip.dataset.el = (k < ev.dr[s] && els[k]) || '';
+      });
+      box.classList.toggle('soul', ev.dr[s] >= 4);
+      box.dataset.soul = soul;
+      const names = els.slice(0, 4).map((el) => (DRAKES[el] ? DRAKES[el][0] + ' (' + DRAKES[el][2] + ')' : '')).filter(Boolean);
+      box.title = names.length ? names.join('\n') + (soul && DRAKES[soul] ? '\n' + DRAKES[soul][1] : '') : 'Dragons';
     }
   }
   /* Le commentaire, façon retransmission : l'action en cours dans un bandeau (son pictogramme, son heure, son titre quand c'est un temps fort),
@@ -446,7 +480,9 @@ export function runMatch({ data, cat, fx }) {
       const alt = [...names.keys()].sort((a, b) => b.length - a.length).map((n) => n.replace(/[.*+?^$(){}|[\]\\]/g, '\\$&')).join('|');
       re = new RegExp('(?<![\\p{L}\\p{N}])(' + alt + ')(?![\\p{L}\\p{N}])', 'gu');
     } catch (e) { re = null; }   /* un navigateur trop ancien pour cette recherche : le texte reste tel quel */
-    return (txt) => { const safe = esc(txt); return re ? safe.replace(re, (m) => '<b' + (names.get(m) || '') + '>' + m + '</b>') : safe; };
+    /* (et le nom d'un ultime ou d'un passif, que le serveur écrit entre guillemets, ressort lui aussi) */
+    const spell = (html) => html.replace(/«\s([^«»]{2,48})\s»/g, '<q class="mv-q">$1</q>');
+    return (txt) => { const safe = esc(txt); return spell(re ? safe.replace(re, (m) => '<b' + (names.get(m) || '') + '>' + m + '</b>') : safe); };
   })();
   const lineHTML = (e) => '<p class="mv-line' + (e.s >= 0 ? ' s' + e.s : '') + (e.hl ? ' hl' : '') + '"><time>' + clockText(e.t) + '</time><span>' + esc(e.txt) + '</span></p>';
   let said = null, fans = null, postAt = -1;
@@ -455,8 +491,9 @@ export function runMatch({ data, cat, fx }) {
     if (said) { pastEl.insertAdjacentHTML('afterbegin', lineHTML(said)); while (pastEl.children.length > 3) pastEl.lastChild.remove(); }
     said = ev;
     nowEl.className = 'mv-now' + (ev.s >= 0 ? ' s' + ev.s : '') + (ev.hl ? ' hl' : '');
+    /* sous le commentaire, quand le serveur le dit : ce que les ultimes et les passifs ont changé à ce combat */
     nowEl.innerHTML = '<span class="mv-now-i">' + icon(EVENT_ICON[ev.k] || 'i-play') + '</span><time>' + clockText(ev.t) + '</time>'
-      + '<p>' + (ev.hl ? '<em>' + esc(ev.hl) + '</em>' : '') + rich(ev.txt) + '</p>';
+      + '<div class="mv-now-t"><p>' + (ev.hl ? '<em>' + esc(ev.hl) + '</em>' : '') + rich(ev.txt) + '</p>' + (ev.kt ? '<p class="mv-kit">' + rich(ev.kt) + '</p>' : '') + '</div>';
     pop(nowEl);
     react(ev);
   }
@@ -514,6 +551,17 @@ export function runMatch({ data, cat, fx }) {
   }
 
   /* ---------- déroulé ---------- */
+  /** Les ultimes lancés de l'autre bout de la carte (le serveur dit lesquels : fr) : un trait part de leur lanceur, là où il se trouve,
+      et s'abat sur l'action. */
+  function globals(ev, at, slow) {
+    for (const i of ev.fr || []) {
+      const side = i < 5 ? 0 : 1;
+      beam(pos[i], at, side, true);
+      ring(at, side, true);
+      again(tokens[i], 'ulting');
+      if (slow) sfx.ult();
+    }
+  }
   /** Un événement, en direct. Les joueurs concernés sont déjà sur place : ils y sont venus à pied, par leur propre chemin. */
   async function show(ev, n) {
     const mine = run, a = plan.at[n], fought = ev.kills.length > 0;
@@ -521,6 +569,7 @@ export function runMatch({ data, cat, fx }) {
     ping(plan.anchors[n], fought ? -1 : ev.s);
     if (!fought) { say(ev); cue(ev); }
     await advance(a.tau + SHOW_LEAD);
+    if (!stopped(mine)) globals(ev, plan.anchors[n], false);
     const streak = new Map();
     for (let j = 0; j < ev.kills.length; j++) {
       if (stopped(mine)) return;
@@ -663,6 +712,8 @@ export function runMatch({ data, cat, fx }) {
         await nap(120, null, 2);
       }
       if (ulted.size) await nap(260, null, 2);
+      /* et ceux qui s'abattent de l'autre bout de la carte */
+      if (!stopped(mine) && !skipSlow && ev.fr && ev.fr.length) { globals(ev, a, true); await nap(300, null, 2); }
     }
     const streak = new Map();
     let count = 0;
@@ -795,14 +846,23 @@ export function runMatch({ data, cat, fx }) {
     const board = (s) => '<table class="sb s' + s + '"><thead><tr><th colspan="2">' + esc(M.teams[s].name) + (s === w ? ' <em>vainqueur</em>' : '') + '</th><th class="num">K</th><th class="num">D</th><th class="num">A</th><th class="num">CS</th><th class="num">Or</th></tr></thead>'
       + '<tbody>' + [0, 1, 2, 3, 4].map((r) => row(s * 5 + r)).join('') + '</tbody></table>';
     const line = (label, a, b) => '<tr><td class="num">' + a + '</td><th>' + label + '</th><td class="num">' + b + '</td></tr>';
+    /* (un serveur récent compte aussi les duos que les pros associent vraiment : une colonne de plus) */
+    const duos = data.report.picks.some((side) => side.some((rep) => rep.duo !== undefined));
     const pickRow = (s, r) => {
       const p = P[s * 5 + r], rep = data.report.picks[s][r];
       return '<tr><td><img src="' + iconUrl(cat, p.champ) + '" alt="" loading="lazy"></td><td><b>' + esc(p.champName) + '</b><i>' + esc(p.name) + '</i></td>'
-        + '<td class="num">' + signed(rep.meta) + '</td><td class="num">' + signed(rep.comfort) + '</td><td class="num">' + signed(rep.counter) + '</td><td class="num"><b>' + signed(rep.total) + '</b></td></tr>';
+        + '<td class="num">' + signed(rep.meta) + '</td><td class="num">' + signed(rep.comfort) + '</td><td class="num">' + signed(rep.counter) + '</td>'
+        + (duos ? '<td class="num">' + (rep.duo ? signed(rep.duo) : '—') + '</td>' : '') + '<td class="num"><b>' + signed(rep.total) + '</b></td></tr>';
     };
-    const draft = (s) => '<table class="sb dr-rep s' + s + '"><thead><tr><th colspan="2">' + esc(M.teams[s].name) + '</th><th class="num">Méta</th><th class="num">Confort</th><th class="num">Duel</th><th class="num">Total</th></tr></thead>'
+    /* ce qu'il y a à dire d'une composition : son équilibre (une phrase), puis, une ligne chacun, ses duos de pros et ce que ses kits promettent */
+    const compHTML = (s) => {
+      const c = data.report.comp[s], plain = c.notes.filter((x) => !x.includes(' : ')), rich2 = c.notes.filter((x) => x.includes(' : '));
+      return 'Composition ' + signed(c.bonus) + ' par joueur' + (plain.length ? ' : ' + esc(plain.join(', ').toLowerCase()) : '')
+        + rich2.map((x) => '<span class="dr-note">' + esc(x) + '</span>').join('');
+    };
+    const draft = (s) => '<table class="sb dr-rep s' + s + '"><thead><tr><th colspan="2">' + esc(M.teams[s].name) + '</th><th class="num">Méta</th><th class="num">Confort</th><th class="num">Duel</th>' + (duos ? '<th class="num">Duo</th>' : '') + '<th class="num">Total</th></tr></thead>'
       + '<tbody>' + [0, 1, 2, 3, 4].map((r) => pickRow(s, r)).join('') + '</tbody>'
-      + '<tfoot><tr><td colspan="6">Composition ' + signed(data.report.comp[s].bonus) + ' par joueur' + (data.report.comp[s].notes.length ? ' : ' + esc(data.report.comp[s].notes.join(', ').toLowerCase()) : '') + '</td></tr></tfoot></table>';
+      + '<tfoot><tr><td colspan="' + (duos ? 7 : 6) + '">' + compHTML(s) + '</td></tr></tfoot></table>';
     let prize;
     if (rewards.html) prize = rewards.html;
     else if (rewards.replay) prize = '<div class="prize"><span>Rediffusion</span><b>' + (won ? 'Victoire' : 'Défaite') + '</b><i>Les récompenses ont déjà été versées.</i></div>';
@@ -825,8 +885,9 @@ export function runMatch({ data, cat, fx }) {
       + '<button class="btn big" type="button" data-act="again">' + (fx ? 'Revoir la partie' : 'Voir la partie') + '</button></div>'
       + '<details class="more" open><summary>Joueurs</summary><div class="end-boards">' + board(0) + board(1) + '</div></details>'
       + '<details class="more"><summary>Bilan de la draft</summary><div class="end-boards">' + draft(0) + draft(1) + '</div>'
-      + '<p class="note">Le total de chaque joueur (méta, confort, duel, composition) s\'est ajouté à sa force pendant la partie.</p></details>'
-      + '<details class="more"><summary>Le fil de la partie</summary><div class="end-feed">' + events.map((e) => '<p class="mv-line' + (e.s >= 0 ? ' s' + e.s : '') + (e.hl ? ' hl' : '') + '"><time>' + clockText(e.t) + '</time><span>' + esc(e.txt) + '</span></p>').join('') + '</div></details>'
+      + '<p class="note">Le total de chaque joueur (méta, confort, duel' + (duos ? ', duo' : '') + ', composition) s\'est ajouté à sa force pendant la partie.'
+      + (duos ? ' Les ultimes et les passifs, eux, ont joué pour de bon dans chaque action.' : '') + '</p></details>'
+      + '<details class="more"><summary>Le fil de la partie</summary><div class="end-feed">' + events.map((e) => '<p class="mv-line' + (e.s >= 0 ? ' s' + e.s : '') + (e.hl ? ' hl' : '') + '"><time>' + clockText(e.t) + '</time><span>' + esc(e.txt) + (e.kt ? ' <i class="mv-kit">' + esc(e.kt) + '</i>' : '') + '</span></p>').join('') + '</div></details>'
       + '</div>';
     stage('end');
     endEl.scrollTop = 0;

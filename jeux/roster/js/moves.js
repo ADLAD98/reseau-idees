@@ -8,6 +8,8 @@
    (et rejoint les siens à la Téléportation), le midlaner l'autre s'il joue un champion de duel ; on se regroupe pour les objectifs.
    Chaque joueur a aussi son niveau, son ultime (disponible ou non), sa vie et sa ressource : ce que le serveur ne compte pas, la mise
    en scène le déduit de ce qu'il fait, avec les vrais délais du jeu (temps de mort, camps, récupération des ultimes).
+   Quand le serveur suit les ultimes (il dit alors, à chaque action, qui lance le sien), la mise en scène s'y tient : un ultime ne part
+   que là où le serveur l'a décidé ; ceux qui traversent la carte amènent leur lanceur sur place, ou s'abattent de loin.
    Tout passe par les couloirs de la carte (voies, sentiers de la jungle, rivière), jamais à travers les murs.
    L'or de chacun, ses sbires, sa quête de rôle et ses achats sont comptés par gold.js : quand un joueur a de quoi faire un bel achat, il
    rentre à la base — ses objets n'apparaissent que là, à la boutique.
@@ -250,6 +252,8 @@ export function deathTime(level, g) {
 /* La Téléportation, pour ceux qui l'ont prise (toplaners et midlaners, le plus souvent) : au-delà de TP_MIN (distance par les couloirs), on ne
    vient plus à pied ; TP_COST : l'incantation, à l'écran. Son délai de récupération est celui du sort : cinq minutes de jeu. */
 const TP_MIN = 520, TP_COST = 560;
+/* Un ultime qui amène son lanceur de l'autre bout de la carte (Twisted Fate, Shen, Nocturne, Galio, Pantheon…) : l'élan, à l'écran. */
+const FLY_COST = 420;
 
 /** Prépare tous les déplacements d'une partie. sim : ce que le serveur renvoie (events, duration, kills).
     kits : pour chacun des dix joueurs, ce qu'on sait de son champion — { res: 'mana' | 'energy' | 'build' | 'none' (sa ressource),
@@ -523,6 +527,9 @@ export function planMoves(sim, kits = []) {
     return 160 + role * 75;
   }
 
+  /* le serveur suit-il les ultimes ? (il donne alors, pour chaque action, ceux qui lancent le leur : u ; ceux que leur ultime amène de
+     l'autre bout de la carte : jn ; ceux qui le lancent de loin sans être là : fr) */
+  const served = ev.some((e) => e.u);
   for (let n = 0; n < N; n++) {
     const e = ev[n], a = at[n];
     let list;
@@ -556,7 +563,8 @@ export function planMoves(sim, kits = []) {
     anchors.push(anchor); casts.push(list);
     const victims = new Map();
     e.kills.forEach((k, j) => { if (!victims.has(k[1])) victims.set(k[1], a.kills[j]); });
-    for (const i of list) appts[i].push({ n, spot: spots.get(i), margin: marginOf(e, i, n), dies: victims.get(i) });
+    /* (celui que son ultime amène sur place n'a pas à venir à pied : il arrive au moment où l'action commence) */
+    for (const i of list) { const fly = !!(e.jn && e.jn.includes(i)); appts[i].push({ n, spot: spots.get(i), margin: fly ? 60 : marginOf(e, i, n), dies: victims.get(i), fly }); }
     for (const [v, when] of victims) {
       /* le vrai temps de mort : selon son niveau et l'heure de la partie (une dizaine de secondes au début, près d'une minute à la fin) */
       const back = Math.max(when + 1000, tauOfGame(e.t + deathTime(levelAtGame(v, e.t), e.t)));
@@ -601,10 +609,36 @@ export function planMoves(sim, kits = []) {
   /* Le serveur ne suit pas les sorts : la mise en scène en tire une histoire plausible. Chacun obtient son ultime au niveau 6 (d'emblée pour
      les quelques champions dont le R sert dès le niveau 1), le lance dans les actions où il compte, puis attend qu'il revienne : le vrai délai
      de récupération de son ultime, à son rang (niveaux 6, 11 et 16), raccourci par l'accélération de compétence que donnent les objets. */
+  /* Quand le serveur suit les ultimes, c'est lui qui décide : chacun lance le sien là où il l'a dit, et nulle part ailleurs — sauf les
+     quelques ultimes qui s'utilisent en continu (moins de 45 secondes de recharge : Corki, Kog'Maw, les changements de forme, le Mantra
+     de Karma…), que le serveur ne compte pas un par un. Le délai affiché est le vrai, sans l'accélération des objets, comme au serveur. */
+  const ALWAYS = 45;
   const ults = [];
   for (let i = 0; i < 10; i++) {
     const kit = kits[i] || {}, cds = kit.cd && kit.cd.length ? kit.cd : [120, 100, 80];
-    const from = kit.early ? 0 : levels[i][4], used = [];
+    let from = kit.early ? 0 : levels[i][4];
+    const used = [];
+    if (served && Math.max(...cds) > ALWAYS) {
+      for (let n = 0; n < N; n++) {
+        const e = ev[n], a = at[n];
+        if (!e.u || !e.u.includes(i)) continue;
+        const A = appts[i].find((x) => x.n === n);
+        const mine = e.kills.findIndex((k) => k[0] === i || k[1] === i || k[2].includes(i));
+        /* lancé au cœur de l'action : juste avant l'élimination à laquelle il prend part, sinon au début — et toujours avant sa propre mort */
+        let when = mine >= 0 ? a.kills[mine] - 260 : a.tau + rand(60, SHOW_LEAD);
+        if (A && A.dies !== undefined) when = Math.min(when, A.dies - 120);
+        const last = used[used.length - 1];
+        if (last) when = Math.max(when, last[0] + 200);
+        const lv = levelAt(i, when), rank = (lv >= 16 ? 2 : lv >= 11 ? 1 : 0) + (kit.early && cds.length > 3 ? 1 : 0);
+        used.push([when, tauOfGame(gameAt(when) + cds[Math.min(rank, cds.length - 1)])]);
+      }
+      /* le serveur a pu le relancer un peu plus tôt (dragons Hextech) : il est prêt, au plus tard, juste avant son lancer suivant ;
+         et il l'a appris, au plus tard, à son premier lancer */
+      for (let k = 0; k + 1 < used.length; k++) if (used[k][1] > used[k + 1][0] - 1) used[k][1] = used[k + 1][0] - 1;
+      if (used.length) from = Math.min(from, used[0][0] - 1);
+      ults.push({ from, used });
+      continue;
+    }
     let ready = from;
     for (const A of appts[i]) {
       const n = A.n, e = ev[n], a = at[n];
@@ -750,11 +784,11 @@ export function planMoves(sim, kits = []) {
 
   /* ---------- l'or de chacun ---------- */
   /* (compté avant les trajets : ce qu'un joueur a en poche décide de ses retours à la base) */
-  const econ = planGold({ ev, at, casts, state, deaths, gameAt, tauOfGame, levelAtGame, kits, duration: sim.duration, total, seed });
+  const econ = planGold({ ev, at, casts, state, deaths, gameAt, tauOfGame, levelAtGame, kits, duration: sim.duration, total, seed, final: sim.players });
 
   /* ---------- 8. le trajet de chaque joueur ---------- */
   const tracks = [], life = [], mana = [];
-  const stats = { camps: [0, 0], rushes: 0, late: 0, recalls: 0, tps: 0 };
+  const stats = { camps: [0, 0], rushes: 0, late: 0, recalls: 0, tps: 0, flights: 0 };
   for (let i = 0; i < 10; i++) {
     const side = i < 5 ? 0 : 1, role = i % 5, sg = side ? 1 : -1, home = fountainSpot(i);
     const keys = [{ t: 0, x: home[0], y: home[1], k: 'h' }];
@@ -914,11 +948,12 @@ export function planMoves(sim, kits = []) {
       cleared = 0;
       stats.recalls++;
     }
-    /** Occupe le joueur jusqu'à « deadline », où il doit se trouver à « target » (ou n'importe où si target est nul). */
-    function routine(deadline, target, sneak) {
+    /** Occupe le joueur jusqu'à « deadline », où il doit se trouver à « target » (ou n'importe où si target est nul).
+        fly : son ultime l'y amène de l'autre bout de la carte (le serveur l'a décidé) — il n'a pas à venir à pied. */
+    function routine(deadline, target, sneak, fly) {
       queue = [];
       /* (on ne se téléporte pas au cœur de la base adverse : il y entrera à pied, par une voie ouverte) */
-      const tp = !!target && canTp(deadline) && dist(target, NEXUS[foe]) >= HEART;
+      const tp = !!target && !fly && canTp(deadline) && dist(target, NEXUS[foe]) >= HEART;
       for (let guard = 0; guard < 600 && cur.t < deadline - 150; guard++) {
         const act = nextAction(deadline, target);
         if (!act) break;
@@ -931,7 +966,7 @@ export function planMoves(sim, kits = []) {
         const path = route(cur.p, act.p), w = pathLen(path) / speed;
         /* le temps qu'il lui faudra ensuite pour rejoindre son rendez-vous : à pied, ou d'une Téléportation s'il est loin et qu'il l'a */
         const far = target ? routeLen(act.p, target) : 0;
-        const back = tp && far > TP_MIN ? TP_COST + 80 : far / VFAST;
+        const back = fly ? Math.min(far / VFAST, FLY_COST + 80) : tp && far > TP_MIN ? TP_COST + 80 : far / VFAST;
         if (Math.max(cur.t + w, act.until || 0) + act.dwell + back > deadline) { queue = []; break; }
         walkPath(path, speed);
         /* le camp n'est pas encore revenu : il l'attend */
@@ -942,6 +977,16 @@ export function planMoves(sim, kits = []) {
       if (!target) { stay(deadline, 'h'); return; }
       const path = route(cur.p, target), len = pathLen(path), left = deadline - cur.t;
       if (len < 2) { stay(deadline, 'h'); return; }
+      /* son ultime l'amène sur place : un court élan là où il se trouve, puis il surgit au cœur de l'action */
+      if (fly && len / VFAST > left - 40) {
+        const cost = Math.min(FLY_COST, left);
+        stay(deadline - cost, 'h');
+        stay(deadline - Math.min(90, cost / 3), 't');
+        jump(target);
+        stay(deadline, 'h');
+        stats.flights++;
+        return;
+      }
       /* trop loin pour arriver à pied : le toplaner incante sa Téléportation et apparaît auprès des siens */
       if (tp && len > TP_MIN && len / VFAST > left - 40) {
         const cost = Math.min(TP_COST, left);
@@ -980,7 +1025,7 @@ export function planMoves(sim, kits = []) {
       if (A.spot) {
         /* il arrive en avance de « margin » ; s'il vient de loin, il a jusqu'au début de l'événement */
         const soonest = cur.t + routeLen(cur.p, A.spot) / VFAST;
-        routine(Math.max(cur.t, Math.min(a.tau, Math.max(a.tau - A.margin, soonest))), A.spot, e.k === 'gank' && role === 1);
+        routine(Math.max(cur.t, Math.min(a.tau, Math.max(a.tau - A.margin, soonest))), A.spot, e.k === 'gank' && role === 1, A.fly);
       } else routine(Math.max(cur.t, a.tau), null, false);
       stay(a.tau, 'h');
       if (A.dies !== undefined) {
@@ -1001,7 +1046,9 @@ export function planMoves(sim, kits = []) {
       }
       /* ce que l'action lui coûte de vie : peu quand on prend une tour ou un objectif laissé libre, beaucoup quand on perd un combat */
       const won = e.s === side, fought = e.kills.length > 0, siege = e.z.slice(0, 2) === 'tw';
-      const hit = e.k === 'nexus' ? 0
+      /* celui qu'un allié a sauvé de justesse, ou à qui son passif vient d'offrir une seconde vie (le serveur le dit : x) : il n'en reste presque rien */
+      const spared = e.x === 'save' || e.x === 'life' ? casts[A.n][e.k === 'gank' ? 2 : 1] : -1;
+      const hit = e.k === 'nexus' ? 0 : i === spared ? rand(0.78, 0.92)
         : e.k === 'duel' ? (siege ? rand(0.04, 0.22) : won ? rand(0.12, 0.38) : rand(0.42, 0.72))
           : e.k === 'gank' && !fought ? (casts[A.n][2] === i ? rand(0.32, 0.58) : rand(0.02, 0.18))
             : fought ? (e.kills.length === 1 ? (won ? rand(0.12, 0.5) : rand(0.2, 0.55)) : won ? rand(0.25, 0.68) : rand(0.5, 0.86))

@@ -1,7 +1,11 @@
 /* L'or de chaque joueur : ce qu'il gagne, les sbires qu'il tue, sa quête de rôle, ce qu'il achète.
-   Le serveur ne compte que l'or des deux équipes. Une vraie retransmission montre celui de chaque joueur, l'écart poste par poste et les
-   objets achetés : ce module les reconstitue à partir de ce que la partie raconte, avec les vraies valeurs du jeu — saison 2026, relevées
-   sur le wiki officiel (wiki.leagueoflegends.com) et dans les données de Riot ; rien ici n'est écrit de mémoire :
+   Une vraie retransmission montre l'or de chaque joueur, l'écart poste par poste et les objets achetés.
+   - Quand le serveur compte l'or et les sbires de chacun (il les donne alors après chaque action : pg, pc), ce sont ses chiffres qui
+     s'affichent : ce module ne fait que les relier d'une action à la suivante — l'or qui coule tout seul (or passif, farm) monte en
+     continu, ce que rapporte l'action elle-même tombe au moment où elle se joue — et en tire les achats.
+   - Avec un serveur qui ne compte que l'or des deux équipes (les parties d'avant), il reconstitue le tout lui-même.
+   Dans les deux cas avec les vraies valeurs du jeu — saison 2026, relevées sur le wiki officiel (wiki.leagueoflegends.com) et dans les
+   données de Riot ; rien ici n'est écrit de mémoire :
    - 500 PO au départ, 20,4 PO toutes les 10 secondes à partir de 1:05 ;
    - le farm : chaque joueur tue des sbires au rythme qui est le sien cette saison (ses sbires par minute chez les pros), un peu plus ou un
      peu moins selon son duel de draft et ce qui se passe sur sa voie ; un mort ne farme pas. Un sbire vaut ce que vaut une vague à cette
@@ -81,8 +85,10 @@ function valueAt(keys, t) {
     leurs instants à l'écran, qui y est, l'état des bâtiments, les morts de chacun, l'horloge). kits : pour chacun des dix joueurs,
     { cspm : ses sbires par minute cette saison, edge : son duel de draft (positif s'il lui est favorable), build : [objet de départ,
     bottes, objets complets…], sup : la forme finale de son objet de support }. */
-export function planGold({ ev, at, casts, state, deaths, gameAt, tauOfGame, levelAtGame, kits = [], duration, total, seed = 1 }) {
+export function planGold({ ev, at, casts, state, deaths, gameAt, tauOfGame, levelAtGame, kits = [], duration, total, seed = 1, final = null }) {
   const N = ev.length, rnd = mulberry32((seed ^ 0x6f1d5e) >>> 0);
+  /* le serveur compte-t-il l'or et les sbires de chacun ? */
+  const served = ev.some((e) => e.pg && e.pc);
   const sideOf = (i) => (i < 5 ? 0 : 1);
   const P = [];
   for (let i = 0; i < 10; i++) {
@@ -219,6 +225,37 @@ export function planGold({ ev, at, casts, state, deaths, gameAt, tauOfGame, leve
     }
   }
 
+  /* ---------- les chiffres du serveur ---------- */
+  /* Après chaque action, le serveur donne l'or et les sbires de chacun. Entre deux actions, la courbe de ce module est ramenée dessus :
+     ce qui coule tout seul est étiré ou resserré pour tomber juste ; ce que l'action rapporte (élimination, tourelle, objectif…) garde sa
+     place à l'écran et prend la valeur qui manque. Ainsi l'affichage est celui du serveur à chaque action, et vraisemblable entre deux. */
+  const mark = P.map(() => ({ gold: GOLD.start, cont: 0, flow: 1, jumps: 0, cs: 0, csAt: 1 }));
+  function anchor(gold, cs) {
+    P.forEach((p, i) => {
+      const m = mark[i], want = Math.max(0, gold[i] - m.gold), flowed = p.cont - m.cont;
+      const mine = p.jumps.slice(m.jumps), jumped = mine.reduce((sum, j) => sum + j[1], 0);
+      /* la part de l'action : celle que ce module lui prêtait, tant qu'elle reste plausible ; le reste revient à ce qui coule */
+      let part = jumped > 0 ? clamp(want - flowed, jumped * 0.6, jumped * 1.8) : 0;
+      if (part > want) part = want;
+      const k = flowed > 1e-6 ? (want - part) / flowed : 0;
+      if (flowed <= 1e-6) part = jumped > 0 ? want : 0;
+      for (const j of mine) j[1] *= jumped > 0 ? part / jumped : 0;
+      for (let q = m.flow; q < p.flow.length; q++) p.flow[q][1] = m.cont + (p.flow[q][1] - m.cont) * k;
+      p.cont = m.cont + flowed * k;
+      /* (un écart que rien n'explique — pas d'action pour lui, rien qui coule — est posé à l'instant de l'action) */
+      const rest = want - part - flowed * k;
+      if (rest > 0.5) p.jumps.push([tauOfGame(now), rest, 'other']);
+      p.gold = gold[i];
+      m.gold = gold[i]; m.cont = p.cont; m.flow = p.flow.length; m.jumps = p.jumps.length;
+      /* les sbires : le serveur les donne entiers ; on vise le milieu, pour ne jamais en afficher un de moins */
+      const target = cs[i] + 0.5, made = p.cs - m.cs, kc = made > 1e-6 ? Math.max(0, target - m.cs) / made : 0;
+      for (let q = m.csAt; q < p.csKeys.length; q++) p.csKeys[q][1] = m.cs + (p.csKeys[q][1] - m.cs) * kc;
+      if (made <= 1e-6 && target > m.cs) p.csKeys.push([now, target]);
+      p.cs = Math.max(m.cs, target);
+      m.cs = p.cs; m.csAt = p.csKeys.length;
+    });
+  }
+
   /* ---------- la partie, événement après événement ---------- */
   const farmer = (i) => (i % 5 === 4 ? i - 1 : i);
   for (let n = 0; n < N; n++) {
@@ -250,14 +287,18 @@ export function planGold({ ev, at, casts, state, deaths, gameAt, tauOfGame, leve
           const w = here.find((i) => sideOf(i) === e.s), l = here.find((i) => sideOf(i) !== e.s);
           const said = /(\d+) sbires d'avance/.exec(e.txt || ''), plate = /plaques/.test(e.txt || '');
           const count = said ? Number(said[1]) : plate ? 4 : 8;
-          if (w !== undefined) P[farmer(w)].boost.push([e.t, e.t + 60, count]);
+          /* (les sbires d'avance, le serveur qui compte l'or les a déjà donnés) */
+          if (w !== undefined && !served) P[farmer(w)].boost.push([e.t, e.t + 60, count]);
           if (l !== undefined) P[farmer(l)].freeze.push([e.t, e.t + 24]);
           if (plate && plates[def][lane][0] > 1) plateFall(def, lane, 0, 1, duo, e.t, a.hud);
         } else if (e.kills.length && plates[def][lane][0] > 1 && rnd() < 0.5) plateFall(def, lane, 0, 1, duo.length ? duo : mine, e.t, a.hud);
       }
     }
+    if (served && e.pg && e.pc) anchor(e.pg, e.pc);
   }
   flowTo(Math.max(duration, now));
+  /* la fin de la partie : les totaux du serveur */
+  if (served && final && final.length === 10 && final.every((f) => f && f.g > 0)) anchor(final.map((f) => f.g), final.map((f) => f.cs || 0));
   for (const p of P) {
     p.jumps.sort((a, b) => a[0] - b[0]);
     let s = 0;
