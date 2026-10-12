@@ -1,4 +1,5 @@
-/* Réglages du jeu. Le nom affiché et l'adresse du serveur se changent ici, nulle part ailleurs. */
+/* Réglages du jeu. Le nom affiché et l'adresse du serveur se changent ici, nulle part ailleurs
+   (sauf l'adresse du serveur, à reporter aussi dans la ligne « Content-Security-Policy » de index.html). */
 export const GAME_NAME = 'Roster';
 
 /* le jeu ouvert sur ce PC (essais) parle au serveur lancé sur ce PC ; le jeu en ligne parle au serveur Cloudflare */
@@ -10,10 +11,14 @@ export const STORE = 'bcorps-cartes-';
 
 /* images officielles des champions (Data Dragon, Riot Games) */
 export const DDRAGON = 'https://ddragon.leagueoflegends.com/cdn';
+/* photos officielles des joueurs et des coachs, hébergées par Leaguepedia */
+export const PHOTOS = 'https://static.wikia.nocookie.net/lolesports_gamepedia_en/images/';
 
 export const ROLE_LABEL = { TOP: 'TOP', JGL: 'JGL', MID: 'MID', BOT: 'ADC', SUP: 'SUP', COACH: 'COACH' };
 export const ROLE_NAME = { TOP: 'Toplaner', JGL: 'Jungler', MID: 'Midlaner', BOT: 'ADC', SUP: 'Support', COACH: 'Coach' };
 export const ROLE_ORDER = ['TOP', 'JGL', 'MID', 'BOT', 'SUP', 'COACH'];
+/* couleur de chaque rang (les mêmes que dans style.css) */
+export const TIER_COLOR = { 1: '#b08660', 2: '#b7c3cf', 3: '#d9b45a', 4: '#27d3c4', 5: '#ffe7a8' };
 
 /* les six statistiques d'une carte : [clé, abréviation sur la carte, nom complet, explication] */
 export const PLAYER_STATS = [

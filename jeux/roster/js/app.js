@@ -1,9 +1,10 @@
 /* Roster — le jeu. Quatre écrans : Packs, Collection, Classement, Profil.
    Le serveur décide de tout (cartes tirées, délais, collection) ; cette page affiche et met en scène. */
 import { ApiError, call, clearSession, deriveKey, loadSession, saveSession } from './api.js';
-import { cardHTML, esc, flagUrl, iconUrl, prepare, statsOf } from './cards.js';
+import { cardHTML, champName, esc, flagUrl, iconUrl, prepare, statsOf } from './cards.js';
 import { GAME_NAME, ROLE_NAME, ROLE_ORDER, STORE } from './config.js';
 import { packHTML, runOpening } from './opening.js';
+import { setSound, sfx, soundOn } from './sound.js';
 
 const app = document.getElementById('app');
 const $ = (sel, root) => (root || document).querySelector(sel);
@@ -41,7 +42,7 @@ function clock(ms) {
 function toast(message, bad) {
   const box = document.getElementById('toasts');
   const el = document.createElement('div');
-  el.className = 'toast cut' + (bad ? ' bad' : '');
+  el.className = 'toast' + (bad ? ' bad' : '');
   el.textContent = message;
   box.appendChild(el);
   setTimeout(() => el.remove(), bad ? 5200 : 3200);
@@ -98,7 +99,7 @@ async function boot() {
     await loadGame();
   } catch (e) {
     if (e instanceof ApiError && e.status === 401) { clearSession(); S.session = null; return showAuth(); }
-    app.innerHTML = '<div class="center"><div><p>' + esc(e.message || 'Serveur injoignable.') + '</p><p style="margin-top:16px"><button class="btn line" id="retry">Réessayer</button></p></div></div>';
+    app.innerHTML = '<div class="center"><div><p>' + esc(e.message || 'Serveur injoignable.') + '</p><p style="margin-top:16px"><button class="btn" id="retry">Réessayer</button></p></div></div>';
     $('#retry').addEventListener('click', boot);
     return;
   }
@@ -112,16 +113,16 @@ function showAuth(message) {
   app.innerHTML = '<div class="auth"><div class="auth-brand">'
     + '<svg class="mark" viewBox="0 0 100 100" aria-hidden="true"><use href="#mark"/></svg>'
     + '<h1>' + esc(GAME_NAME) + '</h1>'
-    + '<p>Ouvre des packs, collectionne les joueurs et les coachs pros de la saison, et compose ton équipe de rêve.</p>'
+    + '<p>Ouvre des packs, collectionne les joueurs et les coachs pros de la saison, compose ton équipe et fais-la jouer.</p>'
     + '<div class="auth-fan" id="fan"></div></div>'
-    + '<form class="auth-form cut" id="authForm" novalidate>'
+    + '<form class="auth-form panel" id="authForm" novalidate>'
     + '<div class="seg"><button type="button" data-mode="login" class="on">Connexion</button><button type="button" data-mode="register">Créer un compte</button></div>'
     + '<label class="field">Pseudo<input name="name" autocomplete="username" autocapitalize="off" spellcheck="false" maxlength="16" required></label>'
     + '<label class="field">Mot de passe<input name="password" type="password" autocomplete="current-password" required></label>'
     + '<label class="field" data-only="register" hidden>Mot de passe, une seconde fois<input name="password2" type="password" autocomplete="new-password"></label>'
     + '<p class="hint" data-only="register" hidden>Aucune adresse e-mail n\'est demandée : note bien ton mot de passe, il ne pourra pas être retrouvé.</p>'
     + '<p class="form-error" role="alert">' + esc(message || '') + '</p>'
-    + '<button class="btn solid big" type="submit">Entrer</button>'
+    + '<button class="btn primary big" type="submit">Entrer</button>'
     + '<p class="legal">Projet de fan gratuit, sans lien avec Riot Games ni avec les équipes citées. <a href="../../">Retour à Bcorps Labs</a></p>'
     + '</form></div>';
   const form = $('#authForm'), error = $('.form-error', form), submit = $('button[type=submit]', form);
@@ -170,7 +171,7 @@ function showAuth(message) {
     if (!fan || !S.cat) return;
     const picks = [];
     for (const role of ['TOP', 'JGL', 'MID', 'BOT', 'SUP']) {
-      const c = S.cat.cards.find((x) => x.role === role && x.art);
+      const c = S.cat.cards.find((x) => x.role === role && x.photo);
       if (c) picks.push(c);
     }
     fan.innerHTML = picks.map((c, i) => cardHTML(c, S.cat, { eager: true }).replace('<article class="', '<article style="--i:' + i + '" class="')).join('');
@@ -207,11 +208,6 @@ document.addEventListener('click', (e) => {
   const t = e.target.closest('[data-card]');
   if (t && S.cat) showSheet(t.dataset.card);
 });
-/* une illustration qui ne charge pas laisse place au fond de la carte, sans icône d'image cassée */
-document.addEventListener('error', (e) => {
-  if (e.target && e.target.classList && e.target.classList.contains('card-art')) e.target.style.visibility = 'hidden';
-}, true);
-
 /* ---------- écran Packs ---------- */
 /* un pack peut s'ouvrir si le délai du pack gratuit est écoulé, ou s'il reste des packs en réserve */
 const timeLeft = () => S.free.readyAt - now();
@@ -224,7 +220,7 @@ function progressHTML() {
     const all = S.cat.cards.filter((c) => c.tier === t.id);
     return '<span style="--tc:var(--t' + t.id + ')"><i></i>' + esc(t.name) + ' ' + all.filter((c) => S.owned.has(c.id)).length + '/' + all.length + '</span>';
   }).join('');
-  return '<div class="meter"><div class="meter-head"><span class="mono">Collection</span><span><b>' + have + '</b> / ' + total + ' cartes</span></div>'
+  return '<div class="meter"><div class="meter-head"><span class="label">Collection</span><span><b>' + have + '</b> / ' + total + ' cartes</span></div>'
     + '<div class="bar"><i style="width:' + pct(have, total) + '%"></i></div><div class="tiers">' + tiers + '</div></div>';
 }
 function packActionHTML() {
@@ -235,12 +231,12 @@ function packActionHTML() {
   }
   const reserve = spare ? '<p class="reserve"><b>' + spare + '</b> pack' + (spare > 1 ? 's' : '') + ' en réserve'
     + (left > 0 ? ' · prochain pack gratuit dans <b id="count">' + clock(left) + '</b>' : '') + '</p>' : '';
-  return '<button class="btn solid big" type="button" id="openPack">' + (left > 0 ? 'Ouvrir un pack en réserve' : 'Ouvrir le pack') + '</button>' + reserve;
+  return '<button class="btn primary big" type="button" id="openPack">' + (left > 0 ? 'Ouvrir un pack en réserve' : 'Ouvrir le pack') + '</button>' + reserve;
 }
 function viewPacks(main) {
   const recent = [...S.owned.entries()].sort((a, b) => b[1].at - a[1].at).slice(0, 6).map(([id]) => S.cat.cardById.get(id)).filter(Boolean);
   main.innerHTML = '<section class="home"><div class="home-pack" id="packBox">' + packHTML(packReady() ? 'ready' : 'waiting', S.cat.season, S.free.size) + '</div>'
-    + '<div class="home-side"><div class="eyebrow mono">Pack gratuit · toutes les ' + Math.round(S.free.cooldownMs / 60000) + ' minutes</div>'
+    + '<div class="home-side"><div class="eyebrow">Pack gratuit · toutes les ' + Math.round(S.free.cooldownMs / 60000) + ' minutes</div>'
     + '<h1 class="h1">' + S.free.size + ' cartes à découvrir</h1>'
     + '<p class="lead">Joueurs et coachs pros de la saison ' + S.cat.season + '. La dernière carte du pack est une carte bonus : rang Titulaire au minimum.</p>'
     + '<div id="packAction" data-sig="' + packSig() + '">' + packActionHTML() + '</div>' + progressHTML() + '</div></section>'
@@ -391,16 +387,16 @@ function showSheet(id) {
     .map((t) => '<span class="chip" style="--tc:var(--t3)">' + t[0] + ' × ' + t[1] + '</span>').join('') : '';
   const sheet = document.createElement('div');
   sheet.className = 'sheet';
-  sheet.innerHTML = '<div class="sheet-box cut" role="dialog" aria-modal="true" aria-label="' + esc(card.name) + '" style="--tc:var(--t' + card.tier + ')">'
+  sheet.innerHTML = '<div class="sheet-box panel" role="dialog" aria-modal="true" aria-label="' + esc(card.name) + '" style="--tc:var(--t' + card.tier + ')">'
     + '<div class="sheet-card">' + cardHTML(card, cat, { eager: true, cls: own ? '' : 'missing' })
-    + '<span class="mono" style="color:var(--mut)">' + (own ? (own.qty > 1 ? own.qty + ' exemplaires' : '1 exemplaire') + ' · depuis le ' + frDate(own.at) : 'Carte manquante') + '</span></div>'
+    + '<span>' + (own ? (own.qty > 1 ? own.qty + ' exemplaires' : '1 exemplaire') + ' · depuis le ' + frDate(own.at) : 'Carte manquante') + '</span></div>'
     + '<div class="sheet-info"><div class="sheet-title"><div><h2>' + esc(card.name) + '</h2>'
     + '<p>' + (card.country ? '<img src="' + flagUrl(card.country) + '" alt="">' + esc(cat.countries[card.country]) + ' · ' : '') + esc(ROLE_NAME[card.role]) + ' · ' + esc(team ? team.name : card.team) + '</p></div>'
     + '<span class="spacer"></span><button class="close" type="button" aria-label="Fermer">' + icon('i-close') + '</button></div>'
     + '<div class="chips"><span class="chip">' + esc(tier.name) + ' · ' + card.ovr + '</span><span class="chip" style="--tc:var(--mut)">' + esc(card.league) + (league ? ' · ' + esc(league.region) : '') + '</span>' + titles + '</div>'
     + '<div><h3 class="h2">Statistiques de la carte</h3><div class="bars">' + statsOf(card).map((s) => '<div title="' + esc(s[3]) + '"><span>' + s[2] + '</span><span class="bar"><i style="width:' + card.stats[s[0]] + '%"></i></span><b>' + card.stats[s[0]] + '</b></div>').join('') + '</div></div>'
     + (facts ? '<div><h3 class="h2">Saison ' + cat.season + (card.kind === 'c' ? ' de son équipe' : ' en chiffres') + '</h3><div class="facts">' + facts + '</div></div>' : '<p class="note">Aucune partie officielle jouée cette saison : la note est celle d\'un remplaçant.</p>')
-    + (card.champs && card.champs.length ? '<div><h3 class="h2">Champions fétiches</h3><div class="champs">' + card.champs.map((c) => '<div class="champ"><img src="' + iconUrl(cat, c[0]) + '" alt="" loading="lazy"><div><b>' + esc(cat.champions[c[0]] || c[0]) + '</b><span>' + c[1] + ' parties · ' + pct(c[2], c[1]) + ' %</span></div></div>').join('') + '</div></div>' : '')
+    + (card.champs && card.champs.length ? '<div><h3 class="h2">Champions fétiches</h3><div class="champs">' + card.champs.map((c) => '<div class="champ"><img src="' + iconUrl(cat, c[0]) + '" alt="" loading="lazy"><div><b>' + esc(champName(cat, c[0])) + '</b><span>' + c[1] + ' parties · ' + pct(c[2], c[1]) + ' %</span></div></div>').join('') + '</div></div>' : '')
     + '<p class="note">Note calculée à partir des statistiques officielles de la saison ' + cat.season + ' (ligue, tournois internationaux, palmarès). Données : Leaguepedia.</p>'
     + '</div></div>';
   const close = () => { sheet.remove(); document.removeEventListener('keydown', onKey); document.body.style.overflow = ''; };
@@ -437,16 +433,17 @@ async function viewBoard(main) {
 async function viewProfile(main) {
   const p = S.player;
   main.innerHTML = '<div class="col-head"><div><h1 class="h1">' + esc(p.name) + '</h1><p>Joueur depuis le ' + frDate(p.createdAt) + '</p></div></div><div class="panels">'
-    + '<section class="panel cut"><h3>Mon compte</h3><div class="kv"><span>Packs ouverts</span><b>' + p.packsOpened + '</b><span>Cartes différentes</span><b>' + p.cardsUnique + ' / ' + S.cat.cards.length + '</b><span>Exemplaires</span><b>' + p.cardsTotal + '</b></div>'
+    + '<section class="panel"><h3>Mon compte</h3><div class="kv"><span>Packs ouverts</span><b>' + p.packsOpened + '</b><span>Cartes différentes</span><b>' + p.cardsUnique + ' / ' + S.cat.cards.length + '</b><span>Exemplaires</span><b>' + p.cardsTotal + '</b></div>'
     + '<div class="switch"><span>Animations</span><button type="button" id="fxSwitch" aria-pressed="' + S.fx + '" aria-label="Animations"></button></div>'
+    + '<div class="switch"><span>Sons</span><button type="button" id="soundSwitch" aria-pressed="' + soundOn() + '" aria-label="Sons"></button></div>'
     + '<div class="actions"><button class="btn" type="button" id="logout">Se déconnecter</button><button class="btn danger" type="button" id="askDelete">Supprimer mon compte</button></div>'
     + '<form id="deleteForm" hidden style="display:grid;gap:10px"><p class="hint">Ton compte et toutes tes cartes seront effacés pour de bon. Tape ton mot de passe pour confirmer.</p>'
     + '<input class="inp" name="password" type="password" autocomplete="current-password" placeholder="Mot de passe" required><p class="form-error" role="alert"></p>'
     + '<div class="actions"><button class="btn danger" type="submit">Effacer définitivement</button><button class="btn" type="button" id="cancelDelete">Annuler</button></div></form></section>'
-    + '<section class="panel cut"><h3>Chances du pack gratuit</h3><div id="odds"><p class="hint">Chargement…</p></div></section>'
-    + '<section class="panel cut"><h3>À propos</h3>'
+    + '<section class="panel"><h3>Chances du pack gratuit</h3><div id="odds"><p class="hint">Chargement…</p></div></section>'
+    + '<section class="panel"><h3>À propos</h3>'
     + '<p class="hint">' + esc(GAME_NAME) + ' est un projet de fan gratuit de Bcorps Labs. Les cartes représentent les joueurs et coachs en activité dans les ligues majeures (LCK, LPL, LEC, LCS, LCP, CBLOL), saison ' + S.cat.season + '. Catalogue du ' + frDate(Date.parse(S.cat.generated)) + '.</p>'
-    + '<p class="hint">Effectifs, statistiques et palmarès : <a href="https://lol.fandom.com/" target="_blank" rel="noopener">Leaguepedia</a>, licence CC BY-SA 3.0. Drapeaux : flag-icons (licence MIT).</p>'
+    + '<p class="hint">Effectifs, statistiques et palmarès : <a href="https://lol.fandom.com/" target="_blank" rel="noopener">Leaguepedia</a>, licence CC BY-SA 3.0. Photos des joueurs : portraits officiels des équipes et des ligues, affichés depuis Leaguepedia. Drapeaux : flag-icons (licence MIT).</p>'
     + '<p class="hint">' + esc(GAME_NAME) + ' was created under Riot Games\' "Legal Jibber Jabber" policy using assets owned by Riot Games. Riot Games does not endorse or sponsor this project. Ce jeu n\'est ni approuvé ni sponsorisé par Riot Games, ni par les équipes et les joueurs cités.</p>'
     + '<div class="actions"><a class="btn" href="../../">Retour à Bcorps Labs</a></div></section></div>';
 
@@ -455,6 +452,11 @@ async function viewProfile(main) {
     e.currentTarget.setAttribute('aria-pressed', String(S.fx));
     document.body.classList.toggle('fx', S.fx);
     try { localStorage.setItem(STORE + 'fx', S.fx ? '1' : '0'); } catch (err) { /* réglage non gardé */ }
+  });
+  $('#soundSwitch').addEventListener('click', (e) => {
+    setSound(!soundOn());
+    e.currentTarget.setAttribute('aria-pressed', String(soundOn()));
+    sfx.click();
   });
   $('#logout').addEventListener('click', async () => {
     try { await call('POST', '/api/logout'); } catch (err) { /* la connexion sera de toute façon oubliée ici */ }
