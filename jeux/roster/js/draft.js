@@ -30,14 +30,16 @@ const HELP = '<div class="dr-help-box panel"><h3>Gagner la draft</h3><ul>'
     ou { over } (la réponse du serveur) si le défi s'est arrêté pendant la draft : l'adversaire a quitté.
     Fearless : le serveur donne dans match.locked les champions déjà joués dans la série ; ils restent affichés, barrés.
     Draft automatique : si le joueur l'allume, son coach choisit à sa place (le serveur décide, selon le talent du coach : match.coach).
-    Elle est éteinte au début de chaque draft : c'est au joueur de l'allumer, à chaque fois. */
-export function runDraft({ match, cat, fx, act, resync, toast, help, head, live, confirmLeave }) {
+    Elle est éteinte au début de chaque draft : c'est au joueur de l'allumer, à chaque fois.
+    Draft simulée (contre l'ordinateur seulement) : le coach fait tous les choix du joueur d'un trait, sans pause ni son, et l'on passe à la partie.
+    On la demande d'emblée (instant) ou en cours de draft, par le bouton « Simuler ». */
+export function runDraft({ match, cat, fx, act, resync, toast, help, head, live, confirmLeave, instant }) {
   let m = match;
   /* en direct : échéance du choix en cours, adversaire absent (son coach choisit alors pour lui ; forfeitAt : l'heure de son forfait) */
   let deadline = live ? live.deadline : null, away = false, forfeitAt = null, alive = true, asking = false, pollTimer = 0, clockTimer = 0;
   /* la draft automatique n'existe que si le serveur sait la jouer (il annonce alors le talent du coach) */
   const canAuto = typeof m.coach === 'number';
-  let auto = false, autoTimer = 0;
+  let auto = false, autoTimer = 0, fast = false;
   /* (le jeu retenait ce réglage d'une draft à l'autre : il ne le fait plus, et oublie ce qu'il avait noté) */
   try { localStorage.removeItem(STORE + 'draft-auto'); } catch (e) { /* rien à oublier */ }
   const coachWord = (s) => (s >= 92 ? 'coach d\'élite' : s >= 86 ? 'très bon coach' : s >= 79 ? 'bon coach' : s >= 70 ? 'coach moyen' : s >= 62 ? 'coach faible' : 'pas de vrai coach');
@@ -88,7 +90,10 @@ export function runDraft({ match, cat, fx, act, resync, toast, help, head, live,
     + '<footer class="dr-foot"><div class="dr-sel"></div>'
     + (canAuto ? '<button class="btn dr-auto" type="button" data-act="auto" aria-pressed="false" title="Ton coach choisit à ta place. Meilleur est le coach (sa note et sa statistique Draft), meilleurs sont ses choix.">'
       + '<b><span class="hide-s">Draft </span>auto</b><i><span class="hide-s">' + esc(coachWord(m.coach)) + ' · </span>' + m.coach + '</i></button>' : '')
+    /* contre l'ordinateur : laisser le coach finir la draft d'un trait */
+    + (canAuto && !live ? '<button class="btn dr-sim" type="button" data-act="sim" title="Ton coach termine la draft d\'un trait, sans attendre : on passe à la partie."><b>Simuler</b><i class="hide-s">la draft</i></button>' : '')
     + '<button class="btn primary big" type="button" data-act="lock" disabled>Verrouiller</button></footer>'
+    + '<p class="dr-fast" hidden>Ton coach termine la draft…</p>'
     + '<div class="dr-help"' + (help ? '' : ' hidden') + '>' + HELP + '</div>';
 
   const $ = (s) => el.querySelector(s);
@@ -258,14 +263,14 @@ export function runDraft({ match, cat, fx, act, resync, toast, help, head, live,
     while (shown < m.log.length) {
       const a = m.log[shown], theirs = a.side !== you;
       /* contre l'ordinateur, un temps de réflexion feint ; en direct, l'adversaire a déjà pris le sien */
-      if (theirs && fx && !live) { syncAll(); await wait(620 + Math.random() * 480); }
+      if (theirs && fx && !fast && !live) { syncAll(); await wait(620 + Math.random() * 480); }
       apply(a);
       shown++;
       /* en draft automatique, les choix s'enchaînent : un simple « toc » à la place des coups */
-      if (auto) sfx.tick(); else if (a.type === 'ban') sfx.ban(); else sfx.pick();
+      if (fast) { /* draft simulée : en silence */ } else if (auto) sfx.tick(); else if (a.type === 'ban') sfx.ban(); else sfx.pick();
       syncAll();
       pop(a.type === 'ban' ? banEl(a.side, bans[a.side].length - 1) : slotEl(a.side, ROLES.indexOf(a.role)));
-      if (fx) await wait(theirs ? 400 : 280);
+      if (fast) await wait(40); else if (fx) await wait(theirs ? 400 : 280);
     }
   }
   /** Prépare le tour du joueur. */
@@ -276,17 +281,26 @@ export function runDraft({ match, cat, fx, act, resync, toast, help, head, live,
     if (t && t.side === you) {
       if (t.type !== lastType || (t.type === 'pick' && (!role || picks[you][ROLES.indexOf(role)]))) role = t.type === 'pick' ? ROLES.find((r, i) => !picks[you][i]) : '';
       lastType = t.type;
-      if (fx && !auto) sfx.turn();
+      if (fx && !auto && !fast) sfx.turn();
     }
     syncAll();
     $('.dr-grid').scrollTop = 0;
+    armAuto();
+  }
+  /** Draft simulée : le coach fait tous mes choix d'un trait (les mêmes choix que la draft automatique, sans les pauses). */
+  function simulate() {
+    if (!canAuto || live || fast) return;
+    auto = true; fast = true; sel = null;
+    el.classList.add('fast');
+    $('.dr-fast').hidden = false;
+    syncAll();
     armAuto();
   }
   /** Draft automatique : à mon tour, le coach choisit après un court instant (le temps de voir ce qui se passe). */
   function armAuto() {
     clearTimeout(autoTimer);
     if (!auto || !alive || !myTurn()) return;
-    autoTimer = setTimeout(() => { if (auto && alive && myTurn()) lock(true); }, fx ? 950 : 250);
+    autoTimer = setTimeout(() => { if (auto && alive && myTurn()) lock(true); }, fast ? 30 : fx ? 950 : 250);
   }
   async function lock(byCoach) {
     const t = turn();
@@ -331,7 +345,7 @@ export function runDraft({ match, cat, fx, act, resync, toast, help, head, live,
     if (!alive) return;
     if (res.sim) {
       syncAll();
-      if (fx) await wait(1200);
+      if (fx) await wait(fast ? 650 : 1200);
       close();
       settle({ final: res });
       return;
@@ -396,6 +410,7 @@ export function runDraft({ match, cat, fx, act, resync, toast, help, head, live,
         syncAll();
         armAuto();
       }
+      else if (what === 'sim') simulate();
       else if (what === 'lock') lock();
       return;
     }
@@ -445,6 +460,8 @@ export function runDraft({ match, cat, fx, act, resync, toast, help, head, live,
   return new Promise((resolve, reject) => {
     settle = resolve;
     fail = reject;
+    /* draft simulée demandée d'emblée : le coach s'y met dès que l'écran est en place */
+    if (instant) simulate();
     playLog().then(startTurn);
   });
 }

@@ -69,6 +69,12 @@ h1,h2,h3,p{margin:0}
 .nav a:hover{color:var(--gold-hi)}
 .nav a.on{color:var(--gold-hi)}
 .nav a.on::after{content:"";position:absolute;left:50%;bottom:-4px;width:8px;height:8px;margin-left:-4px;transform:rotate(45deg);background:var(--gold);box-shadow:0 0 10px var(--gold);z-index:1}
+/* le bouton de la musique de fond : barré quand elle est coupée */
+.tune{position:relative;display:grid;place-items:center;width:34px;height:34px;margin:0 -8px;padding:0;border:0;background:none;color:var(--gold);cursor:pointer}
+.tune:hover{color:var(--gold-hi)}
+.tune svg{width:19px;height:19px}
+.tune.off{color:var(--faint)}
+.tune.off::after{content:"";position:absolute;left:7px;right:7px;top:50%;height:1.5px;background:currentColor;transform:rotate(-38deg)}
 .who{display:flex;align-items:center;gap:9px;color:var(--mut);text-decoration:none;font:600 15px/1 var(--text)}
 .who svg{color:var(--gold)}
 .who:hover{color:var(--gold-hi)}

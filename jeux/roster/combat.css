@@ -255,6 +255,15 @@
 /* la draft automatique : un interrupteur à côté du bouton de verrouillage. Allumé, le coach choisit à la place du joueur */
 .dr-auto{flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;height:56px;padding:0 16px}
 .dr-auto b{font:600 12.5px/1 var(--text);letter-spacing:.12em;text-transform:uppercase}
+/* « Simuler » : le coach termine la draft d'un trait */
+.dr-sim{flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;height:56px;padding:0 16px}
+.dr-sim b{font:600 12.5px/1 var(--text);letter-spacing:.12em;text-transform:uppercase}
+.dr-sim i{font:400 11.5px/1 var(--text);font-style:normal;color:var(--mut);white-space:nowrap}
+.dr.fast .dr-sim,.dr.fast .dr-auto,.dr.fast [data-act="lock"]{opacity:.35;pointer-events:none}
+.dr.fast .dr-pool{opacity:.3;pointer-events:none;transition:opacity .25s}
+.dr-fast{position:absolute;left:50%;top:50%;z-index:6;margin:0;padding:14px 26px;transform:translate(-50%,-50%);border:1px solid var(--gold-lo);background:rgba(1,10,19,.92);
+  font:400 18px/1.2 var(--title);letter-spacing:.14em;text-transform:uppercase;color:var(--gold-hi);white-space:nowrap;box-shadow:0 0 40px rgba(0,0,0,.6)}
+.wd-go{display:flex;flex-direction:column;align-items:stretch;gap:8px}
 .dr-auto i{font:400 11.5px/1 var(--text);font-style:normal;color:var(--mut);white-space:nowrap}
 .dr-auto.on{border-image:linear-gradient(var(--blue-hi),var(--blue)) 1;background:linear-gradient(#0f3a46,#07212c);color:var(--blue-hi);box-shadow:0 0 18px rgba(10,200,185,.3)}
 .dr-auto.on i{color:var(--blue-hi)}

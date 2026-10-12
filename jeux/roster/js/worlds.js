@@ -67,12 +67,12 @@ function runHTML(run, over) {
     const sv = run.series, n = run.next;
     top = '<section class="panel wd-next"><div><span>' + (n ? esc(n.label) : 'Rencontre en cours') + ' · ' + bo(sv.format) + '</span><b>' + esc(sv.names[0]) + ' ' + sv.wins[0] + ' – ' + sv.wins[1] + ' ' + esc(sv.names[1]) + '</b>'
       + '<i>' + (sv.phase === 'draft' ? 'Draft de la manche ' + sv.game + ' en cours.' : 'Manche ' + (sv.games.length + 1) + ' à jouer.') + '</i></div>'
-      + '<button class="btn primary big" type="button" data-wd="play">' + (sv.phase === 'draft' ? 'Reprendre la draft' : 'Manche suivante') + '</button></section>';
+      + '<div class="wd-go"><button class="btn primary big" type="button" data-wd="play">' + (sv.phase === 'draft' ? 'Reprendre la draft' : 'Manche suivante') + '</button>' + SIM + '</div></section>';
   } else if (run.next) {
     const n = run.next, gap = n.rating - T[run.me].rating;
     top = '<section class="panel wd-next"><div><span>' + esc(n.label) + ' · ' + bo(n.format) + '</span><b>contre ' + esc(n.name) + '</b>'
       + '<i>Note ' + n.rating + ' — la tienne : ' + T[run.me].rating + (gap >= 6 ? '. Un gros morceau.' : gap <= -6 ? '. À ta portée.' : '. Match serré.') + ' Tu peux encore retoucher ton équipe dans l\'onglet Jouer.</i></div>'
-      + '<button class="btn primary big" type="button" data-wd="play">Jouer le match</button></section>';
+      + '<div class="wd-go"><button class="btn primary big" type="button" data-wd="play">Jouer le match</button>' + SIM + '</div></section>';
   } else top = '';
   /* les poules */
   const letters = ['A', 'B', 'C', 'D'];
@@ -99,6 +99,9 @@ function runHTML(run, over) {
     + (over ? '' : '<div class="actions wd-quit"><button class="btn danger" type="button" data-wd="quit">Abandonner ce Mondial</button></div>');
 }
 
+/* le bouton qui joue la rencontre en laissant le coach faire les drafts */
+const SIM = '<button class="btn" type="button" data-wd="sim" title="Ton coach fait les drafts à ta place, selon son talent : on passe directement aux parties.">Simuler les drafts</button>';
+
 /* ---------- actions ---------- */
 async function onClick(e) {
   const b = e.target.closest('[data-wd]');
@@ -109,9 +112,9 @@ async function onClick(e) {
     const res = await G.guard(() => G.call('POST', '/api/worlds/start'));
     if (res) { G.applyState(res); S.worlds.done = null; S.worlds.data.run = res.run; S.worlds.data.record.runs++; G.toast('Les poules sont tirées. Bonne chance !'); }
     if (onView()) { const data = await G.guard(() => G.call('GET', '/api/worlds')); if (data) S.worlds.data = data; if (onView()) draw($('#main')); }
-  } else if (what === 'play') {
+  } else if (what === 'play' || what === 'sim') {
     b.disabled = true;
-    play();
+    play(what === 'sim');
   } else if (what === 'quit') {
     if (!(await confirmSheet('Abandonner le Mondial ?', 'Ton parcours s\'arrête là. Les crédits et les packs déjà gagnés te restent ; l\'inscription n\'est pas rendue.', 'Abandonner', { danger: true }))) return;
     await G.guard(() => G.call('POST', '/api/worlds/quit'));
@@ -136,7 +139,7 @@ function rewardsFor(res) {
 }
 
 /** Joue ma prochaine rencontre : autant de drafts et de parties qu'il faut, puis retour au tableau. */
-async function play() {
+async function play(instant) {
   const S = G.S;
   if (S.busy) return;
   S.busy = true;
@@ -147,7 +150,7 @@ async function play() {
     for (let guard = 0; guard < 6; guard++) {
       const n = run.next, sv = run.series;
       const out = await runDraft({
-        match: run.match, cat: S.cat, fx: S.fx, toast: G.toast, help: false,
+        match: run.match, cat: S.cat, fx: S.fx, toast: G.toast, help: false, instant: !!instant,
         head: 'Mondial · ' + (n ? n.label : '') + (sv.format > 1 ? ' · BO' + sv.format + (sv.fearless ? ' fearless' : '') + ' · ' + sv.wins[0] + ' – ' + sv.wins[1] : ''),
         act: async (body) => {
           res = await G.call('POST', '/api/worlds/act', { champ: body.champ, role: body.role, step: body.step, auto: body.auto });

@@ -206,17 +206,20 @@ function showFoe(id) {
     + '<div><span>Défaite</span><b>+' + P.rewards.loss + ' crédits</b></div></div>'
     + (empty ? '<p class="note warn">' + (empty > 1 ? empty + ' postes sont vides' : 'Un poste est vide') + ' dans ton équipe : ' + (empty > 1 ? 'des remplaçants joueront' : 'un remplaçant jouera') + ' à la place.</p>' : '')
     + (P.active ? '<p class="note warn">Ta draft en cours contre ' + esc((cat.teamById.get(P.active.opp) || { name: P.active.opp }).name) + ' sera abandonnée.</p>' : '')
-    + '<div class="actions"><button class="btn primary big" type="button" id="go">Lancer la draft</button></div>'
+    /* (la draft simulée : le coach fait tous les choix d'un trait — proposée quand le serveur sait la jouer) */
+    + '<div class="actions"><button class="btn primary big" type="button" id="go">Lancer la draft</button>'
+    + (G.S.shop ? '<button class="btn big" type="button" id="goSim" title="Ton coach fait toute la draft à ta place, selon son talent : on passe directement à la partie.">Simuler la draft</button>' : '') + '</div>'
     + '<p class="note">Le côté (bleu ou rouge) est tiré au sort. Le bleu choisit en premier, le rouge a le dernier mot.</p></div>';
   const close = () => { sheet.remove(); document.removeEventListener('keydown', onKey); document.body.style.overflow = ''; };
   const onKey = (e) => { if (e.key === 'Escape') close(); };
   sheet.addEventListener('click', async (e) => {
     if (e.target === sheet || e.target.closest('.close')) { close(); return; }
-    if (!e.target.closest('#go')) return;
-    $('#go', sheet).disabled = true;
+    const sim = !!e.target.closest('#goSim');
+    if (!sim && !e.target.closest('#go')) return;
+    sheet.querySelectorAll('#go, #goSim').forEach((b) => { b.disabled = true; });
     const res = await G.guard(() => G.call('POST', '/api/match/start', { team: id }));
     close();
-    if (res) playMatch(res.match);
+    if (res) playMatch(res.match, sim);
   });
   document.addEventListener('keydown', onKey);
   document.body.style.overflow = 'hidden';
@@ -224,16 +227,16 @@ function showFoe(id) {
 }
 
 /* ---------- le match : draft, puis partie ---------- */
-async function playMatch(match) {
+async function playMatch(match, instant) {
   const S = G.S;
   if (S.busy) return;
   S.busy = true;
   let goTo = 'jouer';
   try {
     const out = await runDraft({
-      match, cat: S.cat, fx: S.fx, toast: G.toast,
-      /* un joueur qui n'a encore jamais joué voit d'abord les règles de la draft */
-      help: S.player.wins + S.player.losses === 0 && match.log.length < 2,
+      match, cat: S.cat, fx: S.fx, toast: G.toast, instant: !!instant,
+      /* un joueur qui n'a encore jamais joué voit d'abord les règles de la draft (sauf s'il a demandé à la simuler) */
+      help: !instant && S.player.wins + S.player.losses === 0 && match.log.length < 2,
       act: (body) => G.call('POST', '/api/match/act', body),
       /* en cas de désaccord avec le serveur, on repart de ce qu'il a en mémoire */
       resync: async () => (await G.call('GET', '/api/play')).active,

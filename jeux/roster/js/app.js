@@ -6,6 +6,7 @@ import { GAME_NAME, ROLE_NAME, ROLE_ORDER, STORE } from './config.js';
 import { createDuels } from './duel.js';
 import { sellCard, showOnMarket, viewMarket } from './market.js';
 import { packHTML, runOpening } from './opening.js';
+import { musicOn, setMusic, startMusic } from './music.js';
 import { viewPlay } from './play.js';
 import { viewSocial } from './social.js';
 import { setSound, sfx, soundOn } from './sound.js';
@@ -291,6 +292,8 @@ function shell() {
   app.innerHTML = '<header class="top' + (S.live ? ' wide' : '') + '"><a class="brand" href="#/packs"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#mark"/></svg>' + esc(GAME_NAME) + '<small>saison ' + S.cat.season + '</small></a>'
     + '<nav class="nav">' + tabs().map((t) => '<a href="#/' + t[0] + '" data-tab="' + t[0] + '">' + t[1] + pip(t[0]) + '</a>').join('') + '</nav>'
     + '<span class="spacer"></span><a class="online" id="online" href="#/joueurs" hidden><i></i><b>1</b><span>en ligne</span></a>'
+    /* la musique de fond : un bouton pour la couper ou la remettre */
+    + '<button class="tune' + (musicOn() ? '' : ' off') + '" type="button" id="tune" aria-pressed="' + musicOn() + '" title="Musique de fond" aria-label="Couper ou remettre la musique de fond">' + icon('i-note') + '</button>'
     + '<a class="purse" href="#/' + (S.live ? 'marche' : 'jouer') + '" title="Tes crédits : gagnés en jouant, dépensés au marché">' + icon('i-coin') + '<b id="credits">' + S.player.coins + '</b></a>'
     + '<a class="who" href="#/profil">' + icon('i-user') + '<b>' + esc(S.player.name) + '</b></a></header>'
     + '<main class="main" id="main"></main>'
@@ -332,6 +335,15 @@ function route() {
   VIEWS[tab]($('#main'), parts[1] || '');
 }
 window.addEventListener('hashchange', route);
+/* la musique de fond part au premier geste du joueur (un navigateur ne laisse rien jouer avant) ; son bouton la coupe ou la remet */
+for (const kind of ['pointerdown', 'keydown']) document.addEventListener(kind, () => startMusic(), { passive: true });
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('#tune');
+  if (!b) return;
+  setMusic(!musicOn());
+  b.classList.toggle('off', !musicOn());
+  b.setAttribute('aria-pressed', String(musicOn()));
+});
 
 /* ---------- carte cliquable ---------- */
 function tile(card, extra) {
@@ -832,7 +844,8 @@ async function viewProfile(main) {
     + '<section class="panel"><h3>Chances des boosters</h3><div id="odds"><p class="hint">Chargement…</p></div></section>'
     + '<section class="panel"><h3>À propos</h3>'
     + '<p class="hint">' + esc(GAME_NAME) + ' est un projet de fan gratuit de Bcorps Labs. Les cartes représentent les joueurs et coachs en activité dans les ligues majeures (LCK, LPL, LEC, LCS, LCP, CBLOL), saison ' + S.cat.season + '. Catalogue du ' + frDate(Date.parse(S.cat.generated)) + '.</p>'
-    + '<p class="hint">Effectifs, statistiques et palmarès : <a href="https://lol.fandom.com/" target="_blank" rel="noopener">Leaguepedia</a>, licence CC BY-SA 3.0. Photos des joueurs : portraits officiels des équipes et des ligues, affichés depuis Leaguepedia. Images des champions : Riot Games (Data Dragon). Drapeaux : flag-icons (licence MIT).</p>'
+    + '<p class="hint">Effectifs, statistiques et palmarès : <a href="https://lol.fandom.com/" target="_blank" rel="noopener">Leaguepedia</a>, licence CC BY-SA 3.0. Photos des joueurs : portraits officiels des équipes et des ligues, affichés depuis Leaguepedia. Images des champions : Riot Games (Data Dragon). Logos des équipes : marques de leurs clubs, affichés depuis Leaguepedia. Drapeaux : flag-icons (licence MIT).</p>'
+    + '<p class="hint">Musique de fond : « For Originz » et « Ascending the Vale », Kevin MacLeod (<a href="https://incompetech.com/" target="_blank" rel="noopener">incompetech.com</a>), licence <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">Creative Commons Attribution 4.0</a>.</p>'
     + '<p class="hint">' + esc(GAME_NAME) + ' was created under Riot Games\' "Legal Jibber Jabber" policy using assets owned by Riot Games. Riot Games does not endorse or sponsor this project. Ce jeu n\'est ni approuvé ni sponsorisé par Riot Games, ni par les équipes et les joueurs cités.</p>'
     + '<div class="actions"><a class="btn" href="../../">Retour à Bcorps Labs</a></div></section></div>';
 
