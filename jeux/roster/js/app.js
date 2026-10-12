@@ -318,8 +318,7 @@ window.addEventListener('hashchange', route);
 function tile(card, extra) {
   const own = S.owned.get(card.id);
   return '<button class="tile" type="button" data-card="' + esc(card.id) + '" aria-label="' + esc(card.name) + ', note ' + card.ovr + '">'
-    + cardHTML(card, S.cat, { cls: own ? '' : 'missing' })
-    + (own && own.qty > 1 ? '<span class="badge qty">×' + own.qty + '</span>' : '') + (extra || '') + '</button>';
+    + cardHTML(card, S.cat, { cls: own ? '' : 'missing', qty: own ? own.qty : 0 }) + (extra || '') + '</button>';
 }
 document.addEventListener('click', (e) => {
   const t = e.target.closest('[data-card]');
@@ -570,7 +569,7 @@ function showSheet(id) {
   const sheet = document.createElement('div');
   sheet.className = 'sheet';
   sheet.innerHTML = '<div class="sheet-box panel" role="dialog" aria-modal="true" aria-label="' + esc(card.name) + '" style="--tc:var(--t' + card.tier + ')">'
-    + '<div class="sheet-card">' + cardHTML(card, cat, { eager: true, cls: own ? '' : 'missing' })
+    + '<div class="sheet-card">' + cardHTML(card, cat, { eager: true, cls: own ? '' : 'missing', qty: own ? own.qty : 0 })
     + '<span>' + (own ? (own.qty > 1 ? own.qty + ' exemplaires' : '1 exemplaire') + ' · depuis le ' + frDate(own.at) : 'Carte manquante') + '</span></div>'
     + '<div class="sheet-info"><div class="sheet-title"><div><h2>' + esc(card.name) + '</h2>'
     + '<p>' + (card.country ? '<img src="' + flagUrl(card.country) + '" alt="">' + esc(cat.countries[card.country]) + ' · ' : '') + esc(ROLE_NAME[card.role]) + ' · ' + esc(team ? team.name : card.team) + '</p></div>'

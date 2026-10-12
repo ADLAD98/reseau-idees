@@ -184,8 +184,8 @@ function pickCard() {
   let q = '';
   const list = () => {
     const shown = mine.filter(([c]) => !q || c.name.toLowerCase().includes(q) || (cat.teamById.get(c.team) || { name: '' }).name.toLowerCase().includes(q)).slice(0, 60);
-    return shown.length ? shown.map(([c, qty]) => '<button class="pick" type="button" data-sell="' + esc(c.id) + '">' + cardHTML(c, cat) + (qty > 1 ? '<span class="badge qty">×' + qty + '</span>' : '')
-      + '<span class="pick-note">' + (qty > 1 ? plural(qty - 1, 'double', 'doubles') : '&nbsp;') + '</span></button>').join('') : '<p class="empty">Aucune carte ne correspond.</p>';
+    return shown.length ? shown.map(([c, qty]) => '<button class="pick" type="button" data-sell="' + esc(c.id) + '">' + cardHTML(c, cat, { qty })
+      + '<span class="pick-note">&nbsp;</span></button>').join('') : '<p class="empty">Aucune carte ne correspond.</p>';
   };
   const s = openSheet(sheetTitle('Vendre une carte', 'Tes doubles d\'abord. Une carte en vente quitte ta collection ; elle y revient si tu retires l\'annonce.')
     + '<input class="inp" type="search" id="sellQ" placeholder="Chercher dans tes cartes…" autocomplete="off"><div class="pick-grid" id="sellGrid">' + list() + '</div>', { cls: 'picker', label: 'Vendre une carte' });

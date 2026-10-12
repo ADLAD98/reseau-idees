@@ -57,8 +57,10 @@ const BACK = '<div class="card-face card-back"><svg class="back-mark" viewBox="0
 /* silhouette affichée quand une carte n'a pas de photo, ou que la photo ne se charge pas */
 const SILHOUETTE = '<svg class="card-ph" viewBox="0 0 100 100" aria-hidden="true"><use href="#silhouette"/></svg>';
 
-/** opts : back (ajoute le dos, pour pouvoir la retourner), eager (image chargée tout de suite), cls (classes en plus). */
+/** opts : back (ajoute le dos, pour pouvoir la retourner), eager (image chargée tout de suite), cls (classes en plus),
+    qty (nombre d'exemplaires possédés : à partir de deux, la carte est posée sur une pile et le nombre s'affiche en bas à droite). */
 export function cardHTML(card, cat, opts = {}) {
+  const qty = opts.qty > 1 ? Math.floor(opts.qty) : 0;
   const team = cat.teamById.get(card.team);
   const photo = photoUrl(card), v = card.variant || '';
   /* un nom long est écrit plus petit pour tenir sur la carte */
@@ -68,7 +70,7 @@ export function cardHTML(card, cat, opts = {}) {
   const flag = card.country
     ? '<img class="card-flag" src="' + flagUrl(card.country) + '" alt="' + esc(cat.countries[card.country]) + '" title="' + esc(cat.countries[card.country]) + '" loading="lazy" draggable="false">'
     : '';
-  return '<article class="card t' + card.tier + (card.kind === 'c' ? ' is-coach' : '') + (v ? ' v-' + v : '') + (opts.cls ? ' ' + opts.cls : '') + '" data-id="' + esc(card.id) + '">'
+  return '<article class="card t' + card.tier + (card.kind === 'c' ? ' is-coach' : '') + (v ? ' v-' + v : '') + (qty ? ' stack' + (qty > 2 ? ' s3' : '') : '') + (opts.cls ? ' ' + opts.cls : '') + '" data-id="' + esc(card.id) + '">'
     + '<div class="card-in"><div class="card-face card-front">'
     + '<div class="card-bg"></div>'
     /* édition KC : le « mur bleu » ; holographique et édition KC : une feuille de métal irisée derrière le joueur, et ses paillettes */
@@ -85,7 +87,7 @@ export function cardHTML(card, cat, opts = {}) {
     + '<div class="card-holo"></div><div class="card-frame"></div>'
     + (v ? '<span class="card-mark">' + VARIANTS[v].mark + '</span>' : '')
     + (v === 'kc' ? '<div class="card-glint"></div><span class="card-era">' + esc(karmineEra(cat, card)) + '</span>' : '')
-    + '</div>' + (opts.back ? BACK : '') + '</div><i class="card-gem"></i></article>';
+    + '</div>' + (opts.back ? BACK : '') + '</div><i class="card-gem"></i>' + (qty ? '<span class="card-qty">×' + qty + '</span>' : '') + '</article>';
 }
 
 /** La carte s'incline sous la souris ou le doigt ; les reflets d'une carte holographique suivent le mouvement.

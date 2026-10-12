@@ -269,7 +269,7 @@ async function openTrade(friendId, name, theirCards) {
     list.sort((a, b) => want(b) - want(a) || byOvr(a[0], b[0]));
     const shown = list.slice(0, 48);
     $('[data-pool="' + key + '"]', box).innerHTML = shown.map(([c, qty]) => '<button class="tr-card' + (picked[key].includes(c.id) ? ' on' : '') + '" type="button" data-add="' + key + '" data-id="' + esc(c.id) + '" aria-label="' + esc(c.name) + '">'
-      + cardHTML(c, cat) + (qty > 1 ? '<span class="badge qty">×' + qty + '</span>' : '') + '</button>').join('')
+      + cardHTML(c, cat, { qty }) + '</button>').join('')
       + (list.length > shown.length ? '<p class="tr-more">' + (list.length - shown.length) + ' autres cartes : affine ta recherche.</p>' : '')
       + (!list.length ? '<p class="tr-more">' + (pools[key].length ? 'Aucune carte ne correspond.' : key === 'give' ? 'Tu n\'as pas encore de cartes.' : esc(name) + ' n\'a pas encore de cartes.') + '</p>' : '');
   };
