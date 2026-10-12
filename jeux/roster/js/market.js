@@ -11,7 +11,7 @@ const onTab = () => /^#\/?marche/.test(location.hash) && !!document.getElementBy
 const coin = () => G.icon('i-coin');
 const nameOf = (card) => card.name + (card.variant ? ' (' + VARIANTS[card.variant].name.toLowerCase() + ')' : '');
 /* prix proposé par défaut, quand personne ne vend encore cette carte : selon le rang, plus cher pour une version spéciale */
-const BASE_PRICE = [0, 30, 80, 250, 900, 3000], VARIANT_PRICE = { holo: 2.5, full: 5, kc: 6 };
+const BASE_PRICE = [0, 30, 80, 250, 900, 3000], VARIANT_PRICE = { holo: 2.5, full: 5, kc: 6, legend: 40 };
 const advised = (card) => Math.round(BASE_PRICE[card.tier] * (card.variant ? VARIANT_PRICE[card.variant] : 1));
 
 export async function viewMarket(main, ctx) {
@@ -187,8 +187,23 @@ function pickCard() {
     return shown.length ? shown.map(([c, qty]) => '<button class="pick" type="button" data-sell="' + esc(c.id) + '">' + cardHTML(c, cat, { qty })
       + '<span class="pick-note">&nbsp;</span></button>').join('') : '<p class="empty">Aucune carte ne correspond.</p>';
   };
+  /* la vente rapide de tous les doublons des premiers rangs : le jeu les rachète d'un coup, à bas prix */
+  const quick = S.shop && S.shop.quick, lots = quick ? mine.filter(([c, qty]) => qty > 1 && !c.variant && c.tier <= quick.bulkTier) : [];
+  const bulkCount = lots.reduce((n, [, qty]) => n + qty - 1, 0), bulkGain = lots.reduce((n, [c, qty]) => n + (qty - 1) * (quick.tier[c.tier] || 0), 0);
   const s = openSheet(sheetTitle('Vendre une carte', 'Tes doubles d\'abord. Une carte en vente quitte ta collection ; elle y revient si tu retires l\'annonce.')
+    + (bulkCount ? '<div class="quick-all"><p><b>Vente rapide</b> — le jeu rachète tout de suite tes ' + plural(bulkCount, 'doublon', 'doublons') + ' de rang Recrue, Titulaire et Star. Il te reste un exemplaire de chaque carte.</p>'
+      + '<button class="btn" type="button" id="quickAll">Tout vendre · +' + num(bulkGain) + ' crédits</button></div>' : '')
     + '<input class="inp" type="search" id="sellQ" placeholder="Chercher dans tes cartes…" autocomplete="off"><div class="pick-grid" id="sellGrid">' + list() + '</div>', { cls: 'picker', label: 'Vendre une carte' });
+  if (bulkCount) $('#quickAll', s.box).addEventListener('click', async () => {
+    if (!(await confirmSheet('Vente rapide', 'Vendre ' + plural(bulkCount, 'doublon', 'doublons') + ' pour ' + num(bulkGain) + ' crédits ? Les All-Pro, les MVP et les versions spéciales ne sont pas concernées.', 'Tout vendre'))) return;
+    const res = await G.guard(() => G.call('POST', '/api/market/quick', { all: true }));
+    if (!res) return;
+    G.applyState(res);
+    for (const [id, left] of res.cards) G.owned(id, left);
+    s.close();
+    G.toast('+' + num(res.coins) + ' crédits : ' + plural(res.sold, 'doublon vendu', 'doublons vendus') + '.');
+    if (onTab()) draw($('#main'));
+  });
   $('#sellQ', s.box).addEventListener('input', (e) => { q = e.target.value.trim().toLowerCase(); $('#sellGrid', s.box).innerHTML = list(); });
   s.box.addEventListener('click', (e) => { const b = e.target.closest('[data-sell]'); if (b) { s.close(); sellCard(b.dataset.sell); } });
 }

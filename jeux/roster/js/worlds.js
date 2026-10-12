@@ -148,9 +148,9 @@ async function play() {
       const n = run.next, sv = run.series;
       const out = await runDraft({
         match: run.match, cat: S.cat, fx: S.fx, toast: G.toast, help: false,
-        head: 'Mondial · ' + (n ? n.label : '') + (sv.format > 1 ? ' · BO' + sv.format + ' · ' + sv.wins[0] + ' – ' + sv.wins[1] : ''),
+        head: 'Mondial · ' + (n ? n.label : '') + (sv.format > 1 ? ' · BO' + sv.format + (sv.fearless ? ' fearless' : '') + ' · ' + sv.wins[0] + ' – ' + sv.wins[1] : ''),
         act: async (body) => {
-          res = await G.call('POST', '/api/worlds/act', { champ: body.champ, role: body.role, step: body.step });
+          res = await G.call('POST', '/api/worlds/act', { champ: body.champ, role: body.role, step: body.step, auto: body.auto });
           G.applyState(res);
           run = res.run;
           return Object.assign({ match: run.match }, run.last ? { sim: run.last.sim, report: run.last.report } : {});

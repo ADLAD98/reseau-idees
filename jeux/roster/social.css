@@ -67,6 +67,10 @@ button.soc-who:hover b{color:var(--gold-hi)}
 .board .btn.slim{height:30px;padding:0 10px;font-size:11.5px}
 
 /* ---------- échanges ---------- */
+/* le fearless, sous le choix du nombre de manches */
+.soc-fear{display:flex;align-items:flex-start;gap:10px;margin-top:12px;color:var(--mut);font-size:14.5px;line-height:1.35;cursor:pointer}
+.soc-fear input{flex:none;width:18px;height:18px;margin:1px 0 0;accent-color:var(--blue)}
+.soc-fear b{color:var(--blue-hi);font-weight:600}
 .tile.mini{width:92px;flex:none}
 .tile.mini:hover{transform:translateY(-3px)}
 .tr-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,470px),1fr));gap:16px}
@@ -110,6 +114,11 @@ button.soc-who:hover b{color:var(--gold-hi)}
 .mk-only{display:flex;align-items:center;gap:14px;margin:0 0 14px;color:var(--mut)}
 .mk-only b{color:var(--ink);font-weight:600}
 .mk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(176px,1fr));gap:26px 18px}
+/* la vente rapide de tous les doublons, en tête du choix de la carte à vendre */
+.quick-all{display:flex;align-items:center;gap:16px;padding:12px 14px;border:1px solid var(--line2);background:rgba(5,13,24,.5)}
+.quick-all p{flex:1;margin:0;color:var(--mut);font-size:14.5px;line-height:1.4}
+.quick-all p b{color:var(--gold-hi);font-weight:600}
+.quick-all .btn{flex:none}
 .mk-item{display:flex;flex-direction:column;gap:10px;min-width:0}
 .mk-item .tile .card{--w:100%}
 .mk-item .badge.new{top:-9px}

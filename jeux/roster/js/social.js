@@ -79,7 +79,7 @@ function friendsHTML() {
   const sent = (r) => '<div class="soc-row"><i class="dot"></i><span class="soc-who"><b>' + esc(r.name) + '</b><i>demande envoyée ' + since(now - r.at) + '</i></span>'
     + '<span class="soc-acts"><button class="btn" type="button" data-remove="' + r.id + '">Annuler</button></span></div>';
   const duel = (d) => '<div class="hist-row ' + (d.won ? 'win' : 'lose') + '"><b>' + (d.won ? 'Victoire' : 'Défaite') + '</b><span class="hist-foe">contre ' + esc(d.foe) + (d.bot ? ' (son équipe, dirigée par l\'ordinateur)' : '') + '</span>'
-    + '<span class="hist-score">' + (d.format > 1 ? 'BO' + d.format + ' · ' : '') + d.wins[0] + ' – ' + d.wins[1] + '</span><span class="hist-coins">+' + d.coins + '</span><span></span></div>';
+    + '<span class="hist-score">' + (d.format > 1 ? 'BO' + d.format + ' · ' : '') + d.wins[0] + ' – ' + d.wins[1] + (d.forfeit ? ' · forfait' : '') + '</span><span class="hist-coins">+' + d.coins + '</span><span></span></div>';
   return '<form class="soc-add" id="addFriend" novalidate><div class="soc-add-in"><input class="inp" name="name" placeholder="Pseudo d\'un joueur" maxlength="16" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Pseudo du joueur à ajouter">'
     + '<div class="soc-suggest" id="suggest" hidden></div></div><button class="btn primary" type="submit">Ajouter en ami</button></form>'
     + (F.requests.length ? '<section><h2 class="h2">Demandes reçues</h2><div class="soc-list">' + F.requests.map(ask).join('') + '</div></section>' : '')
@@ -205,13 +205,16 @@ async function openFriend(id, focus) {
     const card = data.deck[k] ? cat.cardById.get(data.deck[k]) : null;
     return card ? cardHTML(card, cat) : '<div class="sq-empty"><i>·</i><b>' + ['Top', 'Jungle', 'Mid', 'ADC', 'Support', 'Coach'][i] + '</b><em>remplaçant</em></div>';
   }).join('');
-  let format = 1;
-  try { format = Number(localStorage.getItem('bcorps-cartes-format')) || 1; } catch (e) { format = 1; }
+  let format = 1, fearless = true;
+  try { format = Number(localStorage.getItem('bcorps-cartes-format')) || 1; fearless = localStorage.getItem('bcorps-cartes-fearless') !== '0'; } catch (e) { format = 1; }
+  /* (le fearless n'est proposé que si le serveur le connaît) */
+  const canFearless = !!S.shop;
   const s = openSheet(sheetTitle(esc(p.name), (p.online ? '<i class="dot on"></i>En ligne' : 'Vu ' + since(now - p.seenAt)) + ' · joueur depuis le ' + frDate(p.createdAt))
     + '<div class="tally soc-tally"><div><b>' + data.lineup.rating + '</b><span>Note d\'équipe</span></div><div><b>' + p.duelWins + ' – ' + p.duelLosses + '</b><span>Défis</span></div>'
     + '<div><b>' + p.cards + '</b><span>Cartes</span></div><div class="gold"><b>' + p.titles + '</b><span>' + (p.titles > 1 ? 'Mondiaux' : 'Mondial') + '</span></div></div>'
     + '<div class="foe-cards">' + team + '</div>'
     + '<div class="soc-duel" id="duelBox"><h3>Le défier</h3><div class="pills" id="fmt">' + FORMATS.map((f) => '<button type="button" data-format="' + f[0] + '"' + (f[0] === format ? ' class="on"' : '') + '>' + f[1] + '</button>').join('') + '</div>'
+    + (canFearless ? '<label class="soc-fear" id="fearBox"' + (format > 1 ? '' : ' hidden') + '><input type="checkbox" id="fear"' + (fearless ? ' checked' : '') + '><span><b>Fearless</b> : un champion joué dans une manche ne peut plus l\'être dans les suivantes, par aucune des deux équipes.</span></label>' : '')
     + '<div class="actions"><button class="btn primary" type="button" id="goLive"' + (p.online ? '' : ' disabled') + '>Défier en direct</button><button class="btn" type="button" id="goBot">Affronter son équipe</button></div>'
     + '<p class="note">' + (p.online ? 'En direct : vous faites la draft chacun votre tour, 35 secondes par choix, puis vous regardez la même partie.'
       : esc(p.name) + ' n\'est pas en ligne : le défi en direct attendra.') + ' « Affronter son équipe » : l\'ordinateur dirige ses cartes, il n\'a pas besoin d\'être là.</p></div>'
@@ -224,9 +227,15 @@ async function openFriend(id, focus) {
     format = Number(b.dataset.format);
     try { localStorage.setItem('bcorps-cartes-format', String(format)); } catch (err) { /* réglage non gardé */ }
     box.querySelectorAll('[data-format]').forEach((x) => x.classList.toggle('on', x === b));
+    if ($('#fearBox', box)) $('#fearBox', box).hidden = format < 2;
   });
-  $('#goLive', box).addEventListener('click', () => { s.close(); G.duel.invite({ id: p.id, name: p.name }, format); });
-  $('#goBot', box).addEventListener('click', () => { s.close(); G.duel.bot({ id: p.id, name: p.name }, format); });
+  if ($('#fear', box)) $('#fear', box).addEventListener('change', (e) => {
+    fearless = e.target.checked;
+    try { localStorage.setItem('bcorps-cartes-fearless', fearless ? '1' : '0'); } catch (err) { /* réglage non gardé */ }
+  });
+  const fear = () => canFearless && fearless && format > 1;
+  $('#goLive', box).addEventListener('click', () => { s.close(); G.duel.invite({ id: p.id, name: p.name }, format, fear()); });
+  $('#goBot', box).addEventListener('click', () => { s.close(); G.duel.bot({ id: p.id, name: p.name }, format, fear()); });
   $('#goTrade', box).addEventListener('click', () => { s.close(); openTrade(p.id, p.name, data.cards); });
   $('#unfriend', box).addEventListener('click', async () => {
     if (!(await confirmSheet('Retirer ' + p.name + ' ?', 'Vous ne pourrez plus vous défier ni échanger de cartes. Les propositions d\'échange en attente entre vous seront annulées.', 'Retirer', { danger: true }))) return;

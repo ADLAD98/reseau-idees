@@ -251,6 +251,17 @@
 .dr-chip.down b{color:#f3a4ad}
 .dr-total{font:700 19px/1 var(--text);font-style:normal;letter-spacing:0;color:var(--blue-hi);font-variant-numeric:tabular-nums}
 .dr-tip{color:var(--mut);font-size:16px}
+/* la draft automatique : un interrupteur à côté du bouton de verrouillage. Allumé, le coach choisit à la place du joueur */
+.dr-auto{flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;height:56px;padding:0 16px}
+.dr-auto b{font:600 12.5px/1 var(--text);letter-spacing:.12em;text-transform:uppercase}
+.dr-auto i{font:400 11.5px/1 var(--text);font-style:normal;color:var(--mut);white-space:nowrap}
+.dr-auto.on{border-image:linear-gradient(var(--blue-hi),var(--blue)) 1;background:linear-gradient(#0f3a46,#07212c);color:var(--blue-hi);box-shadow:0 0 18px rgba(10,200,185,.3)}
+.dr-auto.on i{color:var(--blue-hi)}
+.dr-auto.on b::after{content:" · on"}
+/* l'adversaire ne répond plus : un bandeau, avec le temps qu'il lui reste avant de perdre par forfait */
+.dr-away{flex:none;margin:0;padding:8px 16px;text-align:center;font:600 14.5px/1.3 var(--text);color:#ffe9c4;background:rgba(120,70,10,.5);border-top:1px solid rgba(240,180,80,.5)}
+/* fearless : un champion déjà joué dans la série reste affiché, barré d'un trait doré */
+.dr-c.gone .dr-ci::after{content:"";position:absolute;inset:0;background:linear-gradient(to top right,transparent 46%,rgba(200,170,110,.85) 46% 54%,transparent 54%)}
 .dr-comp{margin-left:auto;color:var(--mut);font-size:14px;white-space:nowrap}
 .dr-comp b{color:var(--ink);font-weight:600}
 .dr-comp b.ok{color:var(--ok)}
@@ -612,6 +623,10 @@
   .dr-tip{flex-basis:100%;font-size:13.5px;line-height:1.3}
   .dr-comp{margin:0;font-size:12px;white-space:normal}
   .dr-foot .btn.big{flex:none;height:48px;padding:0 16px;font-size:14px;letter-spacing:.08em}
+  .dr-auto{height:48px;min-width:58px;padding:0 8px}
+  .dr-auto b{font-size:11px;letter-spacing:.08em}
+  .dr-auto i{font-size:11px}
+  .dr-away{padding:6px 10px;font-size:12.5px}
   .dr-help{padding:12px}
   @media (max-height:700px){
     .dr-hint{display:none}

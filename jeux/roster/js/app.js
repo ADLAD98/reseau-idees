@@ -9,6 +9,7 @@ import { packHTML, runOpening } from './opening.js';
 import { viewPlay } from './play.js';
 import { viewSocial } from './social.js';
 import { setSound, sfx, soundOn } from './sound.js';
+import { confirmSheet } from './ui.js';
 import { viewWorlds } from './worlds.js';
 
 const app = document.getElementById('app');
@@ -32,6 +33,8 @@ const S = {
   session: null,          // { token, name } gardé dans ce navigateur
   player: null,           // ce que le serveur dit du joueur
   free: null,             // pack gratuit : { readyAt, cooldownMs, size }
+  shop: null,             // booster à crédits et barème de la vente rapide (null : le serveur ne les propose pas)
+  pack: 'free',           // booster choisi sur l'écran Packs : 'free' ou 'credits'
   skew: 0,                // heure du serveur − heure de cet appareil
   cat: null,              // catalogue des cartes
   owned: new Map(),       // identifiant de carte → { qty, at }
@@ -74,7 +77,14 @@ function applyState(data) {
   const credits = document.getElementById('credits');
   if (credits && S.player) credits.textContent = S.player.coins;
   if (data.free) S.free = data.free;
+  /* le booster à crédits et la vente rapide (un serveur plus ancien ne les annonce pas : le jeu ne les propose alors pas) */
+  if (data.shop) S.shop = data.shop;
   if (typeof data.skew === 'number') S.skew = data.skew;
+}
+/** Ce que rapporte la vente rapide d'un exemplaire de cette carte (c'est le serveur qui fixe le barème). */
+function quickPrice(card) {
+  const q = S.shop && S.shop.quick;
+  return q ? Math.round((q.tier[card.tier] || 4) * (card.variant ? q.variant[card.variant] || 1 : 1)) : 0;
 }
 /** Lance une action qui parle au serveur ; une connexion expirée ramène à l'écran de connexion. */
 async function guard(action) {
@@ -174,6 +184,7 @@ setInterval(pulse, PULSE_MS);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) pulse(); });
 async function boot() {
   try { S.fx = localStorage.getItem(STORE + 'fx') !== '0'; } catch (e) { S.fx = true; }
+  try { S.pack = localStorage.getItem(STORE + 'booster') === 'credits' ? 'credits' : 'free'; } catch (e) { S.pack = 'free'; }
   try {
     const kept = (localStorage.getItem(STORE + 'classeur') || '').split('/');
     S.filters.group = kept[0] === 'roster' ? 'roster' : '';
@@ -325,11 +336,14 @@ document.addEventListener('click', (e) => {
   if (t && S.cat) showSheet(t.dataset.card);
 });
 /* ---------- écran Packs ---------- */
-/* un pack peut s'ouvrir si le délai du pack gratuit est écoulé, ou s'il reste des packs en réserve */
-const timeLeft = () => S.free.readyAt - now();
-const packReady = () => timeLeft() <= 0 || S.free.spare > 0;
+/* le booster choisi : le pack gratuit, ou le booster à crédits (quand le serveur le propose) */
+const packKind = () => (S.pack === 'credits' && S.shop ? 'credits' : 'free');
+const packWait = () => (packKind() === 'credits' ? S.shop.credits.cooldownMs : S.free.cooldownMs);
+/* le pack gratuit peut s'ouvrir si son délai est écoulé, ou s'il reste des packs en réserve ; le booster à crédits, si son délai est écoulé et qu'on peut le payer */
+const timeLeft = () => (packKind() === 'credits' ? S.shop.credits.readyAt : S.free.readyAt) - now();
+const packReady = () => (packKind() === 'credits' ? timeLeft() <= 0 && S.player.coins >= S.shop.credits.price : timeLeft() <= 0 || S.free.spare > 0);
 /* résumé de la situation : quand il change, on redessine le bouton ; sinon seul le compte à rebours bouge */
-const packSig = () => (timeLeft() <= 0 ? 'pret' : 'attente') + '/' + (S.free.spare || 0);
+const packSig = () => packKind() + '/' + (timeLeft() <= 0 ? 'pret' : 'attente') + '/' + (packKind() === 'credits' ? (S.player.coins >= S.shop.credits.price ? 'ok' : 'court') : S.free.spare || 0);
 function progressHTML() {
   const total = S.cat.cards.length, have = S.owned.size;
   const tally = (all) => all.filter((c) => S.owned.has(c.id)).length + '/' + all.length;
@@ -339,6 +353,15 @@ function progressHTML() {
     + '<div class="bar"><i style="width:' + pct(have, total) + '%"></i></div><div class="tiers">' + tiers + '</div></div>';
 }
 function packActionHTML() {
+  if (packKind() === 'credits') {
+    const shop = S.shop.credits, wait = timeLeft(), missing = shop.price - S.player.coins;
+    if (wait > 0) {
+      return '<div class="wait"><div class="wait-time"><b id="count">' + clock(wait) + '</b><span>avant le prochain booster</span></div>'
+        + '<div class="bar"><i id="countBar" style="width:' + Math.min(100, 100 - (100 * wait) / shop.cooldownMs) + '%"></i></div></div>';
+    }
+    if (missing > 0) return '<button class="btn primary big" type="button" disabled>Il te manque ' + missing + ' crédits</button><p class="reserve">Gagne des matchs, vends tes doublons : il en faut <b>' + shop.price + '</b>.</p>';
+    return '<button class="btn primary big" type="button" id="openPack">Acheter et ouvrir · ' + shop.price + ' crédits</button><p class="reserve">Tu as <b>' + S.player.coins + '</b> crédits.</p>';
+  }
   const left = timeLeft(), spare = S.free.spare || 0;
   if (left > 0 && !spare) {
     return '<div class="wait"><div class="wait-time"><b id="count">' + clock(left) + '</b><span>avant le prochain pack</span></div>'
@@ -350,10 +373,15 @@ function packActionHTML() {
 }
 function viewPacks(main) {
   const recent = [...S.owned.entries()].sort((a, b) => b[1].at - a[1].at).slice(0, 6).map(([id]) => S.cat.cardById.get(id)).filter(Boolean);
-  main.innerHTML = '<section class="home"><div class="home-pack" id="packBox">' + packHTML(packReady() ? 'ready' : 'waiting', S.cat.season, S.free.size) + '</div>'
-    + '<div class="home-side"><div class="eyebrow">Pack gratuit · toutes les ' + Math.round(S.free.cooldownMs / 60000) + ' minutes</div>'
-    + '<h1 class="h1">' + S.free.size + ' cartes à découvrir</h1>'
-    + '<p class="lead">Joueurs et coachs pros de la saison ' + S.cat.season + '. La dernière carte du pack est une carte bonus : rang Titulaire au minimum. Les plus belles cartes existent aussi en version holographique et en full art' + (S.cat.cards.some((c) => c.variant === 'kc') ? ', et les joueurs passés par la Karmine en édition KC' : '') + '.</p>'
+  const kind = packKind(), credits = kind === 'credits';
+  /* le menu des boosters : le pack gratuit, ou celui qui se paie en crédits */
+  const menu = S.shop ? '<div class="seg pack-menu" id="packMenu"><button type="button" data-pack="free"' + (credits ? '' : ' class="on"') + '>Pack gratuit</button>'
+    + '<button type="button" data-pack="credits"' + (credits ? ' class="on"' : '') + '>Booster · ' + S.shop.credits.price + ' crédits</button></div>' : '';
+  main.innerHTML = '<section class="home"><div class="home-pack' + (credits ? ' credits' : '') + '" id="packBox">' + packHTML(packReady() ? 'ready' : 'waiting', S.cat.season, S.free.size) + '</div>'
+    + '<div class="home-side">' + menu + '<div class="eyebrow">' + (credits ? 'Booster à crédits · un toutes les ' + Math.round(S.shop.credits.cooldownMs / 60000) + ' minutes' : 'Pack gratuit · toutes les ' + Math.round(S.free.cooldownMs / 60000) + ' minutes') + '</div>'
+    + '<h1 class="h1">' + S.free.size + ' cartes ' + (credits ? 'de plus' : 'à découvrir') + '</h1>'
+    + '<p class="lead">' + (credits ? 'Un booster en plus du pack gratuit, payé avec tes crédits. Ses chances sont un peu plus faibles que celles du pack gratuit (le détail est dans ton profil).'
+      : 'Joueurs et coachs pros de la saison ' + S.cat.season + '. La dernière carte du pack est une carte bonus : rang Titulaire au minimum. Les plus belles cartes existent aussi en version holographique et en full art' + (S.cat.cards.some((c) => c.variant === 'kc') ? ', et les joueurs passés par la Karmine en édition KC' : '') + '.') + '</p>'
     + '<div id="packAction" data-sig="' + packSig() + '">' + packActionHTML() + '</div>' + progressHTML() + '</div></section>'
     + '<section><h2 class="h2">Dernières cartes obtenues</h2>'
     + (recent.length ? '<div class="row-cards">' + recent.map((c) => tile(c)).join('') + '</div>' : '<p class="empty">Ta collection est vide. Ouvre ton premier pack !</p>')
@@ -372,15 +400,24 @@ setInterval(() => {
   }
   const left = timeLeft(), count = document.getElementById('count'), bar = document.getElementById('countBar');
   if (count) count.textContent = clock(left);
-  if (bar) bar.style.width = Math.min(100, 100 - (100 * left) / S.free.cooldownMs) + '%';
+  if (bar) bar.style.width = Math.min(100, 100 - (100 * left) / packWait()) + '%';
 }, 1000);
 document.addEventListener('click', async (e) => {
+  /* le menu des boosters */
+  const choice = e.target.closest('#packMenu [data-pack]');
+  if (choice && !S.opening) {
+    S.pack = choice.dataset.pack;
+    try { localStorage.setItem(STORE + 'booster', S.pack); } catch (err) { /* réglage non gardé */ }
+    route();
+    return;
+  }
   if (!e.target.closest('#openPack') || S.opening) return;
   S.opening = true;
+  const kind = packKind();
   try {
     const result = await runOpening({
       request: async () => {
-        const data = await call('POST', '/api/packs/free');
+        const data = await call('POST', kind === 'credits' ? '/api/packs/credits' : '/api/packs/free');
         /* le serveur vient d'être mis à jour avec de nouvelles cartes : on recharge le catalogue avant de les montrer */
         if (data.catalogVersion && data.catalogVersion !== S.cat.version) await loadCatalogue(data.catalogVersion);
         return data;
@@ -397,7 +434,7 @@ document.addEventListener('click', async (e) => {
     else route();
   } catch (err) {
     S.opening = false;
-    if (err instanceof ApiError && err.code === 'pas_pret') { applyState({ free: err.data.free, skew: err.data.skew }); toast(err.message, true); route(); }
+    if (err instanceof ApiError && (err.code === 'pas_pret' || err.code === 'credits')) { applyState({ free: err.data.free, shop: err.data.shop, skew: err.data.skew }); toast(err.message, true); route(); }
     else if (err instanceof ApiError && err.status === 401) { clearSession(); S.session = null; showAuth('Ta connexion a expiré. Reconnecte-toi.'); }
     else { toast(err instanceof ApiError ? err.message : 'Un problème est survenu.', true); if (!(err instanceof ApiError)) console.error(err); }
   }
@@ -578,12 +615,17 @@ function showSheet(id) {
     + '<div><h3 class="h2">Statistiques de la carte</h3><div class="bars">' + statsOf(card).map((s) => '<div title="' + esc(s[3]) + '"><span>' + s[2] + '</span><span class="bar"><i style="width:' + card.stats[s[0]] + '%"></i></span><b>' + card.stats[s[0]] + '</b></div>').join('') + '</div></div>'
     + (facts ? '<div><h3 class="h2">Saison ' + cat.season + (card.kind === 'c' ? ' de son équipe' : ' en chiffres') + '</h3><div class="facts">' + facts + '</div></div>' : '<p class="note">Aucune partie officielle jouée cette saison : la note est celle d\'un remplaçant.</p>')
     + (card.champs && card.champs.length ? '<div><h3 class="h2">Champions fétiches</h3><div class="champs">' + card.champs.map((c) => '<div class="champ"><img src="' + iconUrl(cat, c[0]) + '" alt="" loading="lazy"><div><b>' + esc(champName(cat, c[0])) + '</b><span>' + c[1] + ' parties · ' + pct(c[2], c[1]) + ' %</span></div></div>').join('') + '</div></div>' : '')
-    + (card.variant ? '<p class="note">' + (card.variant === 'kc' ? 'Édition Karmine Corp de la carte de ' + esc(card.name) + ' (' + esc(karmineEra(cat, card)) + '), réservée à celles et ceux qui portent ou ont porté ses couleurs'
+    + (card.variant === 'legend' ? '<p class="note">Édition légendaire de ' + esc(card.name) + ' : la carte la plus rare du jeu. Contrairement aux autres versions, elle a sa propre note et ses propres statistiques, et porte tous ses titres mondiaux. Elle prend parfois la place de la carte bonus d\'un pack.</p>'
+      : card.variant ? '<p class="note">' + (card.variant === 'kc' ? 'Édition Karmine Corp de la carte de ' + esc(card.name) + ' (' + esc(karmineEra(cat, card)) + '), réservée à celles et ceux qui portent ou ont porté ses couleurs'
       : 'Version ' + (card.variant === 'holo' ? 'holographique' : 'full art') + ' de la carte de ' + esc(card.name)) + ' : même joueur, même note, un autre habillage. Elle sort parfois d\'un pack à la place de la carte ordinaire, et se collectionne à part.</p>' : '')
     + '<p class="note">Note calculée à partir des statistiques officielles de la saison ' + cat.season + ' (ligue, tournois internationaux, palmarès). Données : Leaguepedia.</p>'
     /* le marché : vendre un exemplaire, ou chercher qui vend cette carte */
     + (S.live && !S.busy && !S.opening ? '<div class="actions sheet-acts">' + (own ? '<button class="btn" type="button" data-sheet="sell">Vendre un exemplaire</button>' : '')
-      + '<button class="btn" type="button" data-sheet="market">' + (own ? 'Voir sur le marché' : 'La chercher au marché') + '</button></div>' : '')
+      + '<button class="btn" type="button" data-sheet="market">' + (own ? 'Voir sur le marché' : 'La chercher au marché') + '</button>'
+      /* vente rapide : le jeu rachète un doublon tout de suite, à bas prix */
+      + (S.shop && own && own.qty > 1 ? '<button class="btn" type="button" data-sheet="quick">Vente rapide · +' + quickPrice(card) + ' crédits</button>'
+        + (own.qty > 2 ? '<button class="btn" type="button" data-sheet="quickall">Vendre les ' + (own.qty - 1) + ' doublons · +' + (own.qty - 1) * quickPrice(card) + '</button>' : '') : '')
+      + '</div>' : '')
     + '</div></div>';
   const close = () => { sheet.remove(); document.removeEventListener('keydown', onKey); document.body.style.overflow = ''; };
   const onKey = (e) => { if (e.key === 'Escape') close(); };
@@ -591,6 +633,7 @@ function showSheet(id) {
     if (e.target === sheet || e.target.closest('.close')) { close(); return; }
     const act = e.target.closest('[data-sheet]');
     if (!act) return;
+    if (act.dataset.sheet === 'quick' || act.dataset.sheet === 'quickall') { close(); quickSell(card, act.dataset.sheet === 'quickall' ? S.owned.get(id).qty - 1 : 1); return; }
     close();
     /* les fenêtres ouvertes derrière (échange, marché) se referment : on change d'écran */
     document.querySelectorAll('.sheet').forEach((el) => { const x = el.querySelector('.close'); if (x) x.click(); });
@@ -615,6 +658,20 @@ async function viewBoard(main) {
     + '</tbody></table>';
 }
 
+/** Vente rapide : le jeu rachète sur-le-champ des doublons d'une carte. Une belle carte fait d'abord confirmer. */
+async function quickSell(card, qty) {
+  const gain = qty * quickPrice(card);
+  if (gain >= 60 && !(await confirmSheet('Vente rapide', 'Vendre ' + (qty > 1 ? qty + ' exemplaires' : 'un exemplaire') + ' de ' + card.name + (card.variant ? ' (' + VARIANTS[card.variant].name.toLowerCase() + ')' : '') + ' pour ' + gain + ' crédits ? Au marché, un autre joueur t\'en donnerait peut-être davantage.', 'Vendre'))) { showSheet(card.id); return; }
+  const res = await guard(() => call('POST', '/api/market/quick', { card: card.id, qty }));
+  if (!res) return;
+  applyState(res);
+  for (const [id, left] of res.cards) PLAY.owned(id, left);
+  toast('+' + res.coins + ' crédits : ' + (res.sold > 1 ? res.sold + ' doublons vendus' : 'un doublon vendu') + '.');
+  route();
+  /* la fiche se rouvre s'il reste des doublons à vendre */
+  if ((S.owned.get(card.id) || { qty: 0 }).qty > 1) showSheet(card.id);
+}
+
 /* ---------- écran Profil ---------- */
 async function viewProfile(main) {
   const p = S.player;
@@ -622,13 +679,17 @@ async function viewProfile(main) {
     + '<section class="panel"><h3>Mon compte</h3><div class="kv"><span>Packs ouverts</span><b>' + p.packsOpened + '</b><span>Cartes différentes</span><b>' + p.cardsUnique + ' / ' + S.cat.cards.length + '</b><span>Exemplaires</span><b>' + p.cardsTotal + '</b><span>Parties gagnées</span><b>' + p.wins + ' sur ' + (p.wins + p.losses) + '</b>'
     + (S.live ? '<span>Défis entre joueurs</span><b>' + (p.duelWins || 0) + ' V – ' + (p.duelLosses || 0) + ' D</b><span>Mondiaux remportés</span><b>' + (p.titles || 0) + '</b>' : '')
     + '<span>Crédits</span><b>' + p.coins + '</b></div>'
+    /* le nom de son équipe : celui que voient ses adversaires */
+    + (p.team ? '<form class="team-form" id="teamForm"><span class="label">Mon équipe</span><div class="team-row"><input class="inp" name="name" maxlength="24" placeholder="' + esc(p.name) + '" value="' + (p.team.custom ? esc(p.team.name) : '') + '" autocomplete="off" aria-label="Nom de l\'équipe">'
+      + '<input class="inp team-tag" name="tag" maxlength="4" placeholder="' + esc(p.team.short) + '" value="' + (p.team.custom ? esc(p.team.short) : '') + '" autocomplete="off" aria-label="Sigle"><button class="btn" type="submit">Renommer</button></div>'
+      + '<p class="hint">Le nom (3 à 24 caractères) et le sigle (2 à 4 lettres) sous lesquels ton équipe joue ses matchs, ses défis et le Mondial. Vide : elle porte ton pseudo.</p><p class="form-error" role="alert"></p></form>' : '')
     + '<div class="switch"><span>Animations</span><button type="button" id="fxSwitch" aria-pressed="' + S.fx + '" aria-label="Animations"></button></div>'
     + '<div class="switch"><span>Sons</span><button type="button" id="soundSwitch" aria-pressed="' + soundOn() + '" aria-label="Sons"></button></div>'
     + '<div class="actions"><button class="btn" type="button" id="logout">Se déconnecter</button><button class="btn danger" type="button" id="askDelete">Supprimer mon compte</button></div>'
     + '<form id="deleteForm" hidden style="display:grid;gap:10px"><p class="hint">Ton compte et toutes tes cartes seront effacés pour de bon. Tape ton mot de passe pour confirmer.</p>'
     + '<input class="inp" name="password" type="password" autocomplete="current-password" placeholder="Mot de passe" required><p class="form-error" role="alert"></p>'
     + '<div class="actions"><button class="btn danger" type="submit">Effacer définitivement</button><button class="btn" type="button" id="cancelDelete">Annuler</button></div></form></section>'
-    + '<section class="panel"><h3>Chances du pack gratuit</h3><div id="odds"><p class="hint">Chargement…</p></div></section>'
+    + '<section class="panel"><h3>Chances des boosters</h3><div id="odds"><p class="hint">Chargement…</p></div></section>'
     + '<section class="panel"><h3>À propos</h3>'
     + '<p class="hint">' + esc(GAME_NAME) + ' est un projet de fan gratuit de Bcorps Labs. Les cartes représentent les joueurs et coachs en activité dans les ligues majeures (LCK, LPL, LEC, LCS, LCP, CBLOL), saison ' + S.cat.season + '. Catalogue du ' + frDate(Date.parse(S.cat.generated)) + '.</p>'
     + '<p class="hint">Effectifs, statistiques et palmarès : <a href="https://lol.fandom.com/" target="_blank" rel="noopener">Leaguepedia</a>, licence CC BY-SA 3.0. Photos des joueurs : portraits officiels des équipes et des ligues, affichés depuis Leaguepedia. Images des champions : Riot Games (Data Dragon). Drapeaux : flag-icons (licence MIT).</p>'
@@ -652,6 +713,21 @@ async function viewProfile(main) {
     S.session = null;
     showAuth();
   });
+  const teamForm = $('#teamForm');
+  if (teamForm) teamForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const error = $('.form-error', teamForm);
+    error.textContent = '';
+    try {
+      const res = await call('POST', '/api/team/name', { name: teamForm.name.value, tag: teamForm.tag.value });
+      applyState(res);
+      toast('Ton équipe s\'appelle maintenant « ' + S.player.team.name + ' » (' + S.player.team.short + ').');
+      route();
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) { clearSession(); S.session = null; showAuth('Ta connexion a expiré. Reconnecte-toi.'); return; }
+      error.textContent = err instanceof ApiError ? err.message : 'Un problème est survenu.';
+    }
+  });
   const form = $('#deleteForm');
   $('#askDelete').addEventListener('click', () => { form.hidden = false; form.password.focus(); });
   $('#cancelDelete').addEventListener('click', () => { form.hidden = true; form.reset(); });
@@ -673,12 +749,17 @@ async function viewProfile(main) {
   const data = await guard(() => call('GET', '/api/packs'));
   const box = document.getElementById('odds');
   if (!data || !box) return;
-  const pack = data.packs[0], show = (x) => (x ? frNum(Math.round(1000 * x) / 10) + ' %' : '—');
-  box.innerHTML = '<table class="odds"><thead><tr><th>Rang</th><th>Cartes 1 à ' + (pack.size - 1) + '</th><th>Carte bonus</th></tr></thead><tbody>'
+  const show = (x) => (x ? frNum(Math.round(10000 * x) / 100) + ' %' : '—');
+  /* un tableau par booster : le pack gratuit, puis le booster à crédits */
+  const table = (pack) => (data.packs.length > 1 ? '<p class="label odds-name">' + esc(pack.name) + (pack.price ? ' · ' + pack.price + ' crédits' : '') + '</p>' : '')
+    + '<table class="odds"><thead><tr><th>Rang</th><th>Cartes 1 à ' + (pack.size - 1) + '</th><th>Carte bonus</th></tr></thead><tbody>'
     + [...S.cat.tiers].reverse().map((t) => '<tr style="--tc:var(--t' + t.id + ')"><td>' + esc(t.name) + '</td><td>' + show(pack.odds[t.id - 1]) + '</td><td>' + show(pack.lastOdds[t.id - 1]) + '</td></tr>').join('')
-    + '</tbody></table>'
+    + '</tbody></table>';
+  box.innerHTML = data.packs.map(table).join('')
     + (data.variants || []).map((v) => {
       const from = S.cat.tiers.filter((t) => t.id >= v.minTier).map((t) => t.name);
+      /* l'édition légendaire ne remplace pas une carte tirée : elle prend parfois la place de la carte bonus */
+      if (v.id === 'legend') return '<p class="hint"><b class="v-legend">' + esc(v.name) + '</b> — la carte bonus est une carte légendaire dans ' + data.packs.map((p) => 'un ' + (p.price ? 'booster à crédits' : 'pack gratuit') + ' sur ' + Math.round(1 / (p.legend || v.pack))).join(', ') + ' (' + v.cards + (v.cards > 1 ? ' cartes' : ' carte') + ').</p>';
       /* l'édition KC ne dépend pas du rang : elle concerne les joueurs et les coachs passés par la Karmine */
       if (v.id === 'kc') return '<p class="hint"><b class="v-kc">' + esc(v.name) + '</b> — ' + show(v.chance) + ' des cartes des joueurs et des coachs passés par la Karmine Corp (' + v.cards + ' cartes) sortent dans cette édition.</p>';
       return '<p class="hint"><b class="v-' + esc(v.id) + '">' + esc(v.name) + '</b> — ' + show(v.chance) + ' des cartes ' + esc(from.slice(0, -1).join(', ') + (from.length > 1 ? ' et ' : '') + from[from.length - 1]) + ' sortent dans cette version.</p>';

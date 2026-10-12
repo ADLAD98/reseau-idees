@@ -3,7 +3,7 @@
    Les conseils affichés (méta, confort, duel) suivent les règles du serveur : voir rules.js. */
 import { ApiError } from './api.js';
 import { esc, iconUrl, photoUrl } from './cards.js';
-import { ROLE_LABEL } from './config.js';
+import { ROLE_LABEL, STORE } from './config.js';
 import { CLASS_NAME, DAMAGE_NAME, ORDER, PHASES, ROLES, compState, pickValue, played, signed } from './rules.js';
 import { setSound, sfx, soundOn } from './sound.js';
 
@@ -23,13 +23,22 @@ const HELP = '<div class="dr-help-box panel"><h3>Gagner la draft</h3><ul>'
 
 /** Joue la draft d'un match. act(body) envoie un choix au serveur ; resync() redemande l'état du match ;
     help : ouvrir d'office l'explication des règles (première draft du joueur) ; head : une ligne au-dessus du titre (série en cours).
+    confirmLeave() : demande confirmation avant de quitter (un défi en direct : quitter, c'est l'abandonner) ;
     live : draft en direct contre un autre joueur — { poll() : vient aux nouvelles auprès du serveur, deadline : échéance du choix en cours,
     now() : heure du serveur }. L'adversaire ne répond pas dans la foulée : on attend son choix en interrogeant le serveur.
-    Renvoie { final } (la réponse du serveur au dernier choix : la partie est jouée) ou { left: true } si le joueur quitte l'écran. */
-export function runDraft({ match, cat, fx, act, resync, toast, help, head, live }) {
+    Renvoie { final } (la réponse du serveur au dernier choix : la partie est jouée), { left: true } si le joueur quitte l'écran,
+    ou { over } (la réponse du serveur) si le défi s'est arrêté pendant la draft : l'adversaire a quitté.
+    Fearless : le serveur donne dans match.locked les champions déjà joués dans la série ; ils restent affichés, barrés.
+    Draft automatique : si le joueur l'allume, son coach choisit à sa place (le serveur décide, selon le talent du coach : match.coach). */
+export function runDraft({ match, cat, fx, act, resync, toast, help, head, live, confirmLeave }) {
   let m = match;
-  /* en direct : échéance du choix en cours, adversaire absent (l'ordinateur choisit alors pour lui) */
-  let deadline = live ? live.deadline : null, away = false, alive = true, asking = false, pollTimer = 0, clockTimer = 0;
+  /* en direct : échéance du choix en cours, adversaire absent (son coach choisit alors pour lui ; forfeitAt : l'heure de son forfait) */
+  let deadline = live ? live.deadline : null, away = false, forfeitAt = null, alive = true, asking = false, pollTimer = 0, clockTimer = 0;
+  /* la draft automatique n'existe que si le serveur sait la jouer (il annonce alors le talent du coach) */
+  const canAuto = typeof m.coach === 'number';
+  let auto = false, autoTimer = 0;
+  try { auto = canAuto && localStorage.getItem(STORE + 'draft-auto') === '1'; } catch (e) { auto = false; }
+  const coachWord = (s) => (s >= 92 ? 'coach d\'élite' : s >= 86 ? 'très bon coach' : s >= 79 ? 'bon coach' : s >= 70 ? 'coach moyen' : s >= 62 ? 'coach faible' : 'pas de vrai coach');
   const you = m.you, foe = 1 - you;
   const champs = Object.entries(cat.champions).filter(([, c]) => c.r.length).sort((a, b) => a[1].n.localeCompare(b[1].n, 'fr'));
   const champ = (id) => cat.champions[id];
@@ -73,7 +82,11 @@ export function runDraft({ match, cat, fx, act, resync, toast, help, head, live 
     + '<div class="dr-grid">' + champs.map(([id, c]) => '<button class="dr-c" type="button" data-champ="' + id + '" title="' + esc(c.n) + '"><span class="dr-ci"><img src="' + iconUrl(cat, id) + '" alt="" loading="lazy" decoding="async" draggable="false"></span>'
       + '<span class="dr-cn">' + esc(c.n) + '</span><i class="dr-star"></i><i class="dr-arrow"></i></button>').join('') + '</div></section>'
     + teamHTML(1) + '</div>'
-    + '<footer class="dr-foot"><div class="dr-sel"></div><button class="btn primary big" type="button" data-act="lock" disabled>Verrouiller</button></footer>'
+    + '<p class="dr-away" hidden></p>'
+    + '<footer class="dr-foot"><div class="dr-sel"></div>'
+    + (canAuto ? '<button class="btn dr-auto" type="button" data-act="auto" aria-pressed="false" title="Ton coach choisit à ta place. Meilleur est le coach (sa note et sa statistique Draft), meilleurs sont ses choix.">'
+      + '<b><span class="hide-s">Draft </span>auto</b><i><span class="hide-s">' + esc(coachWord(m.coach)) + ' · </span>' + m.coach + '</i></button>' : '')
+    + '<button class="btn primary big" type="button" data-act="lock" disabled>Verrouiller</button></footer>'
     + '<div class="dr-help"' + (help ? '' : ' hidden') + '>' + HELP + '</div>';
 
   const $ = (s) => el.querySelector(s);
@@ -84,6 +97,8 @@ export function runDraft({ match, cat, fx, act, resync, toast, help, head, live 
   /* c'est à moi de jouer : mon tour, et tout ce que le serveur a envoyé est déjà affiché */
   const myTurn = () => { const t = turn(); return !!t && t.side === you && shown === m.log.length && !busy; };
   const taken = () => new Set([...bans[0], ...bans[1], ...picks[0].filter(Boolean), ...picks[1].filter(Boolean)]);
+  /* fearless : les champions déjà joués dans les manches précédentes de la série */
+  const lockedSet = () => new Set(m.locked || []);
   const soundBtn = $('[data-act="sound"]');
   const drawSound = () => { soundBtn.innerHTML = icon(soundOn() ? 'i-sound' : 'i-mute'); soundBtn.classList.toggle('off', !soundOn()); };
   drawSound();
@@ -170,7 +185,7 @@ export function runDraft({ match, cat, fx, act, resync, toast, help, head, live 
       : 'Du plus dangereux au moins dangereux entre les mains de l\'adversaire. ★ : parties jouées par le joueur visé.';
   }
   function syncPool() {
-    const t = turn(), my = myTurn(), used = taken(), q = query.trim().toLowerCase();
+    const t = turn(), my = myTurn(), used = taken(), gone = lockedSet(), q = query.trim().toLowerCase();
     const picking = !!t && t.type === 'pick' && t.side === you;
     const ranked = [];
     for (const [id, c] of champs) {
@@ -186,16 +201,18 @@ export function runDraft({ match, cat, fx, act, resync, toast, help, head, live 
       }
       if (q && !c.n.toLowerCase().includes(q)) visible = false;
       tile.b.hidden = !visible;
-      tile.b.disabled = used.has(id);
+      tile.b.disabled = used.has(id) || gone.has(id);
       tile.b.classList.toggle('on', id === sel);
+      tile.b.classList.toggle('gone', gone.has(id));
+      if (gone.has(id)) tile.b.title = c.n + ' — déjà joué dans cette série (fearless)';
       tile.star.textContent = star;
       tile.arrow.className = 'dr-arrow' + (arrow ? ' ' + arrow : '');
-      if (visible) ranked.push([tile.b, used.has(id) ? -99 : score]);
+      if (visible) ranked.push([tile.b, gone.has(id) ? -199 : used.has(id) ? -99 : score]);
     }
     /* la grille est triée sans recréer ses images : on change seulement l'ordre d'affichage */
     ranked.sort((a, b) => b[1] - a[1]);
     ranked.forEach(([b], k) => { b.style.order = k; });
-    $('.dr-grid').classList.toggle('idle', !my);
+    $('.dr-grid').classList.toggle('idle', !my || auto);
   }
   function compHTML() {
     const list = picks[you].filter(Boolean).map(champ);
@@ -207,10 +224,13 @@ export function runDraft({ match, cat, fx, act, resync, toast, help, head, live 
     const t = turn(), my = myTurn(), box = $('.dr-sel'), btn = $('[data-act="lock"]');
     if (!t) { box.innerHTML = '<p class="dr-tip">La draft est terminée.</p>'; btn.hidden = true; return; }
     btn.textContent = t.type === 'ban' ? 'Bannir' : 'Verrouiller';
-    btn.disabled = !my || !sel;
-    if (!sel || !my) {
-      box.innerHTML = '<p class="dr-tip">' + (t.side !== you ? esc(m.teams[foe].name) + (away ? ' est absent : l\'ordinateur choisit à sa place…' : ' réfléchit…') : busy ? 'Un instant…'
-        : t.type === 'ban' ? 'Désigne un champion à interdire aux deux équipes.' : 'Désigne un poste, puis le champion de ton joueur.') + '</p>' + compHTML();
+    btn.disabled = !my || !sel || auto;
+    const autoBtn = $('[data-act="auto"]');
+    if (autoBtn) { autoBtn.classList.toggle('on', auto); autoBtn.setAttribute('aria-pressed', auto ? 'true' : 'false'); }
+    if (!sel || !my || auto) {
+      box.innerHTML = '<p class="dr-tip">' + (t.side !== you ? esc(m.teams[foe].name) + (away ? ' est absent : son coach choisit à sa place…' : ' réfléchit…') : busy ? 'Un instant…'
+        : auto ? 'Draft auto : ton coach choisit…'
+          : t.type === 'ban' ? 'Désigne un champion à interdire aux deux équipes.' : 'Désigne un poste, puis le champion de ton joueur.') + '</p>' + compHTML();
       return;
     }
     const c = champ(sel), chip = (label, v, note, cls) => '<span class="dr-chip ' + (v > 0.05 ? 'up' : v < -0.05 ? 'down' : '') + (cls || '') + '">' + label + ' <b>' + signed(v) + '</b>' + (note ? '<i>' + esc(note) + '</i>' : '') + '</span>';
@@ -257,14 +277,21 @@ export function runDraft({ match, cat, fx, act, resync, toast, help, head, live 
     }
     syncAll();
     $('.dr-grid').scrollTop = 0;
+    armAuto();
   }
-  async function lock() {
+  /** Draft automatique : à mon tour, le coach choisit après un court instant (le temps de voir ce qui se passe). */
+  function armAuto() {
+    clearTimeout(autoTimer);
+    if (!auto || !alive || !myTurn()) return;
+    autoTimer = setTimeout(() => { if (auto && alive && myTurn()) lock(true); }, fx ? 950 : 250);
+  }
+  async function lock(byCoach) {
     const t = turn();
-    if (!sel || !t || !myTurn()) return;
+    if ((!sel && !byCoach) || !t || !myTurn()) return;
     busy = true;
     /* step : le nombre de choix déjà faits que cet écran connaît (un choix fait trop tard est refusé par le serveur) */
-    const body = { id: m.id, champ: sel, step: m.log.length };
-    if (t.type === 'pick') body.role = role;
+    const body = byCoach ? { id: m.id, auto: true, step: m.log.length } : { id: m.id, champ: sel, step: m.log.length };
+    if (!byCoach && t.type === 'pick') body.role = role;
     syncFoot();
     let res;
     try {
@@ -290,11 +317,13 @@ export function runDraft({ match, cat, fx, act, resync, toast, help, head, live 
   }
   /** Prend en compte une réponse du serveur : nouveaux choix à montrer, échéance, et la partie si la draft est finie. */
   async function absorb(res) {
+    /* le défi s'est arrêté là : l'adversaire a quitté */
+    if (res.over) { close(); settle({ over: res }); return; }
     busy = true;
     m = res.match;
     sel = null;
     if (res.deadline !== undefined) deadline = res.deadline;
-    if (res.away !== undefined) away = !!res.away;
+    if (res.away !== undefined) { away = !!res.away; forfeitAt = res.forfeitAt || null; }
     await playLog();
     if (!alive) return;
     if (res.sim) {
@@ -313,9 +342,11 @@ export function runDraft({ match, cat, fx, act, resync, toast, help, head, live 
     try {
       const res = await live.poll();
       if (!alive || busy) return;
+      if (res.over) { close(); settle({ over: res }); return; }
       if (res.deadline !== undefined) deadline = res.deadline;
       const wasAway = away;
       away = !!res.away;
+      forfeitAt = res.forfeitAt || null;
       /* l'adversaire a choisi (ou l'ordinateur a choisi pour l'un de nous, le temps écoulé) */
       if (res.match && (res.sim || res.match.log.length > m.log.length)) await absorb(res);
       else if (wasAway !== away) syncFoot();
@@ -327,6 +358,14 @@ export function runDraft({ match, cat, fx, act, resync, toast, help, head, live 
     }
   }
   function drawClock() {
+    /* l'adversaire ne donne plus signe de vie : on prévient, avec le temps qu'il lui reste avant de perdre par forfait */
+    const warn = $('.dr-away');
+    if (away && forfeitAt) {
+      const left = Math.max(0, Math.ceil((forfeitAt - live.now()) / 1000));
+      const text = m.teams[foe].name + ' ne répond plus. Victoire par forfait dans ' + Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0') + ' s\'il ne revient pas.';
+      if (warn.textContent !== text) warn.textContent = text;
+      warn.hidden = false;
+    } else warn.hidden = true;
     const box = $('.dr-timer'), t = turn();
     if (!deadline || !t) { box.hidden = true; return; }
     const left = deadline - live.now();
@@ -343,7 +382,18 @@ export function runDraft({ match, cat, fx, act, resync, toast, help, head, live 
       const what = a.dataset.act;
       if (what === 'sound') { setSound(!soundOn()); drawSound(); sfx.click(); }
       else if (what === 'help') { $('.dr-help').hidden = !$('.dr-help').hidden; }
-      else if (what === 'leave') { close(); settle({ left: true }); }
+      else if (what === 'leave') {
+        if (confirmLeave) { confirmLeave().then((yes) => { if (yes && alive) { close(); settle({ left: true }); } }); return; }
+        close(); settle({ left: true });
+      }
+      else if (what === 'auto') {
+        auto = !auto;
+        try { localStorage.setItem(STORE + 'draft-auto', auto ? '1' : '0'); } catch (err) { /* réglage non gardé */ }
+        sel = null;
+        sfx.click();
+        syncAll();
+        armAuto();
+      }
       else if (what === 'lock') lock();
       return;
     }
@@ -370,6 +420,7 @@ export function runDraft({ match, cat, fx, act, resync, toast, help, head, live 
     alive = false;
     clearInterval(pollTimer);
     clearInterval(clockTimer);
+    clearTimeout(autoTimer);
     document.removeEventListener('keydown', onKey);
     el.remove();
     document.body.style.overflow = scroll;

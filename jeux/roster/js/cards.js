@@ -6,12 +6,15 @@ const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;
 export const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ESC[c]);
 
 /* Les versions spéciales d'une carte : même joueur, même note, mêmes statistiques, un autre habillage.
-   L'identifiant d'une version est celui de la carte suivi de « ~h », « ~f » ou « ~k » (comme sur le serveur). */
+   L'identifiant d'une version est celui de la carte suivi de « ~h », « ~f », « ~k » ou « ~l » (comme sur le serveur).
+   Seule l'édition légendaire change la note et les statistiques : c'est le serveur qui les donne. */
 export const VARIANTS = {
   holo: { suffix: '~h', name: 'Holographique', mark: 'Holo', rank: 1 },
   full: { suffix: '~f', name: 'Full art', mark: 'Full art', rank: 2 },
   /* l'édition Karmine Corp : pour ceux qui portent ou ont porté ses couleurs */
   kc: { suffix: '~k', name: 'Full art KC', mark: 'KC', rank: 3 },
+  /* l'édition légendaire : un full art « diamant », avec sa propre note et tous les trophées mondiaux du joueur */
+  legend: { suffix: '~l', name: 'Légendaire', mark: 'Légende', rank: 4 },
 };
 /** Les années d'un joueur à la Karmine, telles qu'on les écrit sur sa carte : « Karmine Corp · 2023–2024 », « KC Blue · depuis 2025 ». */
 export function karmineEra(cat, card) {
@@ -21,7 +24,7 @@ export function karmineEra(cat, card) {
 }
 /** Le prestige d'une carte : 2 pour un joueur ou un coach titré aux Worlds ou au MSI, 1 pour une carte d'un grand club, 0 sinon. */
 export const prestigeOf = (card) => (card.titles && card.titles[0] + card.titles[1] > 0 ? 2 : PRESTIGE_TEAMS.includes(card.team) ? 1 : 0);
-/** 0 pour une carte ordinaire, 1 pour une holographique, 2 pour une full art, 3 pour une édition KC. */
+/** 0 pour une carte ordinaire, 1 pour une holographique, 2 pour une full art, 3 pour une édition KC, 4 pour une légendaire. */
 export const variantRank = (card) => (card.variant ? VARIANTS[card.variant].rank : 0);
 
 /** Ajoute au catalogue reçu du serveur de quoi retrouver vite une carte, une équipe ou un rang, et les versions spéciales des cartes. */
@@ -35,7 +38,13 @@ export function prepare(raw) {
   for (const [id, def] of Object.entries(VARIANTS)) {
     const listed = new Set((raw.variants && raw.variants[id]) || []);
     for (const c of base) {
-      const card = Object.assign({}, c, { id: c.id + def.suffix, variant: id, base: c.id });
+      /* l'édition légendaire n'existe que pour les légendes : elle a sa note, son rang et ses statistiques */
+      const legend = id === 'legend' ? raw.legends && raw.legends[c.id] : null;
+      if (id === 'legend' && !legend) continue;
+      const card = Object.assign({}, c, legend ? { ovr: legend.ovr, tier: legend.tier, stats: legend.stats } : null, { id: c.id + def.suffix, variant: id, base: c.id });
+      /* sur sa carte KC, le joueur porte le maillot de la Karmine : sa photo de l'époque, quand il y en a une */
+      const era = id === 'kc' && raw.karmine ? raw.karmine[c.id] : null;
+      if (era && era[3]) card.photo = era[3];
       raw.cardById.set(card.id, card);
       if (listed.has(c.id)) special.push(card);
     }
@@ -63,8 +72,9 @@ const SILHOUETTE = '<svg class="card-ph" viewBox="0 0 100 100" aria-hidden="true
     qty (nombre d'exemplaires possédés : à partir de deux, la carte est posée sur une pile et le nombre s'affiche en bas à droite). */
 export function cardHTML(card, cat, opts = {}) {
   const qty = opts.qty > 1 ? Math.floor(opts.qty) : 0;
-  /* l'holographique et l'édition KC ont déjà leur propre lumière */
-  const pr = card.variant === 'holo' || card.variant === 'kc' ? 0 : prestigeOf(card);
+  /* l'holographique, l'édition KC et la légendaire ont déjà leur propre lumière */
+  const pr = card.variant === 'holo' || card.variant === 'kc' || card.variant === 'legend' ? 0 : prestigeOf(card);
+  const legend = card.variant === 'legend' && cat.legends ? cat.legends[card.base] : null;
   const team = cat.teamById.get(card.team);
   const photo = photoUrl(card), v = card.variant || '';
   /* un nom long est écrit plus petit pour tenir sur la carte */
@@ -82,18 +92,25 @@ export function cardHTML(card, cat, opts = {}) {
     /* édition KC : le « mur bleu » ; holographique et édition KC : une feuille de métal irisée derrière le joueur, et ses paillettes */
     + (v === 'kc' ? '<div class="card-wall"></div>' : '')
     + (v === 'holo' || v === 'kc' ? '<div class="card-foil"></div><div class="card-spark"></div>' : '')
+    /* édition légendaire : les facettes d'un diamant, et ses éclats */
+    + (v === 'legend' ? '<div class="card-facets"></div><div class="card-spark"></div>' : '')
     + '<span class="card-wm">' + esc(v === 'kc' ? 'KC' : team ? team.short : '') + '</span>'
     + picture
     + '<div class="card-shade"></div>'
     + '<div class="card-side"><span class="card-ovr">' + card.ovr + '</span><span class="card-role">' + ROLE_LABEL[card.role] + '</span><i></i>'
     + flag + '<span class="card-league">' + esc(card.league) + '</span></div>'
-    + '<div class="card-plate"><div class="card-name" style="--n:' + len + '">' + esc(card.name) + '</div>'
-    + '<div class="card-team">' + esc(team ? team.name : card.team) + '</div>'
+    + '<div class="card-plate">'
+    /* un trophée par titre mondial, avec son année */
+    + (legend ? '<div class="card-cups" title="Champion du monde ' + legend.worlds.join(', ') + '">' + legend.worlds.map((y) => '<span><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-cup"/></svg><b>' + y + '</b></span>').join('') + '</div>' : '')
+    + '<div class="card-name" style="--n:' + len + '">' + esc(card.name) + '</div>'
+    /* sur une carte KC, le joueur est sous le maillot de la Karmine : c'est elle qui est écrite sous son nom */
+    + '<div class="card-team">' + esc(v === 'kc' && cat.karmine && cat.karmine[card.base] ? (cat.karmine[card.base][2] === 'KCB' ? 'Karmine Corp Blue' : 'Karmine Corp') : team ? team.name : card.team) + '</div>'
     + '<ul class="card-stats">' + statsOf(card).map((s) => '<li><b>' + card.stats[s[0]] + '</b><span>' + s[1] + '</span></li>').join('') + '</ul></div>'
     + '<div class="card-holo"></div><div class="card-frame"></div>'
     + (pr ? '<div class="card-edge"></div>' : '')
     + (v ? '<span class="card-mark">' + VARIANTS[v].mark + '</span>' : '')
     + (v === 'kc' ? '<div class="card-glint"></div><span class="card-era">' + esc(karmineEra(cat, card)) + '</span>' : '')
+    + (v === 'legend' ? '<div class="card-glint"></div>' : '')
     + '</div>' + (opts.back ? BACK : '') + '</div><i class="card-gem"></i>' + (qty ? '<span class="card-qty">×' + qty + '</span>' : '') + '</article>';
 }
 
