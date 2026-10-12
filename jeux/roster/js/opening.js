@@ -437,6 +437,7 @@ export async function runOpening({ request, getCat, fx, size, from }) {
       const c = clientOf(POSE.stack(0));
       particles.burst(c[0], c[1], { count: tier === 5 ? 46 : tier === 4 ? 32 : 14, colors: dustOf(card), shapes: ['dot'], speed: [40, tier >= 4 ? 300 : 190], life: [0.9, 2.2], size: [1, 2.6], gravity: -18, drag: 0.955 });
       label.textContent = cat.tierById.get(card.tier).name + (card.variant ? ' · ' + VARIANTS[card.variant].name : '');
+      label.style.setProperty('--n', label.textContent.length);
       label.classList.add('on');
       op.classList.add('named');
     }
@@ -463,6 +464,8 @@ export async function runOpening({ request, getCat, fx, size, from }) {
       card.variant ? '<span class="v-' + card.variant + '">' + VARIANTS[card.variant].name + '</span>' : '',
     ].filter(Boolean);
     clues.innerHTML = '';
+    /* longueur de la ligne d'indices une fois complète : le texte, plus la place du drapeau et des séparateurs */
+    clues.style.setProperty('--n', parts.reduce((sum, html) => sum + html.replace(/<[^>]+>/g, '').length + 3, 0));
     clues.classList.add('on');
     await wait(380);
     for (let n = 0; n < parts.length; n++) {

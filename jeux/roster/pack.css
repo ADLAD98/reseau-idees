@@ -156,14 +156,15 @@ body.fx .op-rays{animation:turn 46s linear infinite}
 /* au-dessus de la carte : les indices avant une très belle carte, puis son rang */
 .op-clues,.op-label{position:absolute;left:0;right:0;top:calc(50% + var(--heroY) - var(--ch) * .5 - 52px);z-index:32;height:34px;text-align:center;pointer-events:none;opacity:0;transition:opacity .35s}
 .op-clues.on,.op-label.on{opacity:1}
-.op-clues{display:flex;justify-content:center;align-items:center;gap:14px;font:400 16px/1 var(--title);letter-spacing:.18em;text-transform:uppercase;color:var(--gold-hi)}
-.op-clues span{display:flex;align-items:center;gap:10px;animation:opclue .55s cubic-bezier(.2,.8,.2,1) backwards}
-.op-clues span+span::before{content:"";width:5px;height:5px;margin-right:4px;transform:rotate(45deg);background:var(--beam)}
-.op-clues img{width:26px;height:19px;object-fit:cover;box-shadow:0 0 0 1px rgba(240,230,210,.3)}
+/* une seule ligne, quelle que soit sa longueur : la taille du texte suit le nombre de caractères (--n) et la largeur de l'écran */
+.op-clues{display:flex;justify-content:center;align-items:center;gap:.8em;white-space:nowrap;font:400 min(16px,calc((100vw - 28px) / (var(--n,24) * .86)))/1 var(--title);letter-spacing:.16em;text-transform:uppercase;color:var(--gold-hi)}
+.op-clues span{display:flex;align-items:center;gap:.6em;animation:opclue .55s cubic-bezier(.2,.8,.2,1) backwards}
+.op-clues span+span::before{content:"";width:.32em;height:.32em;margin-right:.2em;transform:rotate(45deg);background:var(--beam)}
+.op-clues img{width:1.6em;height:1.2em;object-fit:cover;box-shadow:0 0 0 1px rgba(240,230,210,.3)}
 .op-clues .v-holo{background:linear-gradient(100deg,#ff9cc6,#ffd88a,#a8ffdc,#9ccfff,#d3b4ff);-webkit-background-clip:text;background-clip:text;color:transparent}
 .op-clues .v-full{color:#f1dca0}
 @keyframes opclue{from{opacity:0;transform:translateY(9px)}}
-.op-label{font:400 25px/34px var(--title);letter-spacing:.42em;text-indent:.42em;text-transform:uppercase;color:var(--beam);text-shadow:0 0 22px color-mix(in srgb,var(--beam) 60%,transparent)}
+.op-label{white-space:nowrap;font:400 min(25px,calc((100vw - 28px) / (var(--n,8) * 1.02)))/34px var(--title);letter-spacing:.36em;text-indent:.36em;text-transform:uppercase;color:var(--beam);text-shadow:0 0 22px color-mix(in srgb,var(--beam) 60%,transparent)}
 /* bas de l'écran : consigne, puis bilan */
 .op-foot{position:relative;z-index:45;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;min-height:112px;padding:8px 16px calc(18px + env(safe-area-inset-bottom));flex:none;text-align:center}
 .op-info{min-height:24px;color:var(--mut);font-size:16.5px;letter-spacing:.04em}
@@ -181,7 +182,4 @@ body.fx .op-info.pulse{animation:pulse 2s ease-in-out infinite}
   .op-foot .actions{width:100%;flex-wrap:nowrap}
   .op-foot .actions .btn{flex:1;min-width:0;max-width:340px;height:52px;padding:0 8px;font-size:15px;letter-spacing:.07em}
   .op-info{font-size:15px}
-  .op-clues{gap:10px;font-size:13.5px;letter-spacing:.12em}
-  .op-clues img{width:22px;height:16px}
-  .op-label{font-size:20px}
 }
