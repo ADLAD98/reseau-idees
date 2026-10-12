@@ -1,6 +1,6 @@
 /* Le match : présentation des deux équipes, partie rejouée sur la carte avec commentaires et ralentis, puis résultat.
    Le serveur a déjà joué toute la partie ; il envoie la suite des événements et cet écran les met en scène. */
-import { cardHTML, esc, iconUrl } from './cards.js';
+import { cardHTML, esc, iconUrl, logoHTML } from './cards.js';
 import { DDRAGON, ROLE_LABEL, STORE } from './config.js';
 import { createFans } from './fans.js';
 import { createFx } from './fx.js';
@@ -84,11 +84,13 @@ export function runMatch({ data, cat, fx }) {
       + '<span class="vs-name"><b>' + esc(p.name) + '</b><i>' + esc(p.champName) + '</i></span></div>';
   };
   const draftSum = (s) => data.report.picks[s].reduce((sum, p) => sum + p.total, 0);
-  const vsTeam = (s) => '<div class="vs-team s' + s + '"><div class="vs-head"><b>' + esc(M.teams[s].name) + '</b><span>' + M.teams[s].rating + '</span>'
+  /* le logo de l'équipe adverse (celle du joueur n'en a pas : c'est son équipe à lui) */
+  const crest = (s) => (s === you ? '' : logoHTML(M.opp, 'logo', 80));
+  const vsTeam = (s) => '<div class="vs-team s' + s + '"><div class="vs-head">' + crest(s) + '<b>' + esc(M.teams[s].name) + '</b><span>' + M.teams[s].rating + '</span>'
     + '<i>' + (s === you ? 'Toi · ' : '') + (s === 0 ? 'côté bleu' : 'côté rouge') + ' · draft ' + signed(draftSum(s)) + '</i></div>'
     + '<div class="vs-strips">' + [0, 1, 2, 3, 4].map((r) => strip(s * 5 + r)).join('') + '</div></div>';
   const stat = (sym, key, value) => '<span class="mv-s">' + icon(sym) + '<b data-h="' + key + '">' + value + '</b></span>';
-  const hudTeam = (s) => '<div class="mv-t s' + s + '"><span class="mv-tn">' + esc(short(s)) + (s === you ? '<em>toi</em>' : '') + '</span><b data-h="k' + s + '">0</b></div>';
+  const hudTeam = (s) => '<div class="mv-t s' + s + '"><span class="mv-tn">' + crest(s) + esc(short(s)) + (s === you ? '<em>toi</em>' : '') + '</span><b data-h="k' + s + '">0</b></div>';
   const hudObj = (s) => '<div class="mv-o s' + s + '">' + stat('i-coin', 'g' + s, '2,5k') + stat('i-tower', 'tw' + s, '0')
     + '<span class="mv-s">' + icon('i-drake') + '<span class="mv-dr" data-dr="' + s + '"><i></i><i></i><i></i><i></i></span></span>' + stat('i-baron', 'bn' + s, '0') + '</div>';
   const sideHTML = (s) => '<aside class="mv-side s' + s + '">' + [0, 1, 2, 3, 4].map((r) => {

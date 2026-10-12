@@ -1,7 +1,7 @@
 /* Roster — le jeu. Six écrans : Packs, Jouer (matchs, Mondial), Collection, Marché, Joueurs (amis, échanges, défis, classement), Profil.
    Le serveur décide de tout (cartes tirées, délais, collection, matchs, ventes, échanges) ; cette page affiche et met en scène. */
 import { ApiError, call, clearSession, deriveKey, loadSession, saveSession } from './api.js';
-import { VARIANTS, cardHTML, champName, esc, flagUrl, iconUrl, karmineEra, prepare, statsOf, tiltCard, variantRank } from './cards.js';
+import { VARIANTS, cardHTML, champName, esc, flagUrl, iconUrl, karmineEra, logoHTML, prepare, statsOf, tiltCard, variantRank } from './cards.js';
 import { GAME_NAME, ROLE_NAME, ROLE_ORDER, STORE } from './config.js';
 import { createDuels } from './duel.js';
 import { sellCard, showOnMarket, viewMarket } from './market.js';
@@ -581,7 +581,7 @@ function rostersHTML(groups) {
     }
     const done = g.have === g.total;
     html += '<details class="ros' + (done ? ' done' : '') + '" open data-team="' + esc(g.team.id) + '"><summary class="ros-head">'
-      + '<span class="ros-name"><b>' + esc(g.team.name) + '</b>' + (done ? '<u>Complet</u>' : '') + '<i>' + esc(g.team.league) + ' · note ' + g.rating + '</i></span>'
+      + '<span class="ros-name">' + logoHTML(g.team.id, 'logo', 80) + '<b>' + esc(g.team.name) + '</b>' + (done ? '<u>Complet</u>' : '') + '<i>' + esc(g.team.league) + ' · note ' + g.rating + '</i></span>'
       + '<span class="ros-meter"><span><b>' + g.have + '</b> / ' + g.total + '</span>'
       + (g.special ? '<em title="Versions spéciales">' + g.haveSpecial + ' / ' + g.special + '</em>' : '')
       + '<span class="bar"><i style="width:' + pct(g.have, g.total) + '%"></i></span></span></summary>'

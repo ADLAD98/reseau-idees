@@ -1,7 +1,7 @@
 /* L'écran « Jouer » : mon équipe de six (cinq joueurs et un coach), les équipes à affronter, les dernières parties.
    Le serveur calcule les synergies, la note d'équipe et les récompenses ; ici on affiche et on choisit. */
 import { ApiError } from './api.js';
-import { cardHTML, esc, flagUrl } from './cards.js';
+import { cardHTML, esc, flagUrl, logoHTML } from './cards.js';
 import { ROLE_LABEL, ROLE_NAME } from './config.js';
 import { runDraft } from './draft.js';
 import { runMatch } from './match.js';
@@ -116,7 +116,7 @@ function drawFoes() {
     const team = cat.teamById.get(o.id), gap = o.rating - mine;
     const level = gap >= 9 ? ['hard', 'Très difficile'] : gap >= 4 ? ['hard', 'Difficile'] : gap >= -3 ? ['fair', 'À ta portée'] : ['easy', 'Abordable'];
     return '<button class="foe ' + level[0] + (o.wins ? ' beaten' : '') + '" type="button" data-foe="' + esc(o.id) + '">'
-      + '<span class="foe-r">' + o.rating + '</span>'
+      + logoHTML(o.id, 'logo foe-l', 80) + '<span class="foe-r">' + o.rating + '</span>'
       + '<span class="foe-n"><b>' + esc(team.name) + '</b><i>' + esc(o.league) + ' · ' + level[1] + (o.wins || o.losses ? ' · ' + o.wins + ' V – ' + o.losses + ' D' : '') + '</i></span>'
       + '<span class="foe-w"><b>+' + o.win.coins + '</b>' + (o.wins ? '' : '<i title="Un pack à gagner">' + G.icon('i-pack') + '</i>') + '</span></button>';
   }).join('');

@@ -145,6 +145,16 @@ h1,h2,h3,p{margin:0}
 .card-side i{width:10cqw;height:.3cqw;background:linear-gradient(90deg,transparent,var(--tc),transparent)}
 .card-flag{display:block;width:11.2cqw;height:8.4cqw;object-fit:cover;box-shadow:0 0 0 .35cqw rgba(240,230,210,.35),0 .6cqw 1.8cqw rgba(0,0,0,.6)}
 .card-league{font:700 4cqw/1 var(--text);letter-spacing:.1em;color:var(--tc);text-shadow:0 .4cqw 1cqw #000}
+/* le logo du club, sous le drapeau (un fin halo clair garde lisibles les logos sombres) */
+.card-club{display:block;width:11.6cqw;height:11.6cqw;object-fit:contain;filter:drop-shadow(0 0 .35cqw rgba(240,236,224,.5)) drop-shadow(0 .5cqw 1.2cqw rgba(0,0,0,.7))}
+.card.missing .card-club{filter:grayscale(1) brightness(.7)}
+/* édition KC : le blason de la Karmine, en grand, derrière le joueur */
+.card-crest{position:absolute;top:7%;right:-12%;width:72%;aspect-ratio:1;object-fit:contain;opacity:.2;pointer-events:none;
+  transform:translate(calc((var(--hx) - 50%) * -.08),calc((var(--hy) - 50%) * -.05));filter:brightness(0) invert(1) drop-shadow(0 0 3cqw rgba(60,170,255,.9))}
+.card.missing .card-crest{opacity:.12}
+/* le logo d'une équipe, à côté de son nom (classeur, adversaires, match) */
+.logo{flex:none;display:block;object-fit:contain;filter:drop-shadow(0 0 1px rgba(240,236,224,.45))}
+.ros-name .logo{align-self:center;width:34px;height:34px}
 /* le bandeau du nom, entre deux filets de métal ; dessous, l'équipe et les six statistiques */
 .card-plate{position:absolute;left:0;right:0;bottom:0;padding:0 7cqw 14.2cqw;text-align:center}
 .card-name{position:relative;margin:0 -2.4cqw;padding:1.9cqw 0 1.3cqw;font:400 min(11cqw,calc(82cqw / (var(--n) * .7)))/1.08 var(--title);letter-spacing:.05em;text-transform:uppercase;color:var(--gold-hi);white-space:nowrap;text-shadow:0 .5cqw 2cqw #000;

@@ -1,5 +1,6 @@
 /* Fabrication d'une carte à l'écran. La même carte sert partout : collection, ouverture de pack, fiche détaillée, équipe. */
 import { COACH_STATS, DDRAGON, GAME_NAME, LEGEND_PHOTOS, PHOTOS, PLAYER_STATS, PRESTIGE_TEAMS, ROLE_LABEL } from './config.js';
+import { LOGOS } from './logos.js';
 
 const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 /** Rend un texte inoffensif avant de l'insérer dans la page (les pseudos viennent des joueurs). */
@@ -63,6 +64,10 @@ export const photoUrl = (card, width) => (card.photo ? PHOTOS + card.photo + '/r
 export const champName = (cat, id) => (cat.champions[id] ? cat.champions[id].n : id);
 export const iconUrl = (cat, champId) => DDRAGON + '/' + cat.ddragon + '/img/champion/' + champId + '.png';
 export const flagUrl = (code) => 'drapeaux/' + code.toLowerCase() + '.svg';
+/** Le logo d'une équipe (hébergé par Leaguepedia, comme les photos), à la largeur demandée ; null si le jeu n'en connaît pas. */
+export const logoUrl = (teamId, width) => (LOGOS[teamId] ? PHOTOS + LOGOS[teamId] + '/revision/latest/scale-to-width-down/' + (width || 120) : null);
+/** Le logo d'une équipe, prêt à poser dans la page (rien si le jeu n'en connaît pas). cls : sa classe. */
+export const logoHTML = (teamId, cls, width) => { const url = logoUrl(teamId, width); return url ? '<img class="' + cls + '" src="' + url + '" alt="" loading="lazy" decoding="async" draggable="false">' : ''; };
 export const statsOf = (card) => (card.kind === 'c' ? COACH_STATS : PLAYER_STATS);
 
 /* Le dos, le même pour toutes les cartes : un cristal taillé, serti dans un double anneau d'or et ses soixante graduations ; derrière lui
@@ -129,6 +134,8 @@ export function cardHTML(card, cat, opts = {}) {
   const len = Math.max(7, Array.from(card.name).length);
   const load = 'loading="' + (opts.eager ? 'eager' : 'lazy') + '" decoding="async" draggable="false"';
   const picture = photo ? '<img class="card-photo" src="' + photo + '" alt="" ' + load + '>' : SILHOUETTE;
+  /* le logo de son club, sous le drapeau, comme sur une carte de foot ; sur une édition KC, celui de la Karmine, qu'il y joue encore ou non */
+  const clubId = v === 'kc' ? 'KC' : card.team, club = logoUrl(clubId, 120);
   const flag = card.country
     ? '<img class="card-flag" src="' + flagUrl(card.country) + '" alt="' + esc(cat.countries[card.country]) + '" title="' + esc(cat.countries[card.country]) + '" loading="lazy" draggable="false">'
     : '';
@@ -140,7 +147,7 @@ export function cardHTML(card, cat, opts = {}) {
     /* derrière le joueur, l'illustration de son champion fétiche (les full art n'en ont pas : le portrait remplit la carte) */
     + (card.art && !ed && (!v || v === 'holo' || v === 'legend') ? '<img class="card-art" src="' + DDRAGON + '/img/champion/loading/' + esc(card.art) + '.jpg" alt="" ' + load + '>' : '')
     /* édition KC : le « mur bleu » ; holographique et édition KC : une feuille de métal irisée derrière le joueur, et ses paillettes */
-    + (v === 'kc' ? '<div class="card-wall"></div>' : '')
+    + (v === 'kc' ? '<div class="card-wall"></div>' + (logoUrl('KC') ? '<img class="card-crest" src="' + logoUrl('KC', 300) + '" alt="" ' + load + '>' : '') : '')
     + (v === 'holo' || v === 'kc' ? '<div class="card-foil"></div><div class="card-spark"></div>' : '')
     /* édition légendaire : derrière le joueur, l'aurore, la couronne de rayons et les facettes d'un diamant */
     + (v === 'legend' ? '<div class="card-aurora"></div><div class="card-crown"></div><div class="card-facets"></div>' : '')
@@ -154,7 +161,7 @@ export function cardHTML(card, cat, opts = {}) {
     + (v === 'legend' ? '<div class="card-spark"></div>' : '')
     + '<div class="card-shade"></div>'
     + '<div class="card-side"><span class="card-ovr">' + card.ovr + '</span><span class="card-role">' + esc(card.label || ROLE_LABEL[card.role]) + '</span><i></i>'
-    + flag + '<span class="card-league">' + esc(card.league) + '</span></div>'
+    + flag + (club ? '<img class="card-club" src="' + club + '" alt="" ' + load + '>' : '') + '<span class="card-league">' + esc(card.league) + '</span></div>'
     + '<div class="card-plate">'
     /* un trophée par titre mondial, avec son année */
     + (legend ? '<div class="card-cups" title="Champion du monde ' + legend.worlds.join(', ') + '">' + legend.worlds.map((y) => '<span><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-cup"/></svg><b>' + y + '</b></span>').join('') + '</div>' : '')
@@ -195,6 +202,8 @@ export function tiltCard(el, max = 20) {
 document.addEventListener('error', (e) => {
   const img = e.target;
   if (img && img.classList && img.classList.contains('card-photo')) img.outerHTML = SILHOUETTE;
+  /* un logo qui ne charge pas disparaît, tout simplement */
+  else if (img && img.classList && (img.classList.contains('card-club') || img.classList.contains('card-crest') || img.classList.contains('logo'))) img.remove();
   /* une illustration qui ne charge pas : la carte garde son décor nu */
   else if (img && img.classList && img.classList.contains('card-art')) img.remove();
 }, true);
