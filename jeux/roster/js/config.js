@@ -14,6 +14,11 @@ export const DDRAGON = 'https://ddragon.leagueoflegends.com/cdn';
 /* photos officielles des joueurs et des coachs, hébergées par Leaguepedia */
 export const PHOTOS = 'https://static.wikia.nocookie.net/lolesports_gamepedia_en/images/';
 
+/* Cartes « prestige » : une lumière fait lentement le tour de leur cadre ; derrière les joueurs titrés, les rayons tournent.
+   Les clubs : ceux qui ont gagné un tournoi international depuis 2024 (Worlds, MSI, First Stand, EWC — Leaguepedia, octobre 2026).
+   Les joueurs et les coachs : tous ceux qui ont gagné les Worlds ou le MSI, où qu'ils soient aujourd'hui (palmarès lu dans le catalogue). */
+export const PRESTIGE_TEAMS = ['T1', 'GEN', 'HLE', 'BLG', 'DK'];
+
 export const ROLE_LABEL = { TOP: 'TOP', JGL: 'JGL', MID: 'MID', BOT: 'ADC', SUP: 'SUP', COACH: 'COACH' };
 export const ROLE_NAME = { TOP: 'Toplaner', JGL: 'Jungler', MID: 'Midlaner', BOT: 'ADC', SUP: 'Support', COACH: 'Coach' };
 export const ROLE_ORDER = ['TOP', 'JGL', 'MID', 'BOT', 'SUP', 'COACH'];

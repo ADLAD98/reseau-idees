@@ -1,5 +1,5 @@
 /* Fabrication d'une carte à l'écran. La même carte sert partout : collection, ouverture de pack, fiche détaillée, équipe. */
-import { COACH_STATS, DDRAGON, GAME_NAME, PHOTOS, PLAYER_STATS, ROLE_LABEL } from './config.js';
+import { COACH_STATS, DDRAGON, GAME_NAME, PHOTOS, PLAYER_STATS, PRESTIGE_TEAMS, ROLE_LABEL } from './config.js';
 
 const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 /** Rend un texte inoffensif avant de l'insérer dans la page (les pseudos viennent des joueurs). */
@@ -19,6 +19,8 @@ export function karmineEra(cat, card) {
   if (!k) return '';
   return (k[2] === 'KCB' ? 'KC Blue' : 'Karmine Corp') + ' · ' + (k[1] ? (k[0] === k[1] ? k[0] : k[0] + '–' + k[1]) : 'depuis ' + k[0]);
 }
+/** Le prestige d'une carte : 2 pour un joueur ou un coach titré aux Worlds ou au MSI, 1 pour une carte d'un grand club, 0 sinon. */
+export const prestigeOf = (card) => (card.titles && card.titles[0] + card.titles[1] > 0 ? 2 : PRESTIGE_TEAMS.includes(card.team) ? 1 : 0);
 /** 0 pour une carte ordinaire, 1 pour une holographique, 2 pour une full art, 3 pour une édition KC. */
 export const variantRank = (card) => (card.variant ? VARIANTS[card.variant].rank : 0);
 
@@ -61,6 +63,8 @@ const SILHOUETTE = '<svg class="card-ph" viewBox="0 0 100 100" aria-hidden="true
     qty (nombre d'exemplaires possédés : à partir de deux, la carte est posée sur une pile et le nombre s'affiche en bas à droite). */
 export function cardHTML(card, cat, opts = {}) {
   const qty = opts.qty > 1 ? Math.floor(opts.qty) : 0;
+  /* l'holographique et l'édition KC ont déjà leur propre lumière */
+  const pr = card.variant === 'holo' || card.variant === 'kc' ? 0 : prestigeOf(card);
   const team = cat.teamById.get(card.team);
   const photo = photoUrl(card), v = card.variant || '';
   /* un nom long est écrit plus petit pour tenir sur la carte */
@@ -70,9 +74,11 @@ export function cardHTML(card, cat, opts = {}) {
   const flag = card.country
     ? '<img class="card-flag" src="' + flagUrl(card.country) + '" alt="' + esc(cat.countries[card.country]) + '" title="' + esc(cat.countries[card.country]) + '" loading="lazy" draggable="false">'
     : '';
-  return '<article class="card t' + card.tier + (card.kind === 'c' ? ' is-coach' : '') + (v ? ' v-' + v : '') + (qty ? ' stack' + (qty > 2 ? ' s3' : '') : '') + (opts.cls ? ' ' + opts.cls : '') + '" data-id="' + esc(card.id) + '">'
+  return '<article class="card t' + card.tier + (card.kind === 'c' ? ' is-coach' : '') + (v ? ' v-' + v : '') + (pr ? ' is-prestige' + (pr > 1 ? ' is-icon' : '') : '')
+    + (qty ? ' stack' + (qty > 2 ? ' s3' : '') : '') + (opts.cls ? ' ' + opts.cls : '') + '" data-id="' + esc(card.id) + '">'
     + '<div class="card-in"><div class="card-face card-front">'
     + '<div class="card-bg"></div>'
+    + (pr > 1 ? '<div class="card-rays"></div>' : '')
     /* édition KC : le « mur bleu » ; holographique et édition KC : une feuille de métal irisée derrière le joueur, et ses paillettes */
     + (v === 'kc' ? '<div class="card-wall"></div>' : '')
     + (v === 'holo' || v === 'kc' ? '<div class="card-foil"></div><div class="card-spark"></div>' : '')
@@ -85,6 +91,7 @@ export function cardHTML(card, cat, opts = {}) {
     + '<div class="card-team">' + esc(team ? team.name : card.team) + '</div>'
     + '<ul class="card-stats">' + statsOf(card).map((s) => '<li><b>' + card.stats[s[0]] + '</b><span>' + s[1] + '</span></li>').join('') + '</ul></div>'
     + '<div class="card-holo"></div><div class="card-frame"></div>'
+    + (pr ? '<div class="card-edge"></div>' : '')
     + (v ? '<span class="card-mark">' + VARIANTS[v].mark + '</span>' : '')
     + (v === 'kc' ? '<div class="card-glint"></div><span class="card-era">' + esc(karmineEra(cat, card)) + '</span>' : '')
     + '</div>' + (opts.back ? BACK : '') + '</div><i class="card-gem"></i>' + (qty ? '<span class="card-qty">×' + qty + '</span>' : '') + '</article>';

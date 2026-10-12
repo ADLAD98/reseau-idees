@@ -146,6 +146,34 @@ body.fx .card.t5 .card-front .card-frame{animation:spin 7s linear infinite}
 .card.is-back .card-gem{background:linear-gradient(135deg,#f0e6d2,#c8aa6e 55%,#785a28);box-shadow:0 0 0 .5cqw #07101d}
 .card-gem{position:absolute;top:-1.9cqw;left:50%;width:5.4cqw;height:5.4cqw;margin-left:-2.7cqw;transform:rotate(45deg);pointer-events:none;transition:background 0s calc(var(--flip) / 2),box-shadow 0s calc(var(--flip) / 2);
   background:linear-gradient(135deg,var(--hi),var(--tc) 55%,var(--lo));box-shadow:0 0 0 .5cqw #07101d,0 0 3cqw color-mix(in srgb,var(--tc) 60%,transparent)}
+/* cartes prestige (grands clubs, joueurs titrés) : une lumière fait lentement le tour du cadre, comme sur un bijou qu'on incline.
+   Rien d'irisé, rien qui clignote : seulement de la lumière. Sans animation, elle reste posée sur le coin en haut à droite. */
+/* (le masque : net sur le filet du cadre, puis la lumière s'éteint en quelques millimètres vers l'intérieur de la carte) */
+.card-edge{--m:#000 0,#000 1.5cqw,rgba(0,0,0,.34) 1.7cqw,rgba(0,0,0,.12) 4.5cqw,rgba(0,0,0,0) 10cqw;position:absolute;inset:0;overflow:hidden;pointer-events:none;
+  -webkit-mask-image:linear-gradient(to right,var(--m)),linear-gradient(to left,var(--m)),linear-gradient(to bottom,var(--m)),linear-gradient(to top,var(--m));
+  mask-image:linear-gradient(to right,var(--m)),linear-gradient(to left,var(--m)),linear-gradient(to bottom,var(--m)),linear-gradient(to top,var(--m))}
+.card-edge::before{content:"";position:absolute;left:50%;top:50%;width:178cqw;height:178cqw;margin:-89cqw 0 0 -89cqw;transform:rotate(38deg);
+  background:conic-gradient(from -50deg,rgba(255,255,255,0) 0,color-mix(in srgb,var(--hi) 40%,transparent) 7%,rgba(255,255,255,.96) 12.5%,rgba(255,255,255,.96) 14.5%,color-mix(in srgb,var(--hi) 40%,transparent) 20%,rgba(255,255,255,0) 27%,
+    rgba(255,255,255,0) 54%,color-mix(in srgb,var(--hi) 30%,transparent) 63.5%,rgba(255,255,255,0) 73%)}
+body.fx .card-edge::before{animation:edge 9s linear infinite}
+@keyframes edge{from{transform:rotate(38deg)}to{transform:rotate(398deg)}}
+/* joueurs titrés : derrière eux, les rayons tournent très lentement et la lueur respire */
+.card.is-icon:not(.v-full) .card-bg{background:
+  radial-gradient(120% 62% at 58% 30%,color-mix(in srgb,var(--tc) 30%,transparent),transparent 70%),
+  linear-gradient(165deg,#0d2036,#060d19 62%)}
+.card.is-icon.v-full .card-bg{background:
+  radial-gradient(115% 70% at 50% 26%,color-mix(in srgb,var(--tc) 50%,transparent),transparent 75%),
+  linear-gradient(172deg,color-mix(in srgb,var(--tc) 30%,#07101d),#040913 80%)}
+.card-rays{--rx:58%;--ry:34%;position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.card.v-full .card-rays{--rx:50%;--ry:30%}
+.card-rays::before{content:"";position:absolute;left:var(--rx);top:var(--ry);width:200cqw;height:200cqw;margin:-100cqw 0 0 -100cqw;
+  background:repeating-conic-gradient(from 8deg,color-mix(in srgb,var(--tc) 13%,transparent) 0 4deg,rgba(0,0,0,0) 4deg 14deg)}
+.card-rays::after{content:"";position:absolute;inset:0;opacity:.5;
+  background:radial-gradient(62% 40% at var(--rx) 30%,color-mix(in srgb,var(--hi) 30%,transparent),rgba(0,0,0,0) 72%)}
+body.fx .card-rays::before{animation:turn 80s linear infinite}
+body.fx .card-rays::after{animation:breathe 5.5s ease-in-out infinite alternate}
+@keyframes breathe{from{opacity:.2}to{opacity:.85}}
+.card.missing .card-edge,.card.missing .card-rays{display:none}
 /* dos de la carte */
 .card-back{background:
   repeating-linear-gradient(60deg,rgba(200,170,110,.07) 0 1px,transparent 1px 8cqw),
