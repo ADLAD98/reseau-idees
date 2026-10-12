@@ -79,12 +79,14 @@ function face(cls, shape, season, size, lite, look) {
   const art = !lite && look && look.art ? '<img class="pk-hero" src="' + DDRAGON + '/img/champion/loading/' + esc(look.art) + '.jpg" alt="" draggable="false" decoding="async"><i class="pk-veil"></i>' : '';
   return '<div class="pk-face ' + cls + '" style="clip-path:' + shape + ';-webkit-clip-path:' + shape + '">'
     + (lite ? '' : art + artSVG()
-      + '<div class="pk-txt"><span class="pk-season">Saison ' + esc(season) + '</span><span class="pk-name">' + esc(GAME_NAME) + '</span>'
+      /* (look.title : ce qui s'écrit en tête à la place de la saison — « Booster du jour ») */
+      + '<div class="pk-txt"><span class="pk-season">' + (look && look.title ? esc(look.title) : 'Saison ' + esc(season)) + '</span><span class="pk-name">' + esc(GAME_NAME) + '</span>'
       + '<span class="pk-sub">Joueurs &amp; coachs pros</span><span class="pk-count">' + esc(size) + ' cartes</span>'
       + '<span class="pk-legal">Projet de fan · non officiel · ne peut être vendu</span></div><span class="pk-bars" aria-hidden="true">' + BARS + '</span>')
     + '<i class="pk-crimp top"></i><i class="pk-crimp bot"></i><i class="pk-grain"></i><i class="pk-shade"></i><i class="pk-glare"></i></div>';
 }
-/* la sorte de booster donne ses couleurs au sachet : « free » (bleu, le pack gratuit), « credits » (rouge, le booster à crédits) */
+/* la sorte de booster donne ses couleurs au sachet : « free » (bleu, le pack gratuit), « credits » (rouge, le booster à crédits),
+   « daily » (violet, le booster du jour gagné au « Champion du jour ») */
 const kindOf = (look) => ' k-' + ((look && look.kind) || 'free');
 /* le papier blanc mis à nu le long de la déchirure */
 const fiber = (cls) => '<svg class="pk-fiber ' + cls + '" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polyline points="' + tearPoints() + '"/></svg>';

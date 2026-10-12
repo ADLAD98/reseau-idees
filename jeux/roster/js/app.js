@@ -3,6 +3,7 @@
 import { ApiError, call, clearSession, deriveKey, loadSession, saveSession } from './api.js';
 import { VARIANTS, cardHTML, champName, esc, flagUrl, iconUrl, karmineEra, logoHTML, photoUrl, prepare, statsOf, tiltCard, variantRank } from './cards.js';
 import { GAME_NAME, ROLE_LABEL, ROLE_NAME, ROLE_ORDER, STORE } from './config.js';
+import { dailyLook, drawDaily, loadDaily } from './daily.js';
 import { createDuels } from './duel.js';
 import { sellCard, showOnMarket, viewMarket } from './market.js';
 import { packHTML, runOpening } from './opening.js';
@@ -39,6 +40,9 @@ const S = {
   shop: null,             // booster à crédits et barème de la vente rapide (null : le serveur ne les propose pas)
   pack: 'free',           // booster choisi sur l'écran Packs : 'free' ou 'credits'
   missions: null,         // les missions du jour (false : le serveur ne les connaît pas)
+  daily: null,            // le « Champion du jour » : mon tableau du jour (false : le serveur ne connaît pas ce jeu)
+  dailyOn: false,         // le serveur annonce des boosters du jour : le « Champion du jour » est proposé
+  dailyPool: null,        // la liste des champions pour la saisie, et le nom des régions
   skew: 0,                // heure du serveur − heure de cet appareil
   cat: null,              // catalogue des cartes
   owned: new Map(),       // identifiant de carte → { qty, at }
@@ -84,6 +88,8 @@ function applyState(data) {
   if (data.free) S.free = data.free;
   /* le booster à crédits et la vente rapide (un serveur plus ancien ne les annonce pas : le jeu ne les propose alors pas) */
   if (data.shop) S.shop = data.shop;
+  /* le « Champion du jour » et ses boosters (même remarque) */
+  if (data.daily) { S.dailyOn = true; if (S.daily && S.daily.pack) S.daily.pack.count = data.daily.packs; }
   if (typeof data.skew === 'number') S.skew = data.skew;
 }
 /** Ce que rapporte la vente rapide d'un exemplaire de cette carte (c'est le serveur qui fixe le barème). */
@@ -277,7 +283,7 @@ function showAuth(message) {
       S.session = { token: data.token, name: data.player.name };
       saveSession(S.session);
       /* (un autre compte sur le même écran : rien de l'équipe ni des missions du précédent ne doit rester) */
-      S.play = null; S.missions = null; hubAsked = false;
+      S.play = null; S.missions = null; hubAsked = false; S.daily = null; S.dailyOn = false;
       await loadGame();
       location.hash = '#/packs';
       shell();
@@ -323,7 +329,7 @@ function shell() {
 }
 /* ce que l'application prête aux autres écrans (Jouer, Marché, Joueurs, Mondial) */
 const PLAY = {
-  S, call, guard, toast, applyState, icon, now,
+  S, call, guard, toast, applyState, icon, now, sfx,
   refresh: () => route(),
   expired: () => { clearSession(); S.session = null; showAuth('Ta connexion a expiré. Reconnecte-toi.'); },
   /** Note ce que le serveur dit d'une carte de ma collection : qty exemplaires (0 : je ne l'ai plus). */
@@ -331,6 +337,8 @@ const PLAY = {
   /** Redemande au serveur mes crédits et ma collection. */
   refreshMe: async () => { try { await loadCollection(); } catch (e) { /* on se remettra à jour au prochain passage */ } },
   pulse: () => pulse(),
+  /** Ouvre un booster du jour (from : le sachet d'où part l'ouverture). */
+  openDaily: (from) => openBooster('daily', from),
 };
 const DUELS = createDuels(PLAY);
 PLAY.duel = DUELS;
@@ -511,11 +519,16 @@ function viewPacks(main) {
       /* (sur un téléphone, seulement l'essentiel : le bouton doit tenir sur le premier écran) */
       : 'Joueurs et coachs pros de la saison ' + S.cat.season + '. La dernière carte du pack est une carte bonus<span class="hide-s"> : rang Titulaire au minimum. Les plus belles cartes existent aussi en version holographique et en full art' + (S.cat.cards.some((c) => c.variant === 'kc') ? ', et les joueurs passés par la Karmine en édition KC' : '') + '</span>.') + '</p>'
     + '<div id="packAction" data-sig="' + packSig() + '">' + packActionHTML() + '</div></div></section>'
+    + '<div class="dg-teaser" id="dailyTeaser" hidden></div>'
     + hubHTML()
     + '<section class="missions" id="missions"' + (S.missions ? '' : ' hidden') + '>' + (S.missions ? missionsHTML() : '') + '</section>'
     + '<section><h2 class="h2">Dernières cartes obtenues</h2>'
     + (recent.length ? '<div class="row-cards">' + recent.map((c) => tile(c)).join('') + '</div>' : '<p class="empty">Ta collection est vide. Ouvre ton premier pack !</p>')
-    + '</section>';
+    + '</section>'
+    /* tout en bas : le champion du jour (affiché d'après ce qu'on sait déjà, puis redemandé au serveur) */
+    + '<section class="daily" id="daily" hidden></section>';
+  drawDaily(PLAY);
+  loadDaily(PLAY);
 }
 /* ---------- les missions du jour ---------- */
 function missionsHTML() {
@@ -573,13 +586,18 @@ document.addEventListener('click', async (e) => {
     route();
     return;
   }
-  if (!e.target.closest('#openPack') || S.opening) return;
+  if (e.target.closest('#openPack')) openBooster(packKind(), $('#packBox .pack'));
+});
+/** Ouvre un booster : le pack gratuit, le booster à crédits, ou un booster du jour gagné au « Champion du jour ».
+    from : le sachet d'où part celui de l'ouverture. */
+async function openBooster(kind, from) {
+  if (S.opening) return;
   S.opening = true;
-  const kind = packKind();
+  const look = kind === 'daily' ? dailyLook(S.daily && S.daily.pack ? S.daily.pack.art : null) : packLook(kind);
   try {
     const result = await runOpening({
       request: async () => {
-        const data = await call('POST', kind === 'credits' ? '/api/packs/credits' : '/api/packs/free');
+        const data = await call('POST', '/api/packs/' + (kind === 'credits' || kind === 'daily' ? kind : 'free'));
         /* le serveur vient d'être mis à jour avec de nouvelles cartes : on recharge le catalogue avant de les montrer */
         if (data.catalogVersion && data.catalogVersion !== S.cat.version) await loadCatalogue(data.catalogVersion);
         /* le pack est ouvert : les cartes sont à moi dès maintenant (une revente au bilan part de cet état) */
@@ -591,7 +609,7 @@ document.addEventListener('click', async (e) => {
         }
         return data;
       },
-      getCat: () => S.cat, fx: S.fx, size: S.free.size, from: $('#packBox .pack'), look: packLook(kind),
+      getCat: () => S.cat, fx: S.fx, size: S.free.size, from, look,
       /* au bilan, un doublon se revend sur-le-champ (si le serveur sait racheter les doublons) */
       quick: S.shop && S.shop.quick ? {
         price: (card) => quickPrice(card),
@@ -614,11 +632,11 @@ document.addEventListener('click', async (e) => {
     else route();
   } catch (err) {
     S.opening = false;
-    if (err instanceof ApiError && (err.code === 'pas_pret' || err.code === 'credits')) { applyState({ free: err.data.free, shop: err.data.shop, skew: err.data.skew }); toast(err.message, true); route(); }
+    if (err instanceof ApiError && (err.code === 'pas_pret' || err.code === 'credits')) { applyState({ free: err.data.free, shop: err.data.shop, daily: err.data.daily, skew: err.data.skew }); toast(err.message, true); route(); }
     else if (err instanceof ApiError && err.status === 401) { clearSession(); S.session = null; showAuth('Ta connexion a expiré. Reconnecte-toi.'); }
     else { toast(err instanceof ApiError ? err.message : 'Un problème est survenu.', true); if (!(err instanceof ApiError)) console.error(err); }
   }
-});
+}
 
 /* ---------- écran Collection ---------- */
 function filteredCards() {

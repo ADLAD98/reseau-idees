@@ -7,6 +7,7 @@
 .pack{--pw:250px;--f1:#0a2340;--f2:#11375a;--f3:#0e2e4e;--f4:#071a30;--fglow:rgba(22,178,198,.4);--c1:#1d4d70;--c2:#102f4f;--fink:#93e2ea;--ftag:#0a2038;
   position:relative;width:var(--pw);aspect-ratio:250/380;flex:none;-webkit-user-select:none;user-select:none}
 .pack.k-credits{--f1:#3d0e16;--f2:#641824;--f3:#4d121b;--f4:#23070c;--fglow:rgba(255,120,84,.36);--c1:#7a2430;--c2:#44111a;--fink:#ffcfb0;--ftag:#2b0a10}
+.pack.k-daily{--f1:#1d1140;--f2:#33216c;--f3:#271752;--f4:#120a28;--fglow:rgba(160,120,255,.4);--c1:#4b3190;--c2:#2a1b58;--fink:#dccdff;--ftag:#170d32}
 .pk-ground{position:absolute;left:7%;right:7%;bottom:-6.5%;height:8%;border-radius:50%;background:radial-gradient(closest-side,rgba(0,0,0,.62),rgba(0,0,0,0));filter:blur(4px);pointer-events:none}
 .pk-rig{position:absolute;inset:0;transform:perspective(1000px) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg));transition:transform .6s cubic-bezier(.2,.8,.2,1)}
 .pack.held .pk-rig{transition:transform .08s linear}
@@ -132,6 +133,8 @@ body.fx .pack.ready .pk-glare{animation:pkshine 5.6s cubic-bezier(.4,0,.2,1) inf
 /* le booster à crédits garde ses couleurs pendant l'ouverture */
 .op[data-kind="credits"]{background:radial-gradient(82% 64% at 50% 46%,#3a1218 0,#1a070b 55%,#090204 100%)}
 .op[data-kind="credits"] .op-front .pack::before{background:radial-gradient(closest-side,rgba(255,120,84,.2),rgba(255,120,84,0) 72%)}
+.op[data-kind="daily"]{background:radial-gradient(82% 64% at 50% 46%,#24164e 0,#100a24 55%,#050310 100%)}
+.op[data-kind="daily"] .op-front .pack::before{background:radial-gradient(closest-side,rgba(160,120,255,.22),rgba(160,120,255,0) 72%)}
 /* une très belle carte dans le sachet : dès qu'il s'ouvre, une lueur à sa couleur s'échappe de la bouche et monte en faisceaux */
 .pk-aura{position:absolute;left:-30%;right:-30%;top:-46%;height:74%;opacity:0;pointer-events:none;transition:opacity .35s;
   background:
