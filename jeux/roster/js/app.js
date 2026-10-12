@@ -31,6 +31,7 @@ const S = {
   opening: false,
   play: null,             // l'écran Jouer : équipe, adversaires, parties (dernière réponse du serveur)
   playLeague: '',         // ligue affichée dans la liste des adversaires
+  autoDeck: false,        // la meilleure équipe a déjà été alignée d'office pendant cette visite
   busy: false,            // une draft ou une partie est à l'écran
 };
 

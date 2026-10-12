@@ -62,7 +62,7 @@ function mapSVG() {
     + '<radialGradient id="mvBase0" cx="0" cy="1" r="1"><stop offset="0" stop-color="#4ea3ff" stop-opacity=".42"/><stop offset="1" stop-color="#4ea3ff" stop-opacity="0"/></radialGradient>'
     + '<radialGradient id="mvBase1" cx="1" cy="0" r="1"><stop offset="0" stop-color="#f0586a" stop-opacity=".42"/><stop offset="1" stop-color="#f0586a" stop-opacity="0"/></radialGradient>'
     + '<pattern id="mvHatch" width="16" height="16" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="1.5" height="16" fill="#c8aa6e" fill-opacity=".055"/></pattern></defs>'
-    + '<rect class="m-ground" width="1000" height="1000"/><rect class="m-hatch" width="1000" height="1000"/>'
+    + '<rect class="m-ground" width="1000" height="1000"/><rect width="1000" height="1000" fill="url(#mvHatch)"/>'
     + '<rect x="0" y="640" width="360" height="360" fill="url(#mvBase0)"/><rect x="640" y="0" width="360" height="360" fill="url(#mvBase1)"/>'
     + '<path class="m-river" d="M168 212C300 310 430 430 500 500S700 690 832 788"/><path class="m-river-line" d="M168 212C300 310 430 430 500 500S700 690 832 788"/>'
     + lanes.map((d) => '<path class="m-lane" d="' + d + '"/>').join('') + lanes.map((d) => '<path class="m-lane-line" d="' + d + '"/>').join('')
@@ -171,7 +171,8 @@ export function runMatch({ data, cat, fx }) {
       let left = ms, last = performance.now();
       const step = (now) => {
         if (closed || skipped || mine !== run || (cap && skipSlow)) return resolve();
-        const dt = Math.min(100, now - last);
+        /* l'heure d'une image peut précéder de peu celle du départ : jamais de temps négatif */
+        const dt = Math.max(0, Math.min(100, now - last));
         last = now;
         if (!paused) left -= dt * (cap ? Math.min(speed, cap) : speed);
         if (tick) tick(1 - Math.max(0, left) / ms);
@@ -194,7 +195,7 @@ export function runMatch({ data, cat, fx }) {
     rows[i].classList.toggle('dead', dead);
   }
   function goHome(i, jitter) {
-    if (deadUntil[i] > clockT) { const f = FOUNTAIN[i < 5 ? 0 : 1]; tokens[i].classList.add('away'); moveTo(i, f[0] + (i % 5 - 2) * 9, f[1] + (i % 5 - 2) * 9); return; }
+    if (deadUntil[i] && deadUntil[i] > clockT) { const f = FOUNTAIN[i < 5 ? 0 : 1]; tokens[i].classList.add('away'); moveTo(i, f[0] + (i % 5 - 2) * 9, f[1] + (i % 5 - 2) * 9); return; }
     const h = homeOf(i, clockT, lost), j = jitter ? 8 : 0;
     moveTo(i, h[0] + (Math.random() * 2 - 1) * j, h[1] + (Math.random() * 2 - 1) * j);
   }
@@ -259,8 +260,8 @@ export function runMatch({ data, cat, fx }) {
 
   /* ---------- tableau de bord ---------- */
   function setClock(t) {
-    clockT = t;
-    const text = clockText(t);
+    clockT = Math.max(0, t);
+    const text = clockText(clockT);
     if (H.clock.textContent !== text) H.clock.textContent = text;
   }
   function drawKda(i) { kdaEls[i].textContent = kda[i].k + '/' + kda[i].d + '/' + kda[i].a; }

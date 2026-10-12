@@ -1,6 +1,6 @@
 /* Roster — le combat : écran Jouer (équipe, adversaires), draft, présentation des équipes, partie sur la carte, résultat.
    Même habillage que le reste du jeu (style.css) ; s'y ajoutent les deux couleurs d'équipe, bleu et rouge. */
-:root{--s0:#4ea3ff;--s1:#f0586a;--digits:600 1em/1 var(--text)}
+:root{--s0:#4ea3ff;--s1:#f0586a}
 
 /* ---------- en-tête : crédits ---------- */
 .purse{display:flex;align-items:center;gap:7px;color:var(--gold-hi);text-decoration:none;font:600 15px/1 var(--text);font-variant-numeric:tabular-nums}
@@ -147,11 +147,11 @@
 .dr-ban.preview img{filter:none;opacity:.8}
 .dr-ban.preview::after{opacity:.45}
 @keyframes glow{50%{box-shadow:0 0 12px var(--c),inset 0 0 8px color-mix(in srgb,var(--c) 50%,transparent)}}
-.dr-slots{display:flex;flex-direction:column;gap:8px;min-height:0}
-.dr-slot{position:relative;display:flex;align-items:center;gap:12px;height:70px;padding:0 10px 0 0;border:1px solid var(--line);background:linear-gradient(90deg,rgba(11,24,44,.85),rgba(6,14,27,.5));text-align:left;overflow:hidden;transition:border-color .15s,box-shadow .15s}
+.dr-slots{flex:1;display:grid;grid-template-rows:repeat(5,minmax(40px,70px));align-content:start;gap:8px;min-height:0}
+.dr-slot{position:relative;display:flex;align-items:center;gap:12px;min-height:0;padding:0 10px 0 0;border:1px solid var(--line);background:linear-gradient(90deg,rgba(11,24,44,.85),rgba(6,14,27,.5));text-align:left;overflow:hidden;transition:border-color .15s,box-shadow .15s}
 .dr-team.s1 .dr-slot{flex-direction:row-reverse;padding:0 0 0 10px;text-align:right;background:linear-gradient(270deg,rgba(11,24,44,.85),rgba(6,14,27,.5))}
 .dr-slot:disabled{cursor:default}
-.dr-pic{flex:none;display:grid;place-items:center;width:68px;height:68px;background:#050d18;overflow:hidden}
+.dr-pic{flex:none;display:grid;place-items:center;height:100%;aspect-ratio:1;background:#050d18;overflow:hidden}
 .dr-pic img{display:block;width:100%;height:100%;object-fit:cover;transform:scale(1.12)}
 .dr-pic em{font:400 13px/1 var(--title);font-style:normal;letter-spacing:.16em;text-indent:.16em;color:var(--faint)}
 .dr-who{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
@@ -159,7 +159,7 @@
 .dr-who i{font:400 12.5px/1 var(--text);font-style:normal;letter-spacing:.06em;color:var(--mut);white-space:nowrap}
 .dr-who u{text-decoration:none;color:var(--blue-hi);font-weight:700}
 .dr-cname{min-height:13px;font:400 13px/1 var(--title);letter-spacing:.1em;text-transform:uppercase;color:var(--gold);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.dr-face{flex:none;width:46px;height:46px;border-radius:50%;object-fit:cover;object-position:50% 6%;background:#0a1a2c;box-shadow:0 0 0 1px var(--gold-lo)}
+.dr-face{flex:none;height:min(46px,72%);aspect-ratio:1;border-radius:50%;object-fit:cover;object-position:50% 6%;background:#0a1a2c;box-shadow:0 0 0 1px var(--gold-lo)}
 .dr-slot.picked{border-color:color-mix(in srgb,var(--c) 45%,transparent)}
 .dr-slot.now{border-color:var(--c);box-shadow:inset 3px 0 0 var(--c),0 0 18px -6px var(--c)}
 .dr-team.s1 .dr-slot.now{box-shadow:inset -3px 0 0 var(--c),0 0 18px -6px var(--c)}
@@ -298,7 +298,6 @@
 .mv-beams{z-index:3;pointer-events:none}
 .mv-svg rect{stroke:none}
 .m-ground{fill:#071523}
-.m-hatch{fill:url(#mvHatch)}
 .m-base{fill:none;stroke-width:2;opacity:.4}
 .m-base.s0{stroke:var(--s0)}
 .m-base.s1{stroke:var(--s1)}
@@ -441,6 +440,24 @@
 .end-box .more .note{margin-top:12px}
 .end-feed{display:grid;gap:7px;margin-top:16px}
 
+/* ---------- écrans de largeur moyenne, ou peu hauts ---------- */
+@media (max-width:1140px){
+  .top{gap:16px}
+  .brand small{display:none}
+  .nav a{padding:0 10px;font-size:14px;letter-spacing:.07em}
+}
+@media (max-height:700px) and (min-width:861px){
+  .dr-head{height:56px}
+  .dr-track{margin-bottom:8px}
+  .dr-foot{min-height:78px;padding-top:8px;padding-bottom:8px}
+  .dr-who{gap:3px}
+  .dr-cname{min-height:0}
+  .mv{--map:min(100dvh - 268px,100vw - 520px,700px)}
+  .mv-hud{padding:8px 0}
+  .mv-cast{height:92px;padding-top:8px}
+  .mv-p{padding:4px 10px}
+}
+
 /* ---------- téléphone ---------- */
 @media (max-width:860px){
   .tabs a{font-size:10px;letter-spacing:.03em}
@@ -497,10 +514,10 @@
   .dr-tname i{font-size:9px;letter-spacing:.05em}
   .dr-bans{gap:4px}
   .dr-ban{width:25px;height:25px}
-  .dr-slots{gap:4px}
-  .dr-slot{height:34px;gap:7px;padding:0 6px 0 0}
+  .dr-slots{grid-template-rows:repeat(5,34px);gap:4px}
+  .dr-slot{gap:7px;padding:0 6px 0 0}
   .dr-team.s1 .dr-slot{padding:0 0 0 6px}
-  .dr-pic{width:34px;height:32px}
+  .dr-pic{height:100%}
   .dr-pic em{font-size:9.5px;letter-spacing:.06em;text-indent:.06em}
   .dr-who{gap:3px}
   .dr-who b{font-size:13.5px}
@@ -531,6 +548,13 @@
   .dr-comp{margin:0;font-size:12px;white-space:normal}
   .dr-foot .btn.big{flex:none;height:48px;padding:0 16px;font-size:14px;letter-spacing:.08em}
   .dr-help{padding:12px}
+  @media (max-height:700px){
+    .dr-hint{display:none}
+    .dr-slots{grid-template-rows:repeat(5,30px);gap:3px}
+    .dr-ban{width:22px;height:22px}
+    .dr-roles button{height:34px}
+    .dr-foot{min-height:60px;padding-top:6px;padding-bottom:calc(6px + env(safe-area-inset-bottom))}
+  }
   .dr-help-box{padding:20px 16px}
   .dr-help-box ul,.dr-help-box p{font-size:14.5px}
 
@@ -578,8 +602,9 @@
   .mv-line time{width:36px;font-size:12px}
   .mv-cast .mv-line:first-child{font-size:15.5px}
   .mv-cast .mv-line:first-child time{font-size:13px}
-  .mv-ctrl{padding:6px 0 calc(8px + env(safe-area-inset-bottom))}
-  .mv-ctrl .btn{height:40px;padding:0 16px}
+  .mv-ctrl{gap:8px;padding:6px 0 calc(8px + env(safe-area-inset-bottom))}
+  .mv-ctrl .btn{height:40px;padding:0 13px;letter-spacing:.06em}
+  .mv-speed button{width:44px}
   .mv-replay-top{gap:9px}
   .mv-replay-top span{font-size:9.5px;letter-spacing:.18em}
   .mv-replay-top b{font-size:13.5px;letter-spacing:.1em}

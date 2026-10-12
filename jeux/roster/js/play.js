@@ -22,8 +22,14 @@ export async function viewPlay(main, ctx) {
   const S = G.S;
   if (S.play) draw(main);
   else main.innerHTML = '<div class="col-head"><div><h1 class="h1">Jouer</h1><p>Compose ton équipe, mène la draft, regarde la partie.</p></div></div><div class="center" style="min-height:30dvh"><div class="spin"></div></div>';
-  const data = await G.guard(() => G.call('GET', '/api/play'));
+  let data = await G.guard(() => G.call('GET', '/api/play'));
   if (!data) return;
+  /* première visite avec des cartes mais aucune équipe : on aligne d'office la meilleure, le joueur la retouchera s'il veut */
+  if (!S.autoDeck && S.owned.size && !data.active && SLOTS.every((s) => !data.deck[s[0]])) {
+    S.autoDeck = true;
+    const best = await G.guard(() => G.call('POST', '/api/deck/auto'));
+    if (best) { data = best; G.toast('Ta meilleure équipe est alignée. Touche une carte pour la changer.'); }
+  }
   setPlay(data);
   if (onTab()) draw($('#main'));
 }
@@ -58,7 +64,7 @@ function draw(main) {
       + '<button class="btn primary" type="button" id="resume">Reprendre</button></div>' : '')
     + '<section class="squad panel"><div class="sq-head"><div class="sq-rating"><b>' + L.rating + '</b><span>Note<br>d\'équipe</span></div>'
     + '<div class="sq-traits">' + (L.traits.length ? L.traits.map(traitHTML).join('')
-      : '<p class="hint">' + (filled < 2 ? 'Aligne tes cartes : cinq joueurs et un coach.' : 'Aucune synergie pour l\'instant : aligne des joueurs du même club, du même pays ou de la même ligue.') + '</p>') + '</div>'
+      : '<p class="hint">' + (!S.owned.size ? 'Tu n\'as pas encore de cartes : ouvre tes packs dans l\'onglet Packs, puis reviens composer ton équipe.' : filled < 2 ? 'Aligne tes cartes : cinq joueurs et un coach.' : 'Aucune synergie pour l\'instant : aligne des joueurs du même club, du même pays ou de la même ligue.') + '</p>') + '</div>'
     + '<button class="btn" type="button" id="auto"' + (S.owned.size ? '' : ' disabled') + '>Meilleure équipe</button></div>'
     + '<div class="sq-slots">' + SLOTS.map((s, i) => slot(s[0], s[1], i)).join('') + '</div>'
     + '<details class="more"><summary>Comment marchent les synergies ?</summary><ul>'
