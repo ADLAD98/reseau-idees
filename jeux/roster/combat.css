@@ -358,6 +358,10 @@
 .m-pit circle{fill:#06121f;stroke:rgba(200,170,110,.5);stroke-width:2;stroke-dasharray:5 6}
 .m-pit use{color:var(--gold);stroke-width:1.3;opacity:.85}
 .m-pit.take circle{animation:take 1.4s ease-out}
+/* le monstre est mort : la fosse s'éteint, et le compte à rebours de son retour s'affiche dessous */
+.m-pit[data-off="1"] use{opacity:.3}
+.m-pit[data-off="1"] circle{stroke:rgba(200,170,110,.24)}
+.m-timer{font:700 30px/1 var(--text);font-variant-numeric:tabular-nums;letter-spacing:.02em;fill:var(--gold-hi);stroke:#010a13;stroke-width:7;paint-order:stroke;stroke-linejoin:round}
 @keyframes take{0%{fill:var(--c);stroke:#fff;stroke-width:16}100%{fill:#06121f;stroke-width:2}}
 .m-tw,.m-inh,.m-nexus{stroke:#010a13;stroke-width:3;transition:fill .4s,opacity .4s}
 .m-tw.s0,.m-inh.s0,.m-nexus.s0{fill:var(--s0)}
@@ -411,12 +415,20 @@
 .mv-p{display:flex;align-items:center;gap:11px;padding:7px 10px;border:1px solid var(--line);background:linear-gradient(90deg,rgba(11,24,44,.8),rgba(6,14,27,.4));transition:filter .3s,opacity .3s}
 .mv-side.s0 .mv-p{flex-direction:row-reverse;text-align:right;border-right:2px solid var(--c);background:linear-gradient(270deg,rgba(11,24,44,.8),rgba(6,14,27,.4))}
 .mv-side.s1 .mv-p{border-left:2px solid var(--c)}
-.mv-pi{flex:none;width:42px;height:42px;overflow:hidden;border-radius:50%;box-shadow:0 0 0 1px var(--c)}
+.mv-pw{position:relative;flex:none;display:block}
+.mv-pi{display:block;flex:none;width:42px;height:42px;overflow:hidden;border-radius:50%;box-shadow:0 0 0 1px var(--c)}
+/* l'ultime : une pastille ronde sur le portrait, verte quand il est disponible, éteinte quand il vient de servir (ou avant le niveau 6) */
+.mv-r{position:absolute;top:-3px;right:-3px;width:13px;height:13px;border-radius:50%;border:2px solid #050d18;background:#1b2634;box-shadow:inset 0 0 0 1px #3b4859;transition:background .35s,box-shadow .35s}
+.mv-r.on{background:radial-gradient(circle at 36% 30%,#d8ffc2,#4fd83c 52%,#1f8f25);box-shadow:0 0 7px rgba(84,226,62,.85)}
+.mv-side.s0 .mv-r{right:auto;left:-3px}
 .mv-pi img{display:block;width:100%;height:100%;object-fit:cover;transform:scale(1.14)}
 .mv-pn{flex:1;display:flex;flex-direction:column;gap:4px;min-width:0}
 .mv-pn b{font:600 15.5px/1.1 var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mv-pn i{font:400 12px/1.1 var(--text);font-style:normal;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mv-pk{flex:none;font:600 15px/1 var(--text);color:var(--gold-hi);font-variant-numeric:tabular-nums}
+.mv-pk{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:5px;font:600 15px/1 var(--text);color:var(--gold-hi);font-variant-numeric:tabular-nums}
+.mv-side.s0 .mv-pk{align-items:flex-start}
+.mv-pk b{font:inherit}
+.mv-pk i{font:500 11.5px/1 var(--text);font-style:normal;letter-spacing:.03em;color:var(--mut)}
 .mv-p.dead{filter:grayscale(1);opacity:.42}
 .mv-cast{display:flex;flex-direction:column;gap:7px;flex:none;height:112px;padding-top:12px;overflow:hidden;-webkit-mask-image:linear-gradient(#000 60%,transparent);mask-image:linear-gradient(#000 60%,transparent)}
 .mv-line{display:flex;align-items:baseline;gap:12px;color:var(--mut);font-size:15px;line-height:1.3}
@@ -485,6 +497,7 @@
 .sb td i{display:block;font:400 12px/1.25 var(--text);font-style:normal;color:var(--mut)}
 .sb td.num{text-align:right;font:600 15px/1 var(--text);font-variant-numeric:tabular-nums;white-space:nowrap}
 .sb td.num b{display:inline;color:var(--gold-hi)}
+.sb td.cs i{margin-top:3px;font-size:11px}
 .sb tr.mvp td{background:rgba(200,170,110,.08)}
 .sb tfoot td{padding-top:10px;color:var(--mut);font-size:13.5px}
 .end-box .more .note{margin-top:12px}
@@ -648,7 +661,9 @@
   .mv-side .mv-p,.mv-side.s0 .mv-p,.mv-side.s1 .mv-p{flex:1;flex-direction:column;gap:4px;padding:0;border:0;background:none;text-align:center}
   .mv-pn{display:none}
   .mv-pi{width:30px;height:30px}
-  .mv-pk{font-size:10.5px;color:var(--mut)}
+  .mv-r,.mv-side.s0 .mv-r{top:-3px;left:auto;right:-4px;width:11px;height:11px}
+  .mv-pk,.mv-side.s0 .mv-pk{align-items:center;gap:2px;font-size:10.5px;color:var(--mut)}
+  .mv-pk i{font-size:9.5px;color:var(--faint)}
   .mv-cast{flex:1;gap:5px;height:auto;min-height:64px;padding-top:8px}
   .mv-line{gap:8px;font-size:13.5px}
   .mv-line time{width:36px;font-size:12px}

@@ -21,8 +21,10 @@ const STREAK = ['', '', 'Doublé', 'Triplé', 'Quadruplé', 'Pentakill'];
 function mapSVG() {
   const lanes = ['M92 868V162Q92 92 162 92H868', 'M152 848 848 152', 'M132 908H838Q908 908 908 838V132'];
   const diamond = (p, r) => 'M' + p[0] + ' ' + (p[1] - r) + 'L' + (p[0] + r) + ' ' + p[1] + 'L' + p[0] + ' ' + (p[1] + r) + 'L' + (p[0] - r) + ' ' + p[1] + 'Z';
+  /* sous chaque fosse, le compte à rebours du retour du dragon ou du Nashor */
   const pit = (name, sym) => '<g class="m-pit" data-pit="' + name + '"><circle cx="' + PIT[name][0] + '" cy="' + PIT[name][1] + '" r="40"/>'
-    + '<use href="#' + sym + '" x="' + (PIT[name][0] - 21) + '" y="' + (PIT[name][1] - 21) + '" width="42" height="42"/></g>';
+    + '<use href="#' + sym + '" x="' + (PIT[name][0] - 21) + '" y="' + (PIT[name][1] - 21) + '" width="42" height="42"/>'
+    + '<text class="m-timer" data-timer="' + name + '" x="' + PIT[name][0] + '" y="' + (PIT[name][1] + 72) + '" text-anchor="middle"></text></g>';
   let s = '<svg class="mv-svg" viewBox="0 0 1000 1000" aria-hidden="true"><defs>'
     + '<radialGradient id="mvBase0" cx="0" cy="1" r="1"><stop offset="0" stop-color="#4ea3ff" stop-opacity=".42"/><stop offset="1" stop-color="#4ea3ff" stop-opacity="0"/></radialGradient>'
     + '<radialGradient id="mvBase1" cx="1" cy="0" r="1"><stop offset="0" stop-color="#f0586a" stop-opacity=".42"/><stop offset="1" stop-color="#f0586a" stop-opacity="0"/></radialGradient>'
@@ -82,8 +84,10 @@ export function runMatch({ data, cat, fx }) {
     + '<span class="mv-s">' + icon('i-drake') + '<span class="mv-dr" data-dr="' + s + '"><i></i><i></i><i></i><i></i></span></span>' + stat('i-baron', 'bn' + s, '0') + '</div>';
   const sideHTML = (s) => '<aside class="mv-side s' + s + '">' + [0, 1, 2, 3, 4].map((r) => {
     const i = s * 5 + r, p = P[i];
-    return '<div class="mv-p" data-p="' + i + '"><span class="mv-pi"><img src="' + iconUrl(cat, p.champ) + '" alt="" draggable="false"></span>'
-      + '<span class="mv-pn"><b>' + esc(p.name) + '</b><i>' + ROLE_LABEL[p.role] + ' · ' + esc(p.champName) + '</i></span><span class="mv-pk" data-kda="' + i + '">0/0/0</span></div>';
+    /* la pastille ronde sur le portrait : verte quand l'ultime (R) est disponible, comme dans le jeu */
+    return '<div class="mv-p" data-p="' + i + '"><span class="mv-pw"><span class="mv-pi"><img src="' + iconUrl(cat, p.champ) + '" alt="" draggable="false"></span><i class="mv-r" data-r="' + i + '" title="Ultime (R)"></i></span>'
+      + '<span class="mv-pn"><b>' + esc(p.name) + '</b><i>' + ROLE_LABEL[p.role] + ' · ' + esc(p.champName) + '</i></span>'
+      + '<span class="mv-pk"><b data-kda="' + i + '">0/0/0</b><i data-cs="' + i + '" title="Sbires tués">0 CS</i></span></div>';
   }).join('') + '</aside>';
 
   const root = document.createElement('div');
@@ -111,6 +115,9 @@ export function runMatch({ data, cat, fx }) {
   const built = new Map(Array.from(root.querySelectorAll('[data-b]'), (n) => [n.dataset.b, n]));
   const rows = P.map((p, i) => root.querySelector('.mv-p[data-p="' + i + '"]'));
   const kdaEls = P.map((p, i) => root.querySelector('[data-kda="' + i + '"]'));
+  const csEls = P.map((p, i) => root.querySelector('[data-cs="' + i + '"]')), ultEls = P.map((p, i) => root.querySelector('[data-r="' + i + '"]'));
+  const pitEls = { drake: root.querySelector('[data-pit="drake"]'), baron: root.querySelector('[data-pit="baron"]') };
+  const timerEls = { drake: root.querySelector('[data-timer="drake"]'), baron: root.querySelector('[data-timer="baron"]') };
   const tokens = P.map((p) => {
     const d = document.createElement('div');
     d.className = 'tk s' + p.side;
@@ -133,6 +140,51 @@ export function runMatch({ data, cat, fx }) {
   const plan = planMoves(sim);
   let tau = 0, lastDraw = 0;
   const cursor = P.map(() => 0), shown = P.map(() => null), look = P.map(() => '?');
+
+  /* ---------- ce que le serveur ne compte pas, et qu'une vraie partie affiche : le farm de chacun, le retour du dragon et du Nashor ---------- */
+  const csLook = P.map(() => -1), ultLook = P.map(() => null), timerLook = { drake: '?', baron: '?' };
+  const frac = (x) => x - Math.floor(x), jitter = (i) => frac(Math.sin((sim.duration + 7) * (i + 1) * 12.9898) * 43758.5453);
+  /* sbires par minute : ceux du joueur cette saison quand on les connaît, sinon l'ordinaire de son poste */
+  const CS_RATE = { TOP: 7.8, JGL: 5.6, MID: 8.4, BOT: 9.1, SUP: 1.2 };
+  const csRate = P.map((p, i) => ((p.card && p.card.real && p.card.real.cspm) || CS_RATE[p.role]) * (0.93 + 0.14 * jitter(i)) * (p.side === sim.winner ? 1.03 : 0.97));
+  const downs = plan.deaths.map((list) => list.map(([a, b]) => [plan.gameAt(a), plan.gameAt(b)]));
+  const campsBy = P.map((p, i) => plan.camps.flatMap((c) => c.down.filter((d) => d[2] === i).map((d) => d[0])).sort((a, b) => a - b));
+  /** Sbires tués par le joueur i quand l'horloge du jeu marque g secondes (x : l'instant de la mise en scène). On ne farme pas quand on est mort. */
+  function csAt(i, g, x) {
+    let alive = g;
+    for (const [a, b] of downs[i]) if (a < g) alive -= Math.min(b, g) - a;
+    if (P[i].role === 'JGL') {
+      /* le jungler : quatre par camp qu'on le voit tuer, plus un peu de farm sur les voies une fois la phase de lane passée */
+      let camps = 0;
+      for (const t of campsBy[i]) { if (t <= x) camps++; else break; }
+      return camps * 4 + Math.floor((Math.max(0, alive - 840) / 60) * 1.5);
+    }
+    /* les sbires arrivent sur les voies vers 1:30 */
+    return Math.floor((csRate[i] * Math.max(0, alive - 88)) / 60);
+  }
+  /* Le dragon et le Nashor : absents de la carte entre a et b (secondes de jeu). Les délais d'une vraie partie : premier dragon à 5:00,
+     de retour cinq minutes après sa mort (un peu plus pour le dragon ancestral) ; Nashor à 20:00, de retour six minutes après.
+     Le serveur ne reprend jamais un objectif avant ces délais. */
+  const away = { drake: [[0, 300]], baron: [[0, 1200]] };
+  for (const e of events) {
+    if (e.k === 'elder') away.drake.push([e.t, e.t + 340]);
+    else if (e.k === 'dragon') away.drake.push([e.t, e.t + (e.dr[0] >= 4 || e.dr[1] >= 4 ? 350 : 300)]);
+    else if (e.k === 'baron') away.baron.push([e.t, e.t + 360]);
+  }
+  const awayLeft = (list, g) => { for (const [a, b] of list) if (g >= a && g < b) return b - g; return 0; };
+  /** Met à jour le farm, les pastilles d'ultime et les comptes à rebours, quand ils changent. */
+  function drawLive() {
+    const g = clockT;
+    for (let i = 0; i < 10; i++) {
+      const cs = csAt(i, g, tau), ult = plan.ultReady(i, tau);
+      if (cs !== csLook[i]) { csLook[i] = cs; csEls[i].textContent = cs + ' CS'; }
+      if (ult !== ultLook[i]) { ultLook[i] = ult; ultEls[i].classList.toggle('on', ult); }
+    }
+    for (const name of ['drake', 'baron']) {
+      const left = awayLeft(away[name], g), text = left > 0 ? clockText(Math.ceil(left)) : '';
+      if (text !== timerLook[name]) { timerLook[name] = text; timerEls[name].textContent = text; pitEls[name].dataset.off = text ? '1' : ''; }
+    }
+  }
   const campEls = plan.camps.map((c) => root.querySelector('[data-camp="' + c.id + '"]')), campLook = plan.camps.map(() => '?');
   const stage = (name) => { root.dataset.stage = name; };
   const pop = (node) => { node.classList.remove('pop'); void node.offsetWidth; node.classList.add('pop'); };
@@ -199,6 +251,7 @@ export function runMatch({ data, cat, fx }) {
         rows[i].classList.toggle('dead', dead);
       }
     }
+    drawLive();
     /* les camps de la jungle : attaqués, tués, puis de retour */
     plan.camps.forEach((c, k) => {
       let sig = '';
@@ -372,7 +425,7 @@ export function runMatch({ data, cat, fx }) {
     score[0] = 0; score[1] = 0;
     setClock(0);
     tau = 0;
-    cursor.fill(0); look.fill('?'); campLook.fill('?');
+    cursor.fill(0); look.fill('?'); campLook.fill('?'); csLook.fill(-1); ultLook.fill(null);
     P.forEach((p, i) => { kda[i] = { k: 0, d: 0, a: 0 }; setDead(i, false); drawKda(i); });
     draw(true);
     cast.innerHTML = '<p class="mv-line"><time>0:00</time><span>Bienvenue sur la Faille de l\'invocateur : ' + esc(M.teams[0].name) + ' contre ' + esc(M.teams[1].name) + '.</span></p>';
@@ -421,10 +474,12 @@ export function runMatch({ data, cat, fx }) {
     const won = !!rewards.won, w = sim.winner, mvp = P[sim.mvp], ms = sim.players[sim.mvp];
     const row = (i) => {
       const p = P[i], s = sim.players[i];
+      /* le farm de la partie, et par minute comme sur le tableau des scores du jeu */
+      const cs = csAt(i, sim.duration, plan.total);
       return '<tr' + (i === sim.mvp ? ' class="mvp"' : '') + '><td><img src="' + iconUrl(cat, p.champ) + '" alt="" loading="lazy"></td><td><b>' + esc(p.name) + (i === sim.mvp ? ' <em>MVP</em>' : '') + '</b><i>' + ROLE_LABEL[p.role] + ' · ' + esc(p.champName) + '</i></td>'
-        + '<td class="num">' + s.k + '</td><td class="num">' + s.d + '</td><td class="num">' + s.a + '</td></tr>';
+        + '<td class="num">' + s.k + '</td><td class="num">' + s.d + '</td><td class="num">' + s.a + '</td><td class="num cs">' + cs + '<i>' + (cs / (sim.duration / 60)).toFixed(1).replace('.', ',') + ' / min</i></td></tr>';
     };
-    const board = (s) => '<table class="sb s' + s + '"><thead><tr><th colspan="2">' + esc(M.teams[s].name) + (s === w ? ' <em>vainqueur</em>' : '') + '</th><th class="num">K</th><th class="num">D</th><th class="num">A</th></tr></thead>'
+    const board = (s) => '<table class="sb s' + s + '"><thead><tr><th colspan="2">' + esc(M.teams[s].name) + (s === w ? ' <em>vainqueur</em>' : '') + '</th><th class="num">K</th><th class="num">D</th><th class="num">A</th><th class="num">CS</th></tr></thead>'
       + '<tbody>' + [0, 1, 2, 3, 4].map((r) => row(s * 5 + r)).join('') + '</tbody></table>';
     const line = (label, a, b) => '<tr><td class="num">' + a + '</td><th>' + label + '</th><td class="num">' + b + '</td></tr>';
     const pickRow = (s, r) => {

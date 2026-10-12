@@ -3,6 +3,8 @@
    Ce module en tire le trajet complet de chaque joueur, du début à la fin : les joueurs de voie tiennent leur ligne, rentrent à la base
    après un duel perdu et reviennent à pied ; les junglers enchaînent leurs camps, traversent par la rivière, se cachent avant un gank
    et se placent en avance sur les objectifs ; après la phase de lane, l'équipe se répartit puis se regroupe.
+   Une tour attaquée est défendue : ceux qui tiennent la voie se replient sous elle (toute l'équipe en fin de partie), et les derniers
+   défenseurs sont dans leur base quand elle tombe. Chaque joueur a aussi son ultime : disponible ou non, selon ce qu'il vient de faire.
    Tout passe par les couloirs de la carte (voies, sentiers de la jungle, rivière), jamais à travers les murs.
    Rien ici ne touche à la page : match.js lit ces trajets image par image. */
 
@@ -191,6 +193,8 @@ const OPENING = [4800, 6000];                            // le tout début : cha
 export const SHOW_LEAD = 480, KILL_GAP = 250;            // avant la première élimination, puis entre deux
 const V = 0.34, VFAST = 0.52, VRUSH = 0.8, VMAX = 1.5, VSLOW = 0.09;   // vitesses de marche, en unités de carte par milliseconde
 const LANING_END = 840, LATE = 1500;
+/* heure (secondes de jeu) à laquelle chaque poste atteint le niveau 6 et obtient son ultime : TOP, JGL, MID, ADC, SUP */
+const ULT_AT = [310, 350, 300, 420, 500];
 
 /** Prépare tous les déplacements d'une partie. sim : ce que le serveur renvoie (events, duration, kills). */
 export function planMoves(sim) {
@@ -293,12 +297,12 @@ export function planMoves(sim) {
     else { roles = [0, 2, 3, 4].filter((r) => dutyOf(r, s).lane === lane); roles.push(1); }
     let list = roles.map((r) => att * 5 + r).filter((i) => aliveAt(i, when));
     if (!list.length) list = [0, 1, 2, 3, 4].map((r) => att * 5 + r).filter((i) => aliveAt(i, when)).slice(0, 2);
-    /* un siège repoussé : les défenseurs sont là aussi */
-    if (e.k === 'duel') {
-      const guards = s.phase === 'lane' ? (lane === 0 ? [0] : lane === 1 ? [2] : [3, 4]) : s.phase === 'late' ? [0, 1, 2, 3, 4] : [0, 2, 3, 4].filter((r) => dutyOf(r, s).lane === lane).concat([1]);
-      list = list.concat(guards.map((r) => def * 5 + r).filter((i) => aliveAt(i, when)));
-    }
-    return list;
+    /* une tour ne tombe pas devant des joueurs qui regardent ailleurs : ceux qui tiennent la voie se replient sous elle,
+       leur jungler vient les aider, et en fin de partie (ou face à une poussée du Baron) toute l'équipe défend */
+    const guards = s.phase === 'lane' ? (lane === 0 ? [0] : lane === 1 ? [2] : [3, 4])
+      : s.phase === 'late' || baronUntil[att] > e.t || list.length >= 4 ? [0, 1, 2, 3, 4]
+        : [0, 2, 3, 4].filter((r) => dutyOf(r, s).lane === lane).concat([1]);
+    return list.concat(guards.map((r) => def * 5 + r).filter((i) => aliveAt(i, when)));
   }
   /** Range deux groupes face à face autour d'un point : les bleus du côté de leur base, les rouges en face. */
   function faceOff(out, list, a, u, gap = 46, spread = 64, stagger = 36) {
@@ -377,10 +381,13 @@ export function planMoves(sim) {
     } else if (z === 'base0' || z === 'base1') {
       const def = Number(z[4]);
       if (e.k === 'nexus') {
-        /* les vainqueurs autour du Nexus qui explose */
+        /* les vainqueurs autour du Nexus qui explose ; les derniers défenseurs, acculés entre leur Nexus et leur fontaine */
         const c = NEXUS[def], o = def ? [-0.7071, 0.7071] : [0.7071, -0.7071];
+        const win = list.filter((i) => (i < 5 ? 0 : 1) !== def), lose = list.filter((i) => (i < 5 ? 0 : 1) === def);
         anchor = c;
-        list.forEach((i, k) => { const across = (k - (list.length - 1) / 2) * 50; out.set(i, [c[0] + o[0] * (78 + (k % 2) * 26) - o[1] * across, c[1] + o[1] * (78 + (k % 2) * 26) + o[0] * across]); });
+        win.forEach((i, k) => { const across = (k - (win.length - 1) / 2) * 50; out.set(i, [c[0] + o[0] * (78 + (k % 2) * 26) - o[1] * across, c[1] + o[1] * (78 + (k % 2) * 26) + o[0] * across]); });
+        const back = Math.atan2(-o[1], -o[0]);
+        lose.forEach((i, k) => { const ang = back + (k - (lose.length - 1) / 2) * 0.62; out.set(i, [c[0] + Math.cos(ang) * 58, c[1] + Math.sin(ang) * 58]); });
       } else {
         anchor = def ? [830, 170] : [170, 830];
         faceOff(out, list, anchor, U, 44, 58);
@@ -435,8 +442,17 @@ export function planMoves(sim) {
       const involved = new Set();
       for (const k of e.kills) { involved.add(k[0]); involved.add(k[1]); for (const h of k[2]) involved.add(h); }
       list = [...new Set(e.who)].filter((i) => aliveAt(i, a.tau - 500) || involved.has(i));
+      /* l'assaut final : tous les défenseurs encore debout sont dans leur base, pas seulement ceux qui vont tomber */
+      if (e.z.slice(0, 4) === 'base' && e.k === 'tower') {
+        const def = Number(e.z[4]);
+        for (let r = 0; r < 5; r++) { const i = def * 5 + r; if (!list.includes(i) && aliveAt(i, a.tau - 500)) list.push(i); }
+      }
     }
-    else if (e.k === 'nexus') list = (casts[n - 1] || []).filter((i) => (i < 5 ? 0 : 1) === e.s && aliveAt(i, a.tau));
+    else if (e.k === 'nexus') {
+      /* les vainqueurs, et ce qu'il reste de défenseurs */
+      list = (casts[n - 1] || []).filter((i) => (i < 5 ? 0 : 1) === e.s && aliveAt(i, a.tau));
+      for (let r = 0; r < 5; r++) { const i = (1 - e.s) * 5 + r; if (aliveAt(i, a.tau)) list.push(i); }
+    }
     else if (e.z.slice(0, 2) === 'tw') list = towerCast(n);
     else list = [];
     const { anchor, spots } = spotsOf(n, list);
@@ -680,7 +696,39 @@ export function planMoves(sim) {
     tracks.push(keys);
   }
 
-  return { total, at, anchors, casts, tracks, deaths, camps: CAMPS.map((c) => ({ id: c.id, p: c.p, side: c.side, kind: c.kind, hold: c.hold, down: campDown.get(c.id) })), gameAt, tauOfGame, stats };
+  /* ---------- 6. les ultimes ---------- */
+  /* Le serveur ne suit pas les sorts : la mise en scène en tire une histoire plausible. Chacun obtient son ultime au niveau 6
+     (plus tard en duo sur la voie du bas), le lance dans les actions où il compte, puis attend qu'il revienne. */
+  const ults = [];
+  for (let i = 0; i < 10; i++) {
+    const role = i % 5, from = tauOfGame(ULT_AT[role] + rand(-20, 25)), used = [];
+    let ready = from;
+    for (const A of appts[i]) {
+      const n = A.n, e = ev[n], a = at[n];
+      if (ready > a.tau) continue;
+      const mine = e.kills.findIndex((k) => k[0] === i || k[1] === i || k[2].includes(i));
+      const fought = e.kills.length > 0;
+      const odds = e.k === 'nexus' ? 0 : mine >= 0 ? 0.88 : e.k === 'fight' ? 0.8 : fought ? 0.6
+        : e.k === 'gank' ? (casts[n][0] === i ? 0.7 : 0.4) : e.k === 'duel' ? (LANE_INDEX[e.z] !== undefined ? 0.33 : 0.15) : 0.05;
+      if (rnd() >= odds) continue;
+      /* lancé au cœur de l'action : juste avant l'élimination à laquelle il prend part, sinon au début du combat */
+      const when = Math.max(ready, mine >= 0 ? a.kills[mine] - 260 : a.tau + rand(60, SHOW_LEAD));
+      if (A.dies !== undefined && when > A.dies) continue;
+      const cd = e.t < 780 ? rand(95, 125) : e.t < 1380 ? rand(75, 100) : rand(55, 80);
+      ready = tauOfGame(gameAt(when) + cd);
+      used.push([when, ready]);
+    }
+    ults.push({ from, used });
+  }
+  /** L'ultime du joueur i est-il disponible à l'instant tau ? */
+  const ultReady = (i, x) => {
+    const u = ults[i];
+    if (x < u.from) return false;
+    for (const [a, b] of u.used) { if (x < a) return true; if (x < b) return false; }
+    return true;
+  };
+
+  return { total, at, anchors, casts, tracks, deaths, camps: CAMPS.map((c) => ({ id: c.id, p: c.p, side: c.side, kind: c.kind, hold: c.hold, down: campDown.get(c.id) })), gameAt, tauOfGame, stats, ults, ultReady };
 }
 
 /** Où se trouve un joueur à l'instant tau : { x, y, k } (k : ce qu'il fait — w marche, d court, h attend, f combat, c tue un camp, r rentre, g parti, x mort). */
