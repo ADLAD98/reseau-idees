@@ -29,7 +29,8 @@ const HELP = '<div class="dr-help-box panel"><h3>Gagner la draft</h3><ul>'
     Renvoie { final } (la réponse du serveur au dernier choix : la partie est jouée), { left: true } si le joueur quitte l'écran,
     ou { over } (la réponse du serveur) si le défi s'est arrêté pendant la draft : l'adversaire a quitté.
     Fearless : le serveur donne dans match.locked les champions déjà joués dans la série ; ils restent affichés, barrés.
-    Draft automatique : si le joueur l'allume, son coach choisit à sa place (le serveur décide, selon le talent du coach : match.coach). */
+    Draft automatique : si le joueur l'allume, son coach choisit à sa place (le serveur décide, selon le talent du coach : match.coach).
+    Elle est éteinte au début de chaque draft : c'est au joueur de l'allumer, à chaque fois. */
 export function runDraft({ match, cat, fx, act, resync, toast, help, head, live, confirmLeave }) {
   let m = match;
   /* en direct : échéance du choix en cours, adversaire absent (son coach choisit alors pour lui ; forfeitAt : l'heure de son forfait) */
@@ -37,7 +38,8 @@ export function runDraft({ match, cat, fx, act, resync, toast, help, head, live,
   /* la draft automatique n'existe que si le serveur sait la jouer (il annonce alors le talent du coach) */
   const canAuto = typeof m.coach === 'number';
   let auto = false, autoTimer = 0;
-  try { auto = canAuto && localStorage.getItem(STORE + 'draft-auto') === '1'; } catch (e) { auto = false; }
+  /* (le jeu retenait ce réglage d'une draft à l'autre : il ne le fait plus, et oublie ce qu'il avait noté) */
+  try { localStorage.removeItem(STORE + 'draft-auto'); } catch (e) { /* rien à oublier */ }
   const coachWord = (s) => (s >= 92 ? 'coach d\'élite' : s >= 86 ? 'très bon coach' : s >= 79 ? 'bon coach' : s >= 70 ? 'coach moyen' : s >= 62 ? 'coach faible' : 'pas de vrai coach');
   const you = m.you, foe = 1 - you;
   const champs = Object.entries(cat.champions).filter(([, c]) => c.r.length).sort((a, b) => a[1].n.localeCompare(b[1].n, 'fr'));
@@ -254,16 +256,16 @@ export function runDraft({ match, cat, fx, act, resync, toast, help, head, live,
   /** Montre une à une les actions que le serveur a enregistrées et qui ne sont pas encore à l'écran. */
   async function playLog() {
     while (shown < m.log.length) {
-      const a = m.log[shown], auto = a.side !== you;
+      const a = m.log[shown], theirs = a.side !== you;
       /* contre l'ordinateur, un temps de réflexion feint ; en direct, l'adversaire a déjà pris le sien */
-      if (auto && fx && !live) { syncAll(); await wait(620 + Math.random() * 480); }
+      if (theirs && fx && !live) { syncAll(); await wait(620 + Math.random() * 480); }
       apply(a);
       shown++;
       /* en draft automatique, les choix s'enchaînent : un simple « toc » à la place des coups */
       if (auto) sfx.tick(); else if (a.type === 'ban') sfx.ban(); else sfx.pick();
       syncAll();
       pop(a.type === 'ban' ? banEl(a.side, bans[a.side].length - 1) : slotEl(a.side, ROLES.indexOf(a.role)));
-      if (fx) await wait(auto ? 400 : 280);
+      if (fx) await wait(theirs ? 400 : 280);
     }
   }
   /** Prépare le tour du joueur. */
@@ -389,7 +391,6 @@ export function runDraft({ match, cat, fx, act, resync, toast, help, head, live,
       }
       else if (what === 'auto') {
         auto = !auto;
-        try { localStorage.setItem(STORE + 'draft-auto', auto ? '1' : '0'); } catch (err) { /* réglage non gardé */ }
         sel = null;
         sfx.click();
         syncAll();

@@ -85,7 +85,9 @@ export function runMatch({ data, cat, fx }) {
   const sideHTML = (s) => '<aside class="mv-side s' + s + '">' + [0, 1, 2, 3, 4].map((r) => {
     const i = s * 5 + r, p = P[i];
     /* la pastille ronde sur le portrait : verte quand l'ultime (R) est disponible, comme dans le jeu */
-    return '<div class="mv-p" data-p="' + i + '"><span class="mv-pw"><span class="mv-pi"><img src="' + iconUrl(cat, p.champ) + '" alt="" draggable="false"></span><i class="mv-r" data-r="' + i + '" title="Ultime (R)"></i></span>'
+    return '<div class="mv-p" data-p="' + i + '"><span class="mv-pw"><span class="mv-pi"><img src="' + iconUrl(cat, p.champ) + '" alt="" draggable="false"></span><i class="mv-r" data-r="' + i + '" title="Ultime (R)"></i>'
+      /* le niveau du champion, comme sur le tableau des scores du jeu */
+      + '<b class="mv-lv" data-lv="' + i + '" title="Niveau">1</b></span>'
       + '<span class="mv-pn"><b>' + esc(p.name) + '</b><i>' + ROLE_LABEL[p.role] + ' · ' + esc(p.champName) + '</i></span>'
       + '<span class="mv-pk"><b data-kda="' + i + '">0/0/0</b><i data-cs="' + i + '" title="Sbires tués">0 CS</i></span></div>';
   }).join('') + '</aside>';
@@ -100,7 +102,7 @@ export function runMatch({ data, cat, fx }) {
     + hudObj(0) + '<div class="mv-gold"><i data-h="bar"></i></div>' + hudObj(1) + '</header>'
     + '<div class="mv-mid">' + sideHTML(0)
     + '<div class="mv-map"><div class="mv-map-in">' + mapSVG() + '<svg class="mv-beams" viewBox="0 0 1000 1000" aria-hidden="true"></svg></div>'
-    + '<div class="mv-replay"><div class="mv-replay-top"><span>Ralenti</span><b></b></div><div class="mv-replay-foot"></div></div></div>'
+    + '<div class="mv-replay"><div class="mv-replay-top"><span>Temps fort</span><b></b></div><div class="mv-replay-foot"></div></div></div>'
     + sideHTML(1) + '</div>'
     + '<div class="mv-cast" aria-live="polite"></div>'
     + '<footer class="mv-ctrl"><button class="op-icon" type="button" data-act="pause" aria-label="Pause ou reprise"></button>'
@@ -116,15 +118,18 @@ export function runMatch({ data, cat, fx }) {
   const rows = P.map((p, i) => root.querySelector('.mv-p[data-p="' + i + '"]'));
   const kdaEls = P.map((p, i) => root.querySelector('[data-kda="' + i + '"]'));
   const csEls = P.map((p, i) => root.querySelector('[data-cs="' + i + '"]')), ultEls = P.map((p, i) => root.querySelector('[data-r="' + i + '"]'));
+  const lvEls = P.map((p, i) => root.querySelector('[data-lv="' + i + '"]'));
   const pitEls = { drake: root.querySelector('[data-pit="drake"]'), baron: root.querySelector('[data-pit="baron"]') };
   const timerEls = { drake: root.querySelector('[data-timer="drake"]'), baron: root.querySelector('[data-timer="baron"]') };
   const tokens = P.map((p) => {
     const d = document.createElement('div');
     d.className = 'tk s' + p.side;
-    d.innerHTML = '<img src="' + iconUrl(cat, p.champ) + '" alt="" draggable="false">';
+    /* le portrait, et ce qui ne se voit que pendant un ralenti : la barre de vie */
+    d.innerHTML = '<span class="tk-i"><img src="' + iconUrl(cat, p.champ) + '" alt="" draggable="false"></span><i class="tk-hp"><b></b></i>';
     mapIn.appendChild(d);
     return d;
   });
+  const hpEls = tokens.map((d) => d.querySelector('.tk-hp b'));
   const scroll = document.body.style.overflow;
   document.body.style.overflow = 'hidden';
   document.body.appendChild(root);
@@ -142,7 +147,7 @@ export function runMatch({ data, cat, fx }) {
   const cursor = P.map(() => 0), shown = P.map(() => null), look = P.map(() => '?');
 
   /* ---------- ce que le serveur ne compte pas, et qu'une vraie partie affiche : le farm de chacun, le retour du dragon et du Nashor ---------- */
-  const csLook = P.map(() => -1), ultLook = P.map(() => null), timerLook = { drake: '?', baron: '?' };
+  const csLook = P.map(() => -1), ultLook = P.map(() => null), lvLook = P.map(() => 0), timerLook = { drake: '?', baron: '?' };
   const frac = (x) => x - Math.floor(x), jitter = (i) => frac(Math.sin((sim.duration + 7) * (i + 1) * 12.9898) * 43758.5453);
   /* sbires par minute : ceux du joueur cette saison quand on les connaît, sinon l'ordinaire de son poste */
   const CS_RATE = { TOP: 7.8, JGL: 5.6, MID: 8.4, BOT: 9.1, SUP: 1.2 };
@@ -176,8 +181,9 @@ export function runMatch({ data, cat, fx }) {
   function drawLive() {
     const g = clockT;
     for (let i = 0; i < 10; i++) {
-      const cs = csAt(i, g, tau), ult = plan.ultReady(i, tau);
+      const cs = csAt(i, g, tau), ult = plan.ultReady(i, tau), lv = plan.levelAt(i, tau);
       if (cs !== csLook[i]) { csLook[i] = cs; csEls[i].textContent = cs + ' CS'; }
+      if (lv !== lvLook[i]) { if (lvLook[i] && lv > lvLook[i]) pop(lvEls[i]); lvLook[i] = lv; lvEls[i].textContent = lv; }
       if (ult !== ultLook[i]) { ultLook[i] = ult; ultEls[i].classList.toggle('on', ult); }
     }
     for (const name of ['drake', 'baron']) {
@@ -333,15 +339,13 @@ export function runMatch({ data, cat, fx }) {
   }
 
   /* ---------- une élimination ---------- */
-  function strike(kill, slow) {
+  function strike(kill, slow, from, to) {
     const killer = kill[0], victim = kill[1], side = killer < 5 ? 0 : 1;
-    beam(pos[killer], pos[victim], side, slow);
+    beam(from || pos[killer], to || pos[victim], side, slow);
     setDead(victim, true);
     pop(tokens[victim]);
     sfx.kill();
     if (fx) { const c = clientOf(tokens[victim]); particles.burst(c[0], c[1], { count: slow ? 26 : 10, colors: SIDE_COLORS[side], speed: [50, slow ? 260 : 180], life: [0.35, slow ? 1.1 : 0.7], size: [1.5, 4], gravity: 80 }); }
-    if (slow) return;
-    /* le score ne compte qu'en direct, pas pendant le ralenti */
     score[side]++;
     kda[killer].k++; kda[victim].d++;
     for (const a of kill[2]) { kda[a].a++; drawKda(a); }
@@ -352,12 +356,10 @@ export function runMatch({ data, cat, fx }) {
   /* ---------- déroulé ---------- */
   /** Un événement, en direct. Les joueurs concernés sont déjà sur place : ils y sont venus à pied, par leur propre chemin. */
   async function show(ev, n) {
-    const mine = run, a = plan.at[n];
-    ping(plan.anchors[n], ev.s);
-    say(ev);
-    if (ev.k === 'tower' || ev.k === 'inhib') sfx.tower();
-    else if (ev.k === 'baron' || ev.k === 'elder') sfx.objective(true);
-    else if (ev.k === 'dragon' || ev.k === 'herald' || ev.k === 'grubs') sfx.objective(false);
+    const mine = run, a = plan.at[n], fought = ev.kills.length > 0;
+    /* tant qu'on se bat, rien n'annonce l'issue : le repère sur la carte est neutre, et le commentaire ne vient qu'après la dernière élimination */
+    ping(plan.anchors[n], fought ? -1 : ev.s);
+    if (!fought) { say(ev); cue(ev); }
     await advance(a.tau + SHOW_LEAD);
     for (let j = 0; j < ev.kills.length; j++) {
       if (stopped(mine)) return;
@@ -365,11 +367,22 @@ export function runMatch({ data, cat, fx }) {
       await advance(a.kills[j] + KILL_GAP);
     }
     if (stopped(mine)) return;
+    if (fought) { say(ev); cue(ev); }
+    settle(ev);
+    await advance(a.end);
+  }
+  /** Le son d'un événement : une tour qui tombe, un objectif pris. */
+  function cue(ev) {
+    if (ev.k === 'tower' || ev.k === 'inhib') sfx.tower();
+    else if (ev.k === 'baron' || ev.k === 'elder') sfx.objective(true);
+    else if (ev.k === 'dragon' || ev.k === 'herald' || ev.k === 'grubs') sfx.objective(false);
+  }
+  /** Ce qu'un événement change : bâtiments, objectif, tableau de bord. */
+  function settle(ev) {
     if (ev.st) structures(ev.st, false);
     pulsePit(ev);
     if (ev.k === 'nexus') explode(ev);
     hud(ev);
-    await advance(a.end);
   }
   function explode(ev) {
     const loser = 1 - ev.s, node = built.get('x' + loser);
@@ -383,39 +396,139 @@ export function runMatch({ data, cat, fx }) {
     pop(flash);
     particles.burst(c[0], c[1], { count: 150, colors: SIDE_COLORS[loser].concat(GOLD), speed: [120, 760], life: [0.7, 1.9] });
   }
-  /** Le ralenti : la carte se resserre sur l'action, qui est rejouée lentement, élimination par élimination. */
-  async function slowmo(ev, n) {
-    const mine = run, a = plan.anchors[n], foot = banner.querySelector('.mv-replay-foot');
+  /* ---------- les temps forts, au ralenti ---------- */
+  /* De quoi mettre un combat en scène : déplacer un pion, régler sa barre de vie, lancer un projectile, faire éclater un anneau. */
+  const sideOf = (i) => (i < 5 ? 0 : 1);
+  const put = (i, p) => { tokens[i].style.left = (p[0] / 10).toFixed(2) + '%'; tokens[i].style.top = (p[1] / 10).toFixed(2) + '%'; };
+  const hp = (i, part) => { hpEls[i].style.width = Math.round(100 * part) + '%'; };
+  const again = (node, cls) => { node.classList.remove(cls); void node.offsetWidth; node.classList.add(cls); };
+  function fxNode(cls, p, life) {
+    const node = document.createElement('i');
+    node.className = cls;
+    node.style.left = p[0] / 10 + '%'; node.style.top = p[1] / 10 + '%';
+    mapIn.appendChild(node);
+    setTimeout(() => node.remove(), life);
+    return node;
+  }
+  /** Un projectile part de « from » et touche « to ». */
+  function orb(from, to, side, ms) {
+    const node = fxNode('mv-orb s' + side, from, ms + 90);
+    node.style.transition = 'left ' + ms + 'ms linear,top ' + ms + 'ms linear';
+    requestAnimationFrame(() => requestAnimationFrame(() => { node.style.left = to[0] / 10 + '%'; node.style.top = to[1] / 10 + '%'; }));
+  }
+  const ring = (p, side, big) => fxNode('mv-ring s' + side + (big ? ' big' : ''), p, big ? 1000 : 750);
+
+  /* Le titre affiché pendant un temps fort : il dit où l'on se bat, jamais qui gagne. */
+  const LANE_WORD = { top: 'en haut', mid: 'au milieu', bot: 'en bas' };
+  function teaser(ev, n) {
+    const z = ev.z, fought = ev.kills.length > 0, before = n ? events[n - 1].dr : [0, 0];
+    if (ev.k === 'gank') return 'Embuscade ' + LANE_WORD[z];
+    if (ev.k === 'elder') return 'Dragon ancestral';
+    if (ev.k === 'dragon') return before[0] === 3 || before[1] === 3 ? 'Dragon de l\'âme' : fought ? 'Combat au dragon' : 'Dragon';
+    if (ev.k === 'baron' || z === 'baron') return 'Combat au Baron';
+    if (z.slice(0, 4) === 'base' || z.slice(0, 2) === 'tw') return 'Assaut sur la base';
+    if (LANE_WORD[z] && ev.kills.length <= 1 && new Set(ev.who).size <= 3) return 'Duel ' + LANE_WORD[z];
+    const where = z === 'drake' ? 'au dragon' : z === 'river' ? 'dans la rivière' : LANE_WORD[z] || 'dans la jungle';
+    return (ev.kills.length <= 1 ? 'Accrochage ' : 'Combat ') + where;
+  }
+
+  /** Un temps fort : l'action ne se joue qu'une fois, au ralenti et en gros plan, et rien n'en annonce l'issue. Les deux camps se jettent
+      l'un sur l'autre, les ultimes partent, puis chaque élimination se joue : les assistants touchent la victime (sa vie fond), le tueur
+      fond sur elle et l'achève. Le vrai titre de l'action (« Ace », « Le vol »…) et le commentaire ne tombent qu'à la fin. */
+  async function feature(ev, n) {
+    const mine = run, a = plan.anchors[n], when = plan.at[n], foot = banner.querySelector('.mv-replay-foot'), title = banner.querySelector('b');
     skipSlow = false;
-    banner.querySelector('b').textContent = ev.hl;
+    title.textContent = teaser(ev, n);
+    banner.classList.remove('done');
     foot.innerHTML = '<em>Touche pour passer</em>';
+    ping(a, -1);
     root.classList.add('slow');
     sfx.slowmo();
-    /* on remonte le temps : les victimes sont de nouveau debout */
-    for (const kill of ev.kills) setDead(kill[1], false);
-    const cx = clamp(a[0], 260, 740), cy = clamp(a[1], 260, 740);
-    mapIn.style.transform = 'translate(' + (50 - cx / 5).toFixed(2) + '%,' + (50 - cy / 5).toFixed(2) + '%) scale(2)';
-    await nap(950, null, 2);
+    const cast = [...new Set([...plan.casts[n], ...ev.kills.flatMap((k) => [k[0], k[1]])])];
+    const here = new Map(cast.map((i) => [i, pos[i].slice()])), fallen = new Set();
+    for (const i of cast) { tokens[i].classList.add('fight'); hp(i, 1); }
+    const focus = (p) => {
+      const cx = clamp(p[0], 260, 740), cy = clamp(p[1], 260, 740);
+      mapIn.style.transform = 'translate(' + (50 - cx / 5).toFixed(2) + '%,' + (50 - cy / 5).toFixed(2) + '%) scale(2)';
+    };
+    /* fait avancer un pion vers un point, de « d » au plus, en s'arrêtant à la distance « keep » (les pions ne se marchent pas dessus) */
+    const step = (i, toward, d, keep) => {
+      const p = here.get(i), dx = toward[0] - p[0], dy = toward[1] - p[1], len = Math.hypot(dx, dy) || 1, k = Math.min(d, Math.max(0, len - keep)) / len;
+      const q = [p[0] + dx * k, p[1] + dy * k];
+      here.set(i, q); put(i, q);
+    };
+    focus(a);
+    await nap(620, null, 2);
+    if (!stopped(mine) && cast.length > 1) {
+      /* les deux camps se jettent l'un sur l'autre : chacun fait un pas vers l'adversaire le plus proche */
+      const from = new Map(here);
+      for (const i of cast) {
+        let foe = null, best = Infinity;
+        for (const j of cast) { if (sideOf(j) === sideOf(i)) continue; const d = Math.hypot(from.get(j)[0] - from.get(i)[0], from.get(j)[1] - from.get(i)[1]); if (d < best) { best = d; foe = j; } }
+        if (foe !== null) step(i, from.get(foe), 16, 70);
+      }
+      await nap(260, null, 2);
+      /* les ultimes partent, presque ensemble : un anneau éclate autour de chacun de ceux qui lancent le leur */
+      const ulted = cast.filter((i) => plan.ults[i].used.some(([t]) => t >= when.tau - 400 && t <= when.end));
+      for (const i of ulted) {
+        if (stopped(mine) || skipSlow) break;
+        ring(here.get(i), sideOf(i), true);
+        again(tokens[i], 'ulting');
+        sfx.ult();
+        await nap(120, null, 2);
+      }
+      if (ulted.length) await nap(260, null, 2);
+    }
     const streak = new Map();
+    let count = 0;
     for (const kill of ev.kills) {
       if (stopped(mine)) break;
-      strike(kill, true);
-      const c = (streak.get(kill[0]) || 0) + 1;
-      streak.set(kill[0], c);
+      const K = kill[0], V = kill[1], vp = here.get(V), quick = count >= 4 || skipSlow;
+      /* la carte suit l'action, sans quitter le combat des yeux */
+      focus([(vp[0] + here.get(K)[0]) / 4 + a[0] / 2, (vp[1] + here.get(K)[1]) / 4 + a[1] / 2]);
+      /* ceux qui l'aident touchent d'abord la victime : sa vie fond */
+      const hits = kill[2].filter((h) => here.has(h) && !fallen.has(h)).slice(0, 3);
+      let life = 1;
+      for (const h of hits) {
+        orb(here.get(h), vp, sideOf(h), quick ? 140 : 220);
+        await nap(quick ? 100 : 190, null, 2);
+        life = Math.max(0.28, life - 0.25);
+        hp(V, life); again(tokens[V], 'hurt');
+      }
+      if (!hits.length) { hp(V, 0.5); again(tokens[V], 'hurt'); await nap(170, null, 2); }
+      /* le tueur fond sur sa cible et l'achève (s'il vient de tomber lui-même, c'est son dernier sort qui s'en charge) */
+      if (fallen.has(K)) orb(here.get(K), vp, sideOf(K), quick ? 140 : 220); else step(K, vp, 76, 60);
+      await nap(quick ? 150 : 250, null, 2);
+      if (stopped(mine)) break;
+      hp(V, 0);
+      fallen.add(V);
+      ring(vp, sideOf(K), false);
+      strike(kill, true, here.get(K), vp);
+      const c = (streak.get(K) || 0) + 1;
+      streak.set(K, c);
       /* dans la bande du bas, là où rien ne cache l'action : qui élimine qui */
-      foot.innerHTML = '<p class="mv-kill s' + (kill[0] < 5 ? 0 : 1) + '"><img src="' + iconUrl(cat, P[kill[0]].champ) + '" alt=""><b>' + esc(P[kill[0]].name) + '</b>' + icon('i-play')
-        + '<span>' + esc(P[kill[1]].name) + '</span><img class="v" src="' + iconUrl(cat, P[kill[1]].champ) + '" alt="">' + (c > 1 ? '<em>' + STREAK[Math.min(5, c)] + '</em>' : '') + '</p>';
-      await nap(1000, null, 2);
+      foot.innerHTML = '<p class="mv-kill s' + sideOf(K) + '"><img src="' + iconUrl(cat, P[K].champ) + '" alt=""><b>' + esc(P[K].name) + '</b>' + icon('i-play')
+        + '<span>' + esc(P[V].name) + '</span><img class="v" src="' + iconUrl(cat, P[V].champ) + '" alt="">' + (c > 1 ? '<em>' + STREAK[Math.min(5, c)] + '</em>' : '') + '</p>';
+      await nap(quick ? 480 : 820, null, 2);
+      count++;
     }
-    if (!ev.kills.length) { pulsePit(ev); await nap(1700, null, 2); }
-    await nap(650, null, 2);
+    if (stopped(mine)) { root.classList.remove('slow'); return; }
+    /* l'action est jouée : son vrai titre tombe, avec le commentaire et ce qu'elle change (objectif, bâtiments, or) */
+    tau = when.hud;
+    title.textContent = ev.hl;
+    banner.classList.add('done');
+    say(ev);
+    cue(ev);
+    settle(ev);
+    await nap(ev.kills.length ? 1150 : 1700, null, 2);
     mapIn.style.transform = 'translate(0%,0%) scale(1)';
     root.classList.remove('slow');
-    for (const kill of ev.kills) setDead(kill[1], true);
-    /* le direct reprend : chaque pion retrouve l'allure que lui donne son trajet */
+    for (const i of cast) tokens[i].classList.remove('fight', 'ulting', 'hurt');
+    /* le direct reprend : chaque pion glisse de là où l'action l'a laissé jusqu'à sa place, et retrouve l'allure que lui donne son trajet */
+    for (const i of cast) shown[i] = here.get(i).slice();
     look.fill('?');
     skipSlow = false;
-    await nap(520);
+    await advance(when.end);
   }
   function reset() {
     run++;
@@ -425,8 +538,9 @@ export function runMatch({ data, cat, fx }) {
     score[0] = 0; score[1] = 0;
     setClock(0);
     tau = 0;
-    cursor.fill(0); look.fill('?'); campLook.fill('?'); csLook.fill(-1); ultLook.fill(null);
-    P.forEach((p, i) => { kda[i] = { k: 0, d: 0, a: 0 }; setDead(i, false); drawKda(i); });
+    cursor.fill(0); look.fill('?'); campLook.fill('?'); csLook.fill(-1); ultLook.fill(null); lvLook.fill(0);
+    P.forEach((p, i) => { kda[i] = { k: 0, d: 0, a: 0 }; setDead(i, false); drawKda(i); tokens[i].classList.remove('fight', 'ulting', 'hurt'); });
+    banner.classList.remove('done');
     draw(true);
     cast.innerHTML = '<p class="mv-line"><time>0:00</time><span>Bienvenue sur la Faille de l\'invocateur : ' + esc(M.teams[0].name) + ' contre ' + esc(M.teams[1].name) + '.</span></p>';
     hud({ sc: [0, 0], g: [2500, 2500], tw: [0, 0], dr: [0, 0], bn: [0, 0] });
@@ -460,8 +574,8 @@ export function runMatch({ data, cat, fx }) {
       await advance(plan.at[n].tau);
       if (stopped(mine)) break;
       setClock(events[n].t);
-      await show(events[n], n);
-      if (events[n].hl && fx && !stopped(mine)) await slowmo(events[n], n);
+      /* un temps fort se joue une seule fois, au ralenti et sans en annoncer l'issue ; le reste, en direct */
+      if (events[n].hl && fx) await feature(events[n], n); else await show(events[n], n);
     }
     playing = false;
     if (closed || mine !== run) return;

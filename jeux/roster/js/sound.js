@@ -173,6 +173,8 @@ export const sfx = {
     [E5 / 2, B5 / 2].forEach((f, k) => tone(f, { t: k * 0.12, dur: 0.7, vol: 0.12, type: 'triangle', attack: 0.03 }));
     if (big) { tone(82.4, { dur: 1.2, vol: 0.22, attack: 0.03 }); bell(E6, 0.26, 0.08, 1.1); }
   },
+  /** Un ultime part, pendant un ralenti : un souffle qui s'ouvre, une note grave. */
+  ult() { noise({ dur: 0.3, vol: 0.05, freq: 500, to: 3000, q: 0.8 }); bell(E5 / 2, 0.02, 0.06, 0.6); },
   /** Début d'un ralenti : tout descend. */
   slowmo() { tone(520, { dur: 0.7, to: 130, vol: 0.11, type: 'triangle' }); noise({ dur: 0.7, vol: 0.09, freq: 4200, to: 500, q: 0.8 }); },
   /** Le Nexus explose. */

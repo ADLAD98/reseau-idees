@@ -193,8 +193,10 @@ const OPENING = [4800, 6000];                            // le tout début : cha
 export const SHOW_LEAD = 480, KILL_GAP = 250;            // avant la première élimination, puis entre deux
 const V = 0.34, VFAST = 0.52, VRUSH = 0.8, VMAX = 1.5, VSLOW = 0.09;   // vitesses de marche, en unités de carte par milliseconde
 const LANING_END = 840, LATE = 1500;
-/* heure (secondes de jeu) à laquelle chaque poste atteint le niveau 6 et obtient son ultime : TOP, JGL, MID, ADC, SUP */
-const ULT_AT = [310, 350, 300, 420, 500];
+/* Les niveaux : heure (secondes de jeu) à laquelle chaque poste (TOP, JGL, MID, ADC, SUP) atteint les niveaux 2, 6, 11, 16 et 18 ;
+   entre deux repères, un niveau à intervalles réguliers. Le niveau 6 donne l'ultime. */
+const LEVEL_MARKS = [2, 6, 11, 16, 18];
+const LEVEL_AT = [[95, 305, 690, 1290, 1640], [100, 350, 770, 1420, 1800], [95, 300, 680, 1270, 1620], [115, 420, 880, 1560, 1980], [115, 500, 1080, 1860, 2400]];
 
 /** Prépare tous les déplacements d'une partie. sim : ce que le serveur renvoie (events, duration, kills). */
 export function planMoves(sim) {
@@ -696,12 +698,35 @@ export function planMoves(sim) {
     tracks.push(keys);
   }
 
-  /* ---------- 6. les ultimes ---------- */
-  /* Le serveur ne suit pas les sorts : la mise en scène en tire une histoire plausible. Chacun obtient son ultime au niveau 6
-     (plus tard en duo sur la voie du bas), le lance dans les actions où il compte, puis attend qu'il revienne. */
+  /* ---------- 6. les niveaux ---------- */
+  /* Le serveur ne suit pas l'expérience : chacun monte au rythme ordinaire de son poste (les joueurs seuls sur leur voie d'abord,
+     le support en dernier), un peu plus ou un peu moins vite selon la partie ; un mort n'apprend rien pendant qu'il attend. */
+  const levels = [];
+  for (let i = 0; i < 10; i++) {
+    const marks = LEVEL_AT[i % 5], speed = 0.96 + rnd() * 0.08;
+    const dead = deaths[i].map(([a, b]) => [gameAt(a), gameAt(b)]);
+    const lost = (g) => dead.reduce((sum, [a, b]) => sum + (a < g ? Math.min(b, g) - a : 0), 0);
+    const times = [];
+    for (let L = 2; L <= 18; L++) {
+      let k = 0;
+      while (k < LEVEL_MARKS.length - 2 && LEVEL_MARKS[k + 1] < L) k++;
+      const l0 = LEVEL_MARKS[k], l1 = LEVEL_MARKS[k + 1];
+      const need = (L <= l0 ? marks[k] * ((L - 1) / (l0 - 1)) : marks[k] + (marks[k + 1] - marks[k]) * ((L - l0) / (l1 - l0))) * speed;
+      let g = need;
+      for (let pass = 0; pass < 3; pass++) g = need + 0.6 * lost(g);
+      times.push(tauOfGame(g));
+    }
+    levels.push(times);
+  }
+  /** Le niveau du joueur i à l'instant tau, de 1 à 18. */
+  const levelAt = (i, x) => { const t = levels[i]; let L = 1; while (L < 18 && t[L - 1] <= x) L++; return L; };
+
+  /* ---------- 7. les ultimes ---------- */
+  /* Le serveur ne suit pas les sorts : la mise en scène en tire une histoire plausible. Chacun obtient son ultime au niveau 6,
+     le lance dans les actions où il compte, puis attend qu'il revienne. */
   const ults = [];
   for (let i = 0; i < 10; i++) {
-    const role = i % 5, from = tauOfGame(ULT_AT[role] + rand(-20, 25)), used = [];
+    const from = levels[i][4], used = [];
     let ready = from;
     for (const A of appts[i]) {
       const n = A.n, e = ev[n], a = at[n];
@@ -728,7 +753,7 @@ export function planMoves(sim) {
     return true;
   };
 
-  return { total, at, anchors, casts, tracks, deaths, camps: CAMPS.map((c) => ({ id: c.id, p: c.p, side: c.side, kind: c.kind, hold: c.hold, down: campDown.get(c.id) })), gameAt, tauOfGame, stats, ults, ultReady };
+  return { total, at, anchors, casts, tracks, deaths, camps: CAMPS.map((c) => ({ id: c.id, p: c.p, side: c.side, kind: c.kind, hold: c.hold, down: campDown.get(c.id) })), gameAt, tauOfGame, stats, ults, ultReady, levels, levelAt };
 }
 
 /** Où se trouve un joueur à l'instant tau : { x, y, k } (k : ce qu'il fait — w marche, d court, h attend, f combat, c tue un camp, r rentre, g parti, x mort). */
