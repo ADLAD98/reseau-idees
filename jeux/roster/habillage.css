@@ -202,6 +202,72 @@ p.empty::before{content:"";display:block;width:13px;height:13px;margin:0 auto 16
 .prize.lp.down{border-color:rgba(240,86,107,.45);background:linear-gradient(90deg,rgba(240,86,107,.12),transparent)}
 .prize.lp.down b{color:#f6c4cb}
 
+/* ---------- le club (écran Profil) : sa carte, ses infrastructures ---------- */
+.club{display:grid;gap:18px;margin-bottom:36px}
+.club[hidden]{display:none}
+.club .h2{margin:8px 0 0}
+.cb-card{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:20px 30px;padding:24px 28px}
+/* le blason : un écu à la teinte du club (tirée de son nom), liseré d'or, son sigle au centre */
+.cb-crest{flex:none;position:relative;display:grid;place-items:center;width:92px;height:106px;background:linear-gradient(160deg,#f0e6d2,#c8aa6e 42%,#785a28);
+  clip-path:polygon(50% 0,100% 11%,100% 62%,50% 100%,0 62%,0 11%);-webkit-clip-path:polygon(50% 0,100% 11%,100% 62%,50% 100%,0 62%,0 11%)}
+.cb-crest::before{content:"";position:absolute;inset:2px;background:radial-gradient(90% 62% at 50% 18%,hsl(var(--ch) 58% 34%),hsl(var(--ch) 64% 11%) 78%);
+  clip-path:polygon(50% 0,100% 11%,100% 62%,50% 100%,0 62%,0 11%);-webkit-clip-path:polygon(50% 0,100% 11%,100% 62%,50% 100%,0 62%,0 11%)}
+.cb-crest span{position:relative;margin-top:-12%;font:400 min(32px,calc(88px / var(--n)))/1 var(--title);letter-spacing:.03em;color:var(--gold-hi);text-shadow:0 2px 8px rgba(0,0,0,.75)}
+.cb-crest.small{width:44px;height:51px}
+.cb-crest.small::before{inset:1px}
+.cb-crest.small span{font-size:min(15px,calc(40px / var(--n)))}
+.cb-id{min-width:0}
+.cb-id h2{margin:7px 0 4px;font:400 30px/1.1 var(--title);letter-spacing:.06em;text-transform:uppercase;color:var(--gold-hi);overflow-wrap:anywhere}
+.cb-id p{color:var(--mut);font-size:14.5px}
+.cb-level{display:flex;align-items:center;gap:12px;max-width:400px;margin-top:13px}
+.cb-level b{font:600 12.5px/1 var(--text);letter-spacing:.13em;text-transform:uppercase;color:var(--ink);white-space:nowrap}
+.cb-level .bar{flex:1;height:4px}
+.cb-level em{font:600 12.5px/1 var(--text);font-style:normal;color:var(--mut);font-variant-numeric:tabular-nums}
+.cb-stats{display:flex;align-items:center;gap:28px}
+.cb-stats>div{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.cb-stats b{font:600 24px/1 var(--text);color:var(--gold-hi);font-variant-numeric:tabular-nums;white-space:nowrap}
+.cb-stats span{font:600 11px/1 var(--text);letter-spacing:.14em;text-transform:uppercase;color:var(--mut);white-space:nowrap}
+.cb-stats .gold b{color:var(--blue-hi)}
+.cb-stats .cb-rank{align-items:center;gap:3px}
+.rk-em.small{width:34px;height:35px;padding-top:3px}
+.rk-em.small b{width:19px;height:19px;border-width:1px}
+.rk-em.small span{gap:3px}
+.rk-em.small u{width:3px;height:3px}
+/* une infrastructure : une carte « structure », au bronze, à l'argent puis à l'or selon son niveau */
+.cb-list{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px}
+.cb-s{--sc:var(--gold-lo);display:flex;flex-direction:column;align-items:center;gap:9px;min-width:0;padding:18px 14px 16px;border:1px solid var(--sc);text-align:center;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--sc) 15%,#0a1626),rgba(6,14,27,.7) 62%)}
+.cb-s.lv1{--sc:var(--t1)}
+.cb-s.lv2{--sc:var(--t2)}
+.cb-s.lv3{--sc:var(--t3)}
+.cb-s.off{border-style:dashed;border-color:var(--line2);background:rgba(6,14,27,.45)}
+.cb-s-art{display:grid;place-items:center;width:74px;height:74px;border:1px solid color-mix(in srgb,var(--sc) 62%,transparent);border-radius:50%;
+  background:radial-gradient(closest-side,color-mix(in srgb,var(--sc) 24%,transparent),transparent);color:var(--sc)}
+.cb-s.off .cb-s-art{border-color:var(--line);background:none;color:#5b6b7d}
+.cb-s-art svg{width:44px;height:44px}
+.cb-s>b{font:400 15px/1.2 var(--title);letter-spacing:.08em;text-transform:uppercase;color:var(--gold-hi)}
+.cb-pips{display:flex;gap:7px;padding:2px 0}
+.cb-pips i{width:8px;height:8px;transform:rotate(45deg);border:1px solid var(--line2)}
+.cb-pips i.on{border-color:var(--sc);background:var(--sc);box-shadow:0 0 8px color-mix(in srgb,var(--sc) 70%,transparent)}
+.cb-s-fx{color:var(--ink);font-size:14px;line-height:1.4}
+.cb-s.off .cb-s-fx{color:var(--mut)}
+.cb-s-next{color:var(--mut);font-size:12.5px;line-height:1.35}
+.cb-s-acts{display:grid;gap:8px;width:100%;margin-top:auto;padding-top:4px}
+.cb-s-acts .btn{width:100%}
+.cb-s-done{font:600 11px/1.35 var(--text);letter-spacing:.1em;text-transform:uppercase;color:var(--mut)}
+.cb-note{color:var(--mut);font-size:14px;line-height:1.5}
+/* sur la fiche d'un ami : son club en une ligne */
+.soc-club{display:flex;align-items:center;gap:14px;padding:12px 16px;border:1px solid var(--line);background:rgba(9,20,40,.5)}
+.soc-club>span:nth-child(2){flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.soc-club>span>b{font:600 16px/1.2 var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.soc-club>span>i{font-style:normal;font-size:13.5px;color:var(--mut)}
+.soc-club-s{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:9px}
+.cb-mini{--sc:var(--t1);position:relative;display:grid;place-items:center;width:34px;height:34px;border:1px solid var(--sc);border-radius:50%;color:var(--sc)}
+.cb-mini.lv2{--sc:var(--t2)}
+.cb-mini.lv3{--sc:var(--t3)}
+.cb-mini svg{width:20px;height:20px}
+.cb-mini b{position:absolute;right:-5px;bottom:-5px;display:grid;place-items:center;width:15px;height:15px;border:1px solid var(--sc);border-radius:50%;background:#07101d;font:700 9.5px/1 var(--text);color:var(--ink)}
+
 /* ---------- le champion du jour : la saisie, le tableau des essais, le booster gagné ---------- */
 .daily{margin-top:44px}
 .dg{display:grid;gap:20px}
@@ -330,6 +396,23 @@ body.fx .dg-won{animation:fade .5s}
   .pod .soc-av{width:26px;height:26px;margin:16px 0 14px}
   .pod b{font-size:14.5px}
   .pod>span{font-size:11.5px}
+  .club{gap:14px;margin-bottom:30px}
+  .cb-card{grid-template-columns:auto minmax(0,1fr);gap:16px 18px;padding:18px 16px}
+  .cb-crest{width:68px;height:78px}
+  .cb-crest span{font-size:min(24px,calc(64px / var(--n)))}
+  .cb-id h2{font-size:23px}
+  .cb-stats{grid-column:1/-1;justify-content:space-between;gap:12px}
+  .cb-stats>div{align-items:flex-start}
+  .cb-stats b{font-size:20px}
+  .cb-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .cb-s{padding:16px 10px 12px}
+  .cb-s:last-child{grid-column:1/-1}
+  .cb-s-art{width:62px;height:62px}
+  .cb-s-art svg{width:36px;height:36px}
+  .cb-s>b{font-size:13.5px}
+  .cb-s-fx{font-size:13px}
+  .soc-club{flex-wrap:wrap;padding:12px}
+  .soc-club-s{width:100%;justify-content:flex-start}
   .online-play{margin-bottom:34px}
   .on-grid{grid-template-columns:1fr;gap:14px}
   .on-card{padding:18px 16px}
@@ -359,6 +442,8 @@ body.fx .dg-won{animation:fade .5s}
   .dg-teaser button{height:44px;padding:0 12px;gap:10px}
   .dg-teaser b{font-size:14.5px}
   .pf-id{gap:18px}
+  /* (un long pseudo tient sur une ligne : le titre rétrécit avec sa longueur) */
+  .pf-id .h1{font-size:min(34px,calc(96vw / var(--n,8)))}
   .pf-av{width:38px;height:38px;margin:0 9px}
   .pf-av span{font-size:18px}
 }

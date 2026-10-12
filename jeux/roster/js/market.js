@@ -215,7 +215,7 @@ function pickCard() {
   };
   /* la vente rapide de tous les doublons des premiers rangs : le jeu les rachète d'un coup, à bas prix */
   const quick = S.shop && S.shop.quick, lots = quick ? mine.filter(([c, qty]) => qty > 1 && !c.variant && c.tier <= quick.bulkTier) : [];
-  const bulkCount = lots.reduce((n, [, qty]) => n + qty - 1, 0), bulkGain = lots.reduce((n, [c, qty]) => n + (qty - 1) * (quick.tier[c.tier] || 0), 0);
+  const bulkCount = lots.reduce((n, [, qty]) => n + qty - 1, 0), bulkGain = lots.reduce((n, [c, qty]) => n + (qty - 1) * Math.round((quick.tier[c.tier] || 0) * (quick.bonus || 1)), 0);
   const s = openSheet(sheetTitle('Vendre une carte', 'Tes doubles d\'abord. Une carte en vente quitte ta collection ; elle y revient si tu retires l\'annonce.')
     + (bulkCount ? '<div class="quick-all"><p><b>Vente rapide</b> — le jeu rachète tout de suite tes ' + plural(bulkCount, 'doublon', 'doublons') + ' de rang Recrue, Titulaire et Star. Il te reste un exemplaire de chaque carte.</p>'
       + '<button class="btn" type="button" id="quickAll">Tout vendre · +' + num(bulkGain) + ' crédits</button></div>' : '')

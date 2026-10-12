@@ -11,6 +11,8 @@ import { confirmSheet, countdown, num, openSheet, sheetTitle } from './ui.js';
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 export const formatName = (n, fearless) => (n === 1 ? 'une partie' : 'BO' + n + (fearless ? ' fearless' : ''));
 const POLL = 2000;
+/* durée maximale d'une recherche de partie classée */
+const QUEUE_MAX = 10 * 60000;
 
 /** ctx : ce que l'application prête — S, call, guard, toast, now, refresh, refreshMe, expired. Renvoie { invite, bot, incoming, resume }. */
 export function createDuels(ctx) {
@@ -111,6 +113,15 @@ export function createDuels(ctx) {
       line.textContent = (res.waiting ? (res.waiting > 1 ? res.waiting + ' autres joueurs sont' : 'Un autre joueur est') + ' dans la file.' : 'Personne d\'autre dans la file pour l\'instant.') + ' Plus l\'attente dure, plus la recherche s\'élargit aux rangs voisins.';
       await wait(POLL);
       if (over) return;
+      /* au bout de dix minutes sans adversaire, la recherche s'arrête d'elle-même : un onglet oublié ne reste pas dans la file */
+      if (Date.now() - since > QUEUE_MAX) {
+        s.close();
+        try { await call('POST', '/api/ranked/leave'); } catch (e) { /* la file m'oubliera d'elle-même */ }
+        toast('Personne dans la file pour l\'instant. Réessaie un peu plus tard, ou lance une partie rapide.', true);
+        return;
+      }
+      /* onglet en arrière-plan : on ne donne plus signe de vie (la file m'oublie), et la recherche reprend au retour */
+      if (document.hidden) continue;
       try { res = await call('POST', '/api/ranked/queue'); } catch (e) { if (e instanceof ApiError && e.status === 401) { s.close(); ctx.expired(); return; } continue; }
       if (res.duel) { s.close(); sfx.turn(); resume(res.duel); return; }
     }

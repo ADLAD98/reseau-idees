@@ -2,6 +2,7 @@
    Le serveur garde tout (amitiés, propositions, cartes) ; ici on affiche et on demande. */
 import { ApiError } from './api.js';
 import { cardHTML, esc } from './cards.js';
+import { crestHTML, structuresLine } from './club.js';
 import { confirmSheet, openSheet, plural, sheetTitle, since } from './ui.js';
 
 const $ = (sel, root) => (root || document).querySelector(sel);
@@ -227,11 +228,14 @@ async function openFriend(id, focus) {
   const s = openSheet(sheetTitle(esc(p.name), (p.online ? '<i class="dot on"></i>En ligne' : 'Vu ' + since(now - p.seenAt)) + ' · joueur depuis le ' + frDate(p.createdAt))
     + '<div class="tally soc-tally"><div><b>' + data.lineup.rating + '</b><span>Note d\'équipe</span></div><div><b>' + p.duelWins + ' – ' + p.duelLosses + '</b><span>Défis</span></div>'
     + '<div><b>' + p.cards + '</b><span>Cartes</span></div><div class="gold"><b>' + p.titles + '</b><span>' + (p.titles > 1 ? 'Mondiaux' : 'Mondial') + '</span></div></div>'
+    /* son club : son blason, son niveau, son rang au classé, ses infrastructures */
+    + (p.club ? '<div class="soc-club">' + crestHTML(p.team, p.club.short, 'small') + '<span><b>' + esc(p.team) + '</b><i>Club de niveau ' + p.club.level + (p.rank ? ' · ' + esc(p.rank.label) : '') + '</i></span>'
+      + '<span class="soc-club-s">' + structuresLine(p.club.levels) + '</span></div>' : '')
     + '<div class="foe-cards">' + team + '</div>'
     + '<div class="soc-duel" id="duelBox"><h3>Le défier</h3><div class="pills" id="fmt">' + FORMATS.map((f) => '<button type="button" data-format="' + f[0] + '"' + (f[0] === format ? ' class="on"' : '') + '>' + f[1] + '</button>').join('') + '</div>'
     + (canFearless ? '<label class="soc-fear" id="fearBox"' + (format > 1 ? '' : ' hidden') + '><input type="checkbox" id="fear"' + (fearless ? ' checked' : '') + '><span><b>Fearless</b> : un champion joué dans une manche ne peut plus l\'être dans les suivantes, par aucune des deux équipes.</span></label>' : '')
     + '<div class="actions"><button class="btn primary" type="button" id="goLive"' + (p.online ? '' : ' disabled') + '>Défier en direct</button><button class="btn" type="button" id="goBot">Affronter son équipe</button></div>'
-    + '<p class="note">' + (p.online ? 'En direct : vous faites la draft chacun votre tour, ' + (p.turn || 35) + ' secondes par choix, puis vous regardez la même partie.'
+    + '<p class="note">' + (p.online ? 'En direct : vous faites la draft chacun votre tour, ' + (data.turn || 35) + ' secondes par choix, puis vous regardez la même partie.'
       : esc(p.name) + ' n\'est pas en ligne : le défi en direct attendra.') + ' « Affronter son équipe » : l\'ordinateur dirige ses cartes, il n\'a pas besoin d\'être là.</p></div>'
     + '<div class="actions"><button class="btn" type="button" id="goTrade">Proposer un échange</button><button class="btn danger" type="button" id="unfriend">Retirer de mes amis</button></div>',
     { cls: 'friend', label: p.name });

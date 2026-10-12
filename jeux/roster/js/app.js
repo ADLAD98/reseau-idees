@@ -2,6 +2,7 @@
    Le serveur décide de tout (cartes tirées, délais, collection, matchs, ventes, échanges) ; cette page affiche et met en scène. */
 import { ApiError, call, clearSession, deriveKey, loadSession, saveSession } from './api.js';
 import { VARIANTS, cardHTML, champName, esc, flagUrl, iconUrl, karmineEra, logoHTML, photoUrl, prepare, statsOf, tiltCard, variantRank } from './cards.js';
+import { clubSectionHTML, loadClub } from './club.js';
 import { GAME_NAME, ROLE_LABEL, ROLE_NAME, ROLE_ORDER, STORE } from './config.js';
 import { dailyLook, drawDaily, loadDaily } from './daily.js';
 import { createDuels } from './duel.js';
@@ -44,6 +45,8 @@ const S = {
   daily: null,            // le « Champion du jour » : mon tableau du jour (false : le serveur ne connaît pas ce jeu)
   dailyOn: false,         // le serveur annonce des boosters du jour : le « Champion du jour » est proposé
   dailyPool: null,        // la liste des champions pour la saisie, et le nom des régions
+  club: null,             // mon club : le niveau de chacune de ses infrastructures (null : le serveur ne connaît pas le club)
+  clubView: null,         // le détail du club (prix, effets, billetterie), tel que l'écran Profil l'affiche
   skew: 0,                // heure du serveur − heure de cet appareil
   cat: null,              // catalogue des cartes
   owned: new Map(),       // identifiant de carte → { qty, at }
@@ -91,12 +94,14 @@ function applyState(data) {
   if (data.shop) S.shop = data.shop;
   /* le « Champion du jour » et ses boosters (même remarque) */
   if (data.daily) { S.dailyOn = true; if (S.daily && S.daily.pack) S.daily.pack.count = data.daily.packs; }
+  if (data.club) S.club = data.club;
   if (typeof data.skew === 'number') S.skew = data.skew;
 }
 /** Ce que rapporte la vente rapide d'un exemplaire de cette carte (c'est le serveur qui fixe le barème). */
 function quickPrice(card) {
   const q = S.shop && S.shop.quick;
-  return q ? Math.round((q.tier[card.tier] || 4) * (card.variant ? q.variant[card.variant] || 1 : 1)) : 0;
+  /* (bonus : ce que la cellule de recrutement du club ajoute au prix de chaque carte) */
+  return q ? Math.round(Math.round((q.tier[card.tier] || 4) * (card.variant ? q.variant[card.variant] || 1 : 1)) * (q.bonus || 1)) : 0;
 }
 /** Lance une action qui parle au serveur ; une connexion expirée ramène à l'écran de connexion. */
 async function guard(action) {
@@ -287,7 +292,7 @@ function showAuth(message) {
       S.session = { token: data.token, name: data.player.name };
       saveSession(S.session);
       /* (un autre compte sur le même écran : rien de l'équipe ni des missions du précédent ne doit rester) */
-      S.play = null; S.missions = null; hubAsked = false; S.daily = null; S.dailyOn = false;
+      S.play = null; S.missions = null; hubAsked = false; S.daily = null; S.dailyOn = false; S.club = null; S.clubView = null;
       await loadGame();
       location.hash = '#/packs';
       shell();
@@ -507,6 +512,8 @@ function packActionHTML() {
     + (left > 0 ? ' · prochain pack gratuit dans <b id="count">' + clock(left) + '</b>' : '') + '</p>' : '';
   return '<button class="btn primary big" type="button" id="openPack">' + (left > 0 ? 'Ouvrir un pack en réserve' : 'Ouvrir le pack') + '</button>' + reserve;
 }
+/* « 10 minutes », « 9 min 30 » : le délai du pack gratuit (le centre de formation du club le raccourcit) */
+const every = (ms) => { const m = Math.floor(ms / 60000), s = Math.round((ms % 60000) / 1000); return s ? m + ' min ' + s : m + ' minutes'; };
 function viewPacks(main) {
   /* les missions avancent en jouant : on les redemande à chaque passage sur cet écran */
   loadMissions();
@@ -517,7 +524,7 @@ function viewPacks(main) {
   const menu = S.shop ? '<div class="seg pack-menu" id="packMenu"><button type="button" data-pack="free"' + (credits ? '' : ' class="on"') + '>Pack gratuit</button>'
     + '<button type="button" data-pack="credits"' + (credits ? ' class="on"' : '') + '>Booster · ' + S.shop.credits.price + ' crédits</button></div>' : '';
   main.innerHTML = '<section class="home"><div class="home-pack' + (credits ? ' credits' : '') + '" id="packBox">' + packHTML(packReady() ? 'ready' : 'waiting', S.cat.season, S.free.size, packLook(kind)) + '</div>'
-    + '<div class="home-side">' + menu + '<div class="eyebrow">' + (credits ? 'Booster à crédits · un toutes les ' + Math.round(S.shop.credits.cooldownMs / 60000) + ' minutes' : 'Pack gratuit · toutes les ' + Math.round(S.free.cooldownMs / 60000) + ' minutes') + '</div>'
+    + '<div class="home-side">' + menu + '<div class="eyebrow">' + (credits ? 'Booster à crédits · un toutes les ' + Math.round(S.shop.credits.cooldownMs / 60000) + ' minutes' : 'Pack gratuit · toutes les ' + every(S.free.cooldownMs)) + '</div>'
     + '<h1 class="h1">' + S.free.size + ' cartes ' + (credits ? 'de plus' : 'à découvrir') + '</h1>'
     + '<p class="lead">' + (credits ? 'Un booster en plus du pack gratuit, payé avec tes crédits. Ses chances sont un peu plus faibles que celles du pack gratuit (le détail est dans ton profil).'
       /* (sur un téléphone, seulement l'essentiel : le bouton doit tenir sur le premier écran) */
@@ -967,11 +974,13 @@ async function viewProfile(main) {
   const p = S.player;
   /* en tête : le losange du joueur, son équipe, puis ses chiffres */
   const games = p.wins + p.losses, titles = p.titles || 0;
-  main.innerHTML = '<div class="col-head"><div class="pf-id"><i class="who-av pf-av"><span>' + esc(p.name.charAt(0).toUpperCase()) + '</span></i><div><h1 class="h1">' + esc(p.name) + '</h1>'
+  main.innerHTML = '<div class="col-head"><div class="pf-id"><i class="who-av pf-av"><span>' + esc(p.name.charAt(0).toUpperCase()) + '</span></i><div><h1 class="h1" style="--n:' + Math.max(6, p.name.length) + '">' + esc(p.name) + '</h1>'
     + '<p>Joueur depuis le ' + frDate(p.createdAt) + (p.team ? ' · équipe <b>' + esc(p.team.name) + '</b> (' + esc(p.team.short) + ')' : '') + '</p></div></div>'
     + '<div class="tally"><div><b>' + num(p.wins) + '</b><span>' + (p.wins > 1 ? 'victoires' : 'victoire') + '</span></div><div><b>' + (games ? pct(p.wins, games) + '<small> %</small>' : '–') + '</b><span>de réussite</span></div>'
     + '<div><b>' + p.cardsUnique + '<small>/' + S.cat.cards.length + '</small></b><span>cartes</span></div>'
-    + (S.live ? '<div class="gold"><b>' + titles + '</b><span>' + (titles > 1 ? 'Mondiaux' : 'Mondial') + '</span></div>' : '') + '</div></div><div class="panels">'
+    + (S.live ? '<div class="gold"><b>' + titles + '</b><span>' + (titles > 1 ? 'Mondiaux' : 'Mondial') + '</span></div>' : '') + '</div></div>'
+    /* mon club : sa carte et ses infrastructures (rempli quand le serveur a répondu) */
+    + (S.club ? clubSectionHTML() : '') + '<div class="panels">'
     + '<section class="panel"><h3>Mon compte</h3><div class="kv"><span>Packs ouverts</span><b>' + p.packsOpened + '</b><span>Cartes différentes</span><b>' + p.cardsUnique + ' / ' + S.cat.cards.length + '</b><span>Exemplaires</span><b>' + p.cardsTotal + '</b><span>Parties gagnées</span><b>' + p.wins + ' sur ' + (p.wins + p.losses) + '</b>'
     + (S.live ? '<span>Défis entre joueurs</span><b>' + (p.duelWins || 0) + ' V – ' + (p.duelLosses || 0) + ' D</b><span>Mondiaux remportés</span><b>' + (p.titles || 0) + '</b>' : '')
     + '<span>Crédits</span><b>' + p.coins + '</b></div>'
@@ -994,6 +1003,7 @@ async function viewProfile(main) {
     + '<p class="hint">' + esc(GAME_NAME) + ' was created under Riot Games\' "Legal Jibber Jabber" policy using assets owned by Riot Games. Riot Games does not endorse or sponsor this project. Ce jeu n\'est ni approuvé ni sponsorisé par Riot Games, ni par les équipes et les joueurs cités.</p>'
     + '<div class="actions"><a class="btn" href="../../">Retour à Bcorps Labs</a></div></section></div>';
 
+  loadClub(PLAY);
   $('#fxSwitch').addEventListener('click', (e) => {
     S.fx = !S.fx;
     e.currentTarget.setAttribute('aria-pressed', String(S.fx));
