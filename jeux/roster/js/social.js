@@ -216,7 +216,7 @@ async function openFriend(id, focus) {
     + '<div class="soc-duel" id="duelBox"><h3>Le défier</h3><div class="pills" id="fmt">' + FORMATS.map((f) => '<button type="button" data-format="' + f[0] + '"' + (f[0] === format ? ' class="on"' : '') + '>' + f[1] + '</button>').join('') + '</div>'
     + (canFearless ? '<label class="soc-fear" id="fearBox"' + (format > 1 ? '' : ' hidden') + '><input type="checkbox" id="fear"' + (fearless ? ' checked' : '') + '><span><b>Fearless</b> : un champion joué dans une manche ne peut plus l\'être dans les suivantes, par aucune des deux équipes.</span></label>' : '')
     + '<div class="actions"><button class="btn primary" type="button" id="goLive"' + (p.online ? '' : ' disabled') + '>Défier en direct</button><button class="btn" type="button" id="goBot">Affronter son équipe</button></div>'
-    + '<p class="note">' + (p.online ? 'En direct : vous faites la draft chacun votre tour, 35 secondes par choix, puis vous regardez la même partie.'
+    + '<p class="note">' + (p.online ? 'En direct : vous faites la draft chacun votre tour, ' + (p.turn || 35) + ' secondes par choix, puis vous regardez la même partie.'
       : esc(p.name) + ' n\'est pas en ligne : le défi en direct attendra.') + ' « Affronter son équipe » : l\'ordinateur dirige ses cartes, il n\'a pas besoin d\'être là.</p></div>'
     + '<div class="actions"><button class="btn" type="button" id="goTrade">Proposer un échange</button><button class="btn danger" type="button" id="unfriend">Retirer de mes amis</button></div>',
     { cls: 'friend', label: p.name });
