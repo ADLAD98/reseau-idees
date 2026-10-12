@@ -50,10 +50,11 @@ export function compState(list) {
   for (const c of list) { if (c.d === 'AD') ad++; else if (c.d === 'AP') ap++; else { ad += 0.5; ap += 0.5; } }
   return { ad, ap, front: list.some((c) => c.t === 'Tank' || c.t2 === 'Tank'), size: list.length };
 }
-/** Chances de victoire estimées d'après l'écart de note, pour un joueur qui drafte correctement.
+/** Chances de victoire estimées d'après l'écart de note, pour un joueur qui suit les conseils de draft.
     Réglé sur des milliers de matchs complets (outils/essai-equilibre.mjs côté serveur) : à note égale, l'équipe réelle garde
-    un léger avantage, parce que ses joueurs se connaissent et jouent leurs champions habituels. */
-export const winChance = (mine, theirs) => 1 / (1 + Math.exp(-0.21 * (mine - theirs - 1.2)));
+    un léger avantage, parce que ses joueurs se connaissent et jouent leurs champions habituels ; et un remplaçant (subs : leur nombre)
+    coûte plus que sa note ne le dit, car il n'a aucun champion de confort. */
+export const winChance = (mine, theirs, subs = 0) => 1 / (1 + Math.exp(-0.21 * (mine - theirs - 1.2 - 1.5 * subs)));
 /** Écrit un bonus avec son signe et une virgule : +1,5 ou −0,4. */
 export const signed = (x) => {
   const v = Math.round(x * 10) / 10;

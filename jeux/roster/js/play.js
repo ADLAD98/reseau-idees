@@ -188,7 +188,8 @@ function showFoe(id) {
   const S = G.S, P = S.play, cat = S.cat, o = P.opponents.find((x) => x.id === id);
   if (!o) return;
   const team = cat.teamById.get(id), league = cat.leagues.find((l) => l.id === o.league);
-  const mine = P.lineup.rating, chance = Math.min(95, Math.max(5, Math.round(winChance(mine, o.rating) * 20) * 5));
+  const subs = P.lineup.players.filter((p) => !p.id).length;
+  const mine = P.lineup.rating, chance = Math.min(95, Math.max(5, Math.round(winChance(mine, o.rating, subs) * 20) * 5));
   const cards = o.players.concat([o.coach]).map((cid) => (cid ? cat.cardById.get(cid) : null)).filter(Boolean);
   const empty = SLOTS.filter((s) => !P.deck[s[0]]).length;
   const sheet = document.createElement('div');
@@ -229,6 +230,8 @@ async function playMatch(match) {
   try {
     const out = await runDraft({
       match, cat: S.cat, fx: S.fx, toast: G.toast,
+      /* un joueur qui n'a encore jamais joué voit d'abord les règles de la draft */
+      help: S.player.wins + S.player.losses === 0 && match.log.length < 2,
       act: (body) => G.call('POST', '/api/match/act', body),
       /* en cas de désaccord avec le serveur, on repart de ce qu'il a en mémoire */
       resync: async () => (await G.call('GET', '/api/play')).active,

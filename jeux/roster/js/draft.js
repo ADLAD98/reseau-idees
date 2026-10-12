@@ -21,9 +21,10 @@ const HELP = '<div class="dr-help-box panel"><h3>Gagner la draft</h3><ul>'
   + '</ul><p>Le total de chaque joueur s\'ajoute à sa force pendant la partie.</p>'
   + '<div class="actions"><button class="btn" type="button" data-act="help">Compris</button></div></div>';
 
-/** Joue la draft d'un match. act(body) envoie un choix au serveur ; resync() redemande l'état du match.
+/** Joue la draft d'un match. act(body) envoie un choix au serveur ; resync() redemande l'état du match ;
+    help : ouvrir d'office l'explication des règles (première draft du joueur).
     Renvoie { final } (la réponse du serveur au dernier choix : la partie est jouée) ou { left: true } si le joueur quitte l'écran. */
-export function runDraft({ match, cat, fx, act, resync, toast }) {
+export function runDraft({ match, cat, fx, act, resync, toast, help }) {
   let m = match;
   const you = m.you, foe = 1 - you;
   const champs = Object.entries(cat.champions).filter(([, c]) => c.r.length).sort((a, b) => a[1].n.localeCompare(b[1].n, 'fr'));
@@ -68,7 +69,7 @@ export function runDraft({ match, cat, fx, act, resync, toast }) {
       + '<span class="dr-cn">' + esc(c.n) + '</span><i class="dr-star"></i><i class="dr-arrow"></i></button>').join('') + '</div></section>'
     + teamHTML(1) + '</div>'
     + '<footer class="dr-foot"><div class="dr-sel"></div><button class="btn primary big" type="button" data-act="lock" disabled>Verrouiller</button></footer>'
-    + '<div class="dr-help" hidden>' + HELP + '</div>';
+    + '<div class="dr-help"' + (help ? '' : ' hidden') + '>' + HELP + '</div>';
 
   const $ = (s) => el.querySelector(s);
   const tiles = new Map(Array.from(el.querySelectorAll('.dr-c'), (b) => [b.dataset.champ, { b, star: b.querySelector('.dr-star'), arrow: b.querySelector('.dr-arrow') }]));
