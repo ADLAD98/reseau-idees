@@ -564,7 +564,17 @@ body.fx .card.e-ceo .card-front .card-frame::after{animation:spin 5s linear infi
 .sel{appearance:none;-webkit-appearance:none;padding-right:30px!important;background:#050d18 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%23c8aa6e' stroke-width='1.5'%3E%3Cpath d='M2 4l4 4 4-4'/%3E%3C/svg%3E") right 10px center/11px no-repeat}
 .sel option{background:#091428;color:var(--ink)}
 .filters-row{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom:24px}
-.filters-row .seg{min-width:340px}
+.filters-row .seg{min-width:430px}
+/* l'onglet « Doublons » : un bandeau (combien, pour combien, tout vendre), et sous chaque carte le bouton qui revend ses doublons */
+.dupes-bar{display:flex;align-items:center;justify-content:space-between;gap:14px 24px;flex-wrap:wrap;margin:-8px 0 20px;padding:14px 18px;border:1px solid var(--line2);border-left:3px solid var(--gold);background:linear-gradient(90deg,rgba(200,170,110,.1),rgba(9,20,40,.5) 55%)}
+.dupes-bar p{flex:1 1 320px;margin:0;color:var(--mut);font-size:14.5px;line-height:1.45}
+.dupes-bar p b{color:var(--gold-hi);font-weight:600}
+.dupes-bar .btn{flex:none}
+.grid .dupe{display:flex;flex-direction:column;min-width:0}
+.grid .dupe .tile{padding-bottom:8px}
+.dupe-sell{align-self:center;height:34px;margin:0 8px 16px;padding:0 12px;max-width:calc(100% - 16px);font-size:12.5px;letter-spacing:.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dupe-sell.sure,#dupesAll.sure{transition:none;color:#010a13;background:linear-gradient(#ffe7a8,#c8aa6e);border-color:var(--gold-hi)}
+.dupe-no{align-self:center;margin:0 8px 16px;height:34px;display:grid;place-items:center;font-size:12px;letter-spacing:.06em;color:var(--faint)}
 .filters-row .seg.small{min-width:250px}
 .count{color:var(--mut);font-size:14.5px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(184px,1fr));gap:8px 4px;margin:0 -8px}
@@ -705,6 +715,10 @@ body.fx .card.e-ceo .card-front .card-frame::after{animation:spin 5s linear infi
   .filters-more{display:none;grid-column:1/-1;grid-template-columns:repeat(2,1fr);gap:10px}
   .filters-more.open{display:grid}
   .filters-row .seg,.filters-row .seg.small{min-width:0;width:100%}
+  .filters-row #fown button{font-size:12px;letter-spacing:.05em}
+  .dupes-bar{padding:12px 14px}
+  .dupes-bar .btn{flex:1 1 100%;height:auto;min-height:44px;padding:8px 12px;white-space:normal;line-height:1.25}
+  .dupe-sell{height:32px;margin:0 4px 14px;padding:0 6px;max-width:calc(100% - 8px);font-size:11.5px;letter-spacing:.02em}
   .filters-row{gap:10px 18px}
   .ros-head{flex-wrap:wrap;padding-top:14px}
   .ros-name{flex-basis:calc(100% - 30px);flex-wrap:wrap;gap:6px 10px}

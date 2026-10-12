@@ -9,7 +9,7 @@ import { packHTML, runOpening } from './opening.js';
 import { viewPlay } from './play.js';
 import { viewSocial } from './social.js';
 import { setSound, sfx, soundOn } from './sound.js';
-import { confirmSheet } from './ui.js';
+import { confirmSheet, num } from './ui.js';
 import { viewWorlds } from './worlds.js';
 
 const app = document.getElementById('app');
@@ -488,6 +488,8 @@ function filteredCards() {
   const f = S.filters, q = f.q.trim().toLowerCase();
   const list = S.cat.cards.filter((c) => {
     const own = S.owned.has(c.id);
+    /* l'onglet « Doublons » : seulement les cartes que j'ai en plusieurs exemplaires */
+    if (f.own === 'dupes' && !(own && S.owned.get(c.id).qty > 1)) return false;
     if (f.own === 'owned' && !own) return false;
     if (f.own === 'missing' && own) return false;
     if (f.league && c.league !== f.league) return false;
@@ -560,16 +562,53 @@ function rostersHTML(groups) {
   }
   return html;
 }
+/* ---------- l'onglet « Doublons » : revendre en deux clics, en gardant toujours un exemplaire ---------- */
+/** Ce que le jeu rachète d'un coup (« tout vendre ») : les doublons ordinaires des premiers rangs. Renvoie { count, gain }. */
+function bulkDupes() {
+  const quick = S.shop && S.shop.quick;
+  let count = 0, gain = 0;
+  if (quick) for (const [id, own] of S.owned) {
+    const c = S.cat.cardById.get(id);
+    if (c && own.qty > 1 && !c.variant && !c.limited && c.tier <= quick.bulkTier) { count += own.qty - 1; gain += (own.qty - 1) * (quick.tier[c.tier] || 0); }
+  }
+  return { count, gain };
+}
+/** Une carte de l'onglet « Doublons » : la carte, et dessous le bouton qui revend tous ses doublons (une édition limitée ne se revend pas ainsi). */
+function dupeTile(card) {
+  const extra = S.owned.get(card.id).qty - 1, gain = extra * quickPrice(card);
+  return '<div class="dupe">' + tile(card)
+    + (card.limited ? '<span class="dupe-no">Au marché seulement</span>'
+      : '<button class="btn dupe-sell" type="button" data-quick="' + esc(card.id) + '" title="Vendre ' + (extra > 1 ? 'les ' + extra + ' doublons' : 'le doublon') + ' pour ' + num(gain) + ' crédits"'
+        + ' data-say="Vendre' + (extra > 1 ? ' ×' + extra : '') + ' · +' + num(gain) + '">Vendre' + (extra > 1 ? ' ×' + extra : '') + ' · +' + num(gain) + '</button>') + '</div>';
+}
+/** Le bandeau de l'onglet : combien de doublons, ce qu'ils valent, et le bouton qui revend d'un coup ceux des premiers rangs. */
+function dupesBar(list) {
+  const all = list.reduce((n, c) => n + S.owned.get(c.id).qty - 1, 0), worth = list.reduce((n, c) => n + (c.limited ? 0 : (S.owned.get(c.id).qty - 1) * quickPrice(c)), 0), bulk = bulkDupes();
+  if (!all) return '<p><b>Aucun doublon.</b> Chaque carte que tu possèdes n\'est là qu\'en un exemplaire.</p>';
+  return '<p><b>' + num(all) + (all > 1 ? ' doublons' : ' doublon') + '</b> · le jeu les rachète tout de suite pour <b>' + num(worth) + ' crédits</b>. Tu gardes toujours un exemplaire de chaque carte.'
+    + ' Au marché, un autre joueur t\'en donnerait peut-être davantage.</p>'
+    + (bulk.count ? '<button class="btn primary" type="button" id="dupesAll" data-say="Tout vendre (Recrue à Star) · +' + num(bulk.gain) + '">Tout vendre (Recrue à Star) · +' + num(bulk.gain) + '</button>' : '');
+}
+/** Un bouton de vente se confirme d'un second clic : le premier l'arme pour quelques secondes. Renvoie true au second. */
+function armed(btn) {
+  if (btn.classList.contains('sure')) return true;
+  btn.classList.add('sure');
+  btn.textContent = btn.id === 'dupesAll' ? 'Confirmer la vente' : 'Confirmer';
+  setTimeout(() => { if (btn.isConnected && btn.classList.contains('sure')) { btn.classList.remove('sure'); btn.textContent = btn.dataset.say; } }, 3500);
+  return false;
+}
 function drawGrid() {
   const grid = document.getElementById('grid');
   if (!grid) return;
-  const list = filteredCards(), roster = S.filters.group === 'roster';
+  const list = filteredCards(), roster = S.filters.group === 'roster' && S.filters.own !== 'dupes', dupes = S.filters.own === 'dupes';
+  const bar = document.getElementById('dupesBar');
+  if (bar) { bar.hidden = !dupes; bar.innerHTML = dupes ? dupesBar(list) : ''; }
   const groups = roster ? rosterGroups(list) : [];
   $('#gridCount').textContent = list.length + (list.length > 1 ? ' cartes affichées' : ' carte affichée') + ' · ' + list.filter((c) => S.owned.has(c.id)).length + ' possédées'
     + (roster && groups.length ? ' · ' + groups.length + (groups.length > 1 ? ' rosters' : ' roster') : '');
   grid.className = roster ? 'rosters' : 'grid';
-  grid.innerHTML = !list.length ? '' : roster ? rostersHTML(groups) : list.map((c) => tile(c)).join('');
-  $('#gridEmpty').hidden = list.length > 0;
+  grid.innerHTML = !list.length ? '' : roster ? rostersHTML(groups) : dupes ? list.map((c) => dupeTile(c)).join('') : list.map((c) => tile(c)).join('');
+  $('#gridEmpty').hidden = list.length > 0 || dupes;
 }
 function viewCollection(main) {
   const f = S.filters, cat = S.cat;
@@ -594,12 +633,35 @@ function viewCollection(main) {
       ? '<select class="sel" data-f="rsort" aria-label="Ordre des rosters">' + [['league', 'Rosters : par ligue'], ['done', 'Rosters : les plus complets'], ['rating', 'Rosters : les mieux notés']].map((s) => option(s[0], s[1], f.rsort)).join('') + '</select>'
       : '<select class="sel" data-f="sort" aria-label="Tri">' + [['ovr', 'Tri : note'], ['name', 'Tri : nom'], ['team', 'Tri : équipe'], ['recent', 'Tri : récentes'], ['qty', 'Tri : exemplaires']].map((s) => option(s[0], s[1], f.sort)).join('') + '</select>')
     + '</div></div><div class="filters-row"><div class="seg" id="fown">'
-    + [['all', 'Toutes'], ['owned', 'Possédées'], ['missing', 'Manquantes']].map((o) => '<button type="button" data-own="' + o[0] + '"' + (f.own === o[0] ? ' class="on"' : '') + '>' + o[1] + '</button>').join('')
+    /* « Doublons » : seulement si le serveur sait les racheter */
+    + [['all', 'Toutes'], ['owned', 'Possédées']].concat(S.shop ? [['dupes', 'Doublons']] : [], [['missing', 'Manquantes']]).map((o) => '<button type="button" data-own="' + o[0] + '"' + (f.own === o[0] ? ' class="on"' : '') + '>' + o[1] + '</button>').join('')
     + '</div><div class="seg small" id="fgroup" role="group" aria-label="Rangement du classeur">'
     + [['', 'À la suite'], ['roster', 'Par roster']].map((o) => '<button type="button" data-group="' + o[0] + '"' + (f.group === o[0] ? ' class="on"' : '') + '>' + o[1] + '</button>').join('')
     + '</div><span class="count" id="gridCount"></span></div>'
+    + '<div class="dupes-bar" id="dupesBar" hidden></div>'
     + '<div class="grid" id="grid"></div><p class="empty" id="gridEmpty" hidden>Aucune carte ne correspond à ces filtres.</p>';
+  if (f.own === 'dupes' && !S.shop) f.own = 'owned';
   drawGrid();
+  /* l'onglet « Doublons » : un clic arme le bouton, le second vend */
+  main.addEventListener('click', async (e) => {
+    const one = e.target.closest('[data-quick]'), all = e.target.closest('#dupesAll');
+    if (!one && !all) return;
+    if (!armed(one || all)) return;
+    (one || all).disabled = true;
+    if (one) {
+      const card = cat.cardById.get(one.dataset.quick), own = S.owned.get(card.id);
+      if (own && own.qty > 1) await quickSell(card, own.qty - 1, true);
+      /* vente refusée (compte trop récent, collection qui a bougé) : le bouton retrouve son état */
+      if (one.isConnected) drawGrid();
+      return;
+    }
+    const res = await guard(() => call('POST', '/api/market/quick', { all: true }));
+    if (!res) { route(); return; }
+    applyState(res);
+    for (const [id, left] of res.cards) PLAY.owned(id, left);
+    toast('+' + num(res.coins) + ' crédits : ' + (res.sold > 1 ? res.sold + ' doublons vendus' : 'un doublon vendu') + '.');
+    route();
+  });
   let typing = 0;
   $('#fq').addEventListener('input', (e) => { f.q = e.target.value; clearTimeout(typing); typing = setTimeout(drawGrid, 140); });
   $('#fmore').addEventListener('click', (e) => {
@@ -707,17 +769,17 @@ async function viewBoard(main) {
 }
 
 /** Vente rapide : le jeu rachète sur-le-champ des doublons d'une carte. Une belle carte fait d'abord confirmer. */
-async function quickSell(card, qty) {
+async function quickSell(card, qty, sure) {
   const gain = qty * quickPrice(card);
-  if (gain >= 60 && !(await confirmSheet('Vente rapide', 'Vendre ' + (qty > 1 ? qty + ' exemplaires' : 'un exemplaire') + ' de ' + card.name + (card.variant ? ' (' + VARIANTS[card.variant].name.toLowerCase() + ')' : '') + ' pour ' + gain + ' crédits ? Au marché, un autre joueur t\'en donnerait peut-être davantage.', 'Vendre'))) { showSheet(card.id); return; }
+  if (!sure && gain >= 60 && !(await confirmSheet('Vente rapide', 'Vendre ' + (qty > 1 ? qty + ' exemplaires' : 'un exemplaire') + ' de ' + card.name + (card.variant ? ' (' + VARIANTS[card.variant].name.toLowerCase() + ')' : '') + ' pour ' + gain + ' crédits ? Au marché, un autre joueur t\'en donnerait peut-être davantage.', 'Vendre'))) { showSheet(card.id); return; }
   const res = await guard(() => call('POST', '/api/market/quick', { card: card.id, qty }));
   if (!res) return;
   applyState(res);
   for (const [id, left] of res.cards) PLAY.owned(id, left);
   toast('+' + res.coins + ' crédits : ' + (res.sold > 1 ? res.sold + ' doublons vendus' : 'un doublon vendu') + '.');
   route();
-  /* la fiche se rouvre s'il reste des doublons à vendre */
-  if ((S.owned.get(card.id) || { qty: 0 }).qty > 1) showSheet(card.id);
+  /* la fiche se rouvre s'il reste des doublons à vendre (pas depuis l'onglet « Doublons », où l'on enchaîne) */
+  if (!sure && (S.owned.get(card.id) || { qty: 0 }).qty > 1) showSheet(card.id);
 }
 
 /* ---------- écran Profil ---------- */
