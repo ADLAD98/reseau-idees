@@ -43,7 +43,10 @@ h1,h2,h3,p{margin:0}
   background:#161b22;color:#cdbe91;font:400 14px/1 var(--title);letter-spacing:.1em;text-transform:uppercase;text-decoration:none;white-space:nowrap;
   transition:color .15s,background .15s,box-shadow .15s}
 .btn:hover{color:var(--gold-hi);border-image:linear-gradient(#f0e6d2,#c8aa6e) 1;background:linear-gradient(#1e2328,#383222);box-shadow:0 0 16px rgba(200,170,110,.2)}
-.btn:active{transform:translateY(1px)}
+.btn:active{transform:translateY(1px) scale(.985)}
+body.fx .btn{transition:color .15s,background .15s,box-shadow .15s,transform .12s cubic-bezier(.2,.8,.3,1.3)}
+body.fx .btn.primary:not([disabled]):hover{transform:translateY(-1px)}
+body.fx .btn.primary:not([disabled]):active{transform:translateY(1px) scale(.985)}
 .btn.primary{border:2px solid;border-image:linear-gradient(#0ac8b9,#0397ab) 1;background:linear-gradient(#0f3a46,#07212c);color:var(--blue-hi);text-shadow:0 0 12px rgba(10,200,185,.55)}
 .btn.primary:hover{border-image:linear-gradient(#cdfafa,#0ac8b9) 1;background:linear-gradient(#14505f,#0a2c3a);color:#fff;box-shadow:0 0 24px rgba(10,200,185,.4)}
 .btn.big{height:58px;padding:0 44px;font-size:18px;letter-spacing:.14em}
@@ -69,6 +72,20 @@ h1,h2,h3,p{margin:0}
 .nav a:hover{color:var(--gold-hi)}
 .nav a.on{color:var(--gold-hi)}
 .nav a.on::after{content:"";position:absolute;left:50%;bottom:-4px;width:8px;height:8px;margin-left:-4px;transform:rotate(45deg);background:var(--gold);box-shadow:0 0 10px var(--gold);z-index:1}
+/* les menus vivent un peu : un filet se déploie sous l'onglet qu'on survole, le losange de l'onglet choisi vient s'y poser */
+.nav a::before{content:"";position:absolute;left:16px;right:16px;bottom:17px;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);opacity:0;transform:scaleX(.2);transition:transform .28s cubic-bezier(.2,.75,.25,1),opacity .28s}
+.nav a:hover::before,.nav a.on::before{opacity:.75;transform:none}
+@keyframes navDot{from{opacity:0;transform:translateY(-9px) rotate(45deg) scale(.3)}}
+body.fx .nav a.on::after{animation:navDot .36s cubic-bezier(.2,.8,.3,1.25)}
+/* le passage d'une page à l'autre : l'ancienne s'efface, les blocs de la nouvelle arrivent l'un après l'autre, du côté de son onglet */
+@keyframes pageOut{to{opacity:0}}
+@keyframes pageIn{from{opacity:0;transform:translate3d(calc(var(--dir,0) * 30px),8px,0)}}
+body.fx .main.page-out{animation:pageOut .12s ease-in forwards}
+body.fx .main.page-in>*{animation:pageIn .44s cubic-bezier(.2,.75,.25,1) backwards}
+body.fx .main.page-in>*:nth-child(2){animation-delay:.05s}
+body.fx .main.page-in>*:nth-child(3){animation-delay:.1s}
+body.fx .main.page-in>*:nth-child(4){animation-delay:.15s}
+body.fx .main.page-in>*:nth-child(n+5){animation-delay:.2s}
 /* le bouton de la musique de fond : barré quand elle est coupée */
 .tune{position:relative;display:grid;place-items:center;width:34px;height:34px;margin:0 -8px;padding:0;border:0;background:none;color:var(--gold);cursor:pointer}
 .tune:hover{color:var(--gold-hi)}
@@ -588,6 +605,9 @@ body.fx .card.e-ceo .card-front .card-frame::after{animation:spin 5s linear infi
 .seg button:hover{color:var(--gold-hi)}
 .seg button.on{color:var(--gold-hi)}
 .seg button.on::after{content:"";position:absolute;left:12%;right:12%;bottom:-1px;height:2px;background:linear-gradient(90deg,transparent,var(--gold),transparent)}
+@keyframes segIn{from{opacity:0;transform:scaleX(.15)}}
+body.fx .seg button.on::after{animation:segIn .3s cubic-bezier(.2,.75,.25,1)}
+body.fx .seg button:active{transform:scale(.97)}
 .field{display:flex;flex-direction:column;gap:8px;font:600 12px/1 var(--text);letter-spacing:.14em;text-transform:uppercase;color:var(--mut)}
 .field input,.inp,.sel{height:46px;padding:0 14px;border:1px solid #3a4250;border-radius:0;background:#050d18;color:var(--ink);font:400 17px/1 var(--text);letter-spacing:.01em;text-transform:none;outline:none;transition:border-color .15s,box-shadow .15s}
 .field input:focus,.inp:focus,.sel:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(200,170,110,.14)}
@@ -687,6 +707,9 @@ body.fx .card.e-ceo .card-front .card-frame::after{animation:spin 5s linear infi
 
 /* ---------- fiche d'une carte ---------- */
 .sheet{position:fixed;inset:0;z-index:40;display:grid;place-items:center;padding:24px;background:rgba(1,6,12,.9);overflow:auto;animation:fade .2s}
+/* une fenêtre qui s'ouvre monte d'un rien en prenant sa taille */
+@keyframes sheetIn{from{opacity:0;transform:translateY(16px) scale(.985)}}
+body.fx .sheet>*{animation:sheetIn .32s cubic-bezier(.2,.75,.25,1) backwards}
 @keyframes fade{from{opacity:0}}
 .sheet-box{display:grid;grid-template-columns:auto minmax(0,1fr);gap:36px;width:100%;max-width:920px;padding:34px}
 .sheet-card{display:grid;place-items:center;align-content:start;gap:22px}
@@ -800,6 +823,12 @@ body.fx .card.e-ceo .card-front .card-frame::after{animation:spin 5s linear infi
   .tabs a svg{width:22px;height:22px}
   .tabs a.on{color:var(--gold-hi)}
   .tabs a.on::before{content:"";position:absolute;top:-4px;left:50%;width:7px;height:7px;margin-left:-3.5px;transform:rotate(45deg);background:var(--gold);box-shadow:0 0 8px var(--gold)}
+  /* la barre d'onglets répond au doigt : le pictogramme s'enfonce, celui de l'onglet choisi se soulève, son losange vient se poser */
+  .tabs a svg{transition:transform .26s cubic-bezier(.2,.8,.3,1.4),color .15s}
+  body.fx .tabs a.on svg{transform:translateY(-2px) scale(1.12)}
+  body.fx .tabs a:active svg{transform:scale(.86)}
+  @keyframes tabDot{from{opacity:0;transform:translateY(8px) rotate(45deg) scale(.3)}}
+  body.fx .tabs a.on::before{animation:tabDot .34s cubic-bezier(.2,.8,.3,1.25)}
   .main{padding:22px 16px calc(var(--tabs) + 40px)}
   #toasts{bottom:calc(var(--tabs) + 16px + env(safe-area-inset-bottom))}
   .top{gap:12px;padding:0 16px}

@@ -149,6 +149,13 @@ export const sfx = {
   heart() { tone(64, { dur: 0.17, to: 44, vol: 0.34 }); tone(56, { t: 0.18, dur: 0.22, to: 38, vol: 0.24 }); },
   /** La carte glisse (mise en valeur, retour à sa place). */
   whoosh() { noise({ dur: 0.32, vol: 0.1, freq: 500, to: 2600, q: 0.7 }); },
+  /** Une page cartonnée qui se tourne (on change de page, on ouvre la fiche d'une carte) : le carton fend l'air, puis se pose. Discret. */
+  page() {
+    noise({ dur: 0.2, vol: 0.05, freq: 700, to: 2200, q: 0.8, attack: 0.07 });
+    noise({ t: 0.03, dur: 0.15, vol: 0.018, type: 'highpass', freq: 3800 });
+    noise({ t: 0.19, dur: 0.06, vol: 0.06, type: 'lowpass', freq: 620, to: 260 });
+    tone(170, { t: 0.19, dur: 0.07, to: 95, vol: 0.04, type: 'triangle' });
+  },
   /** Toutes les cartes sont retournées. */
   done() { bell(E5, 0, 0.08, 0.9); bell(B5, 0.09, 0.07, 0.9); bell(E6, 0.18, 0.07, 1.2); },
   /** Un bouton, un champion désigné : un petit « toc » de bois, grave et bref (pas un bip). */

@@ -332,13 +332,33 @@ function route() {
   }
   const tab = tabs().some((t) => t[0] === name) && VIEWS[name] ? name : 'packs';
   document.querySelectorAll('[data-tab]').forEach((a) => a.classList.toggle('on', a.dataset.tab === tab));
-  window.scrollTo(0, 0);
-  VIEWS[tab]($('#main'), parts[1] || '');
+  const main = $('#main'), show = () => { window.scrollTo(0, 0); VIEWS[tab](main, parts[1] || ''); };
+  /* On change de page : l'ancienne s'efface, la nouvelle arrive du côté de son onglet, bloc après bloc. (Une page qui se redessine sur place
+     — après un achat, une revente… — ne rejoue rien.) */
+  const from = shownTab, order = tabs().map((t) => t[0]), mine = ++pageTurn;
+  shownTab = tab;
+  if (from !== null && from !== tab) sfx.page();
+  if (!S.fx || from === tab) { main.classList.remove('page-out'); show(); return; }
+  const enter = () => {
+    main.classList.remove('page-out', 'page-in');
+    show();
+    void main.offsetWidth;
+    main.classList.add('page-in');
+    setTimeout(() => { if (mine === pageTurn) main.classList.remove('page-in'); }, 750);
+  };
+  main.style.setProperty('--dir', from === null ? 0 : order.indexOf(tab) > order.indexOf(from) ? 1 : -1);
+  if (from === null) { enter(); return; }
+  main.classList.remove('page-in');
+  main.classList.add('page-out');
+  setTimeout(() => { if (mine === pageTurn && $('#main') === main) enter(); }, 120);
 }
+let shownTab = null, pageTurn = 0;
 window.addEventListener('hashchange', route);
 /* la musique de fond part au premier geste du joueur (un navigateur ne laisse rien jouer avant) ; son bouton la coupe ou la remet */
 for (const kind of ['pointerdown', 'keydown']) document.addEventListener(kind, () => startMusic(), { passive: true });
 const syncTune = () => { const b = document.getElementById('tune'); if (b) b.classList.toggle('off', !musicOn()); };
+/* les onglets d'une page (filtres, sous-menus) répondent d'un petit « toc » */
+document.addEventListener('click', (e) => { if (e.target.closest('.seg button:not(.on)')) sfx.click(); });
 document.addEventListener('click', (e) => {
   const b = e.target.closest('#tune');
   if (b) toggleVolume(b, syncTune);
@@ -734,6 +754,7 @@ function viewCollection(main) {
 function showSheet(id) {
   const cat = S.cat, card = cat.cardById.get(id);
   if (!card) return;
+  sfx.page();
   const own = S.owned.get(id), team = cat.teamById.get(card.team), tier = cat.tierById.get(card.tier);
   const league = cat.leagues.find((l) => l.id === card.league);
   const real = card.real || {};
