@@ -388,18 +388,18 @@
 /* pendant un ralenti : les pions bougent (ils se jettent l'un sur l'autre, le tueur fond sur sa cible), ceux qui se battent ont une barre de vie,
    un ultime qui part fait éclater un anneau, un coup reçu fait tressaillir */
 .mv.slow .tk{transition:left .26s cubic-bezier(.2,.8,.2,1),top .26s cubic-bezier(.2,.8,.2,1),filter .3s,opacity .3s}
-/* sur la carte, pas de barres en temps normal (la vie se lit sur les côtés) ; pendant un temps fort, les combattants ont leur barre de vie */
-.tk-bars{display:none;position:absolute;left:1%;right:1%;bottom:106%;padding:1px;background:rgba(1,10,19,.94);pointer-events:none}
-.mv.slow .tk.fight .tk-bars{display:block}
-.tk-hp{display:block;height:3px;background:#0c1826;overflow:hidden}
-.tk-hp b,.mv-hp b,.mv-mp b{display:block;width:100%;height:100%;transition:width .22s ease-out}
+/* au-dessus de chaque champion, comme dans le jeu, deux fines barres : sa vie (verte), et sa ressource quand il en a une */
+.tk-bars{position:absolute;left:1%;right:1%;bottom:106%;display:flex;flex-direction:column;gap:1px;padding:1px;background:rgba(1,10,19,.94);pointer-events:none}
+.tk-hp,.tk-mp{display:block;height:3px;background:#0c1826;overflow:hidden}
+.tk-mp{height:2px}
+.tk-hp b,.tk-mp b,.mv-hp b,.mv-mp b{display:block;width:100%;height:100%;transition:width .22s ease-out}
 .tk-hp b,.mv-hp b{background:linear-gradient(#8bf07a,#3fbf3a)}
 .tk-hp b.low,.mv-hp b.low{background:linear-gradient(#ffb36b,#e2553a)}
-.mv-mp b{background:var(--res,#3d9bf0)}
+.tk-mp b,.mv-mp b{background:var(--res,#3d9bf0)}
 /* la couleur de chaque ressource : mana, énergie, fureur et rage, puits de sang et afflux sanguin, vapeur, courage et férocité, agressivité, bouclier, impulsion */
 .r-m{--res:linear-gradient(#6fbcff,#2f7fd8)}.r-e{--res:linear-gradient(#f6e98a,#d9bb2c)}.r-f,.r-r{--res:linear-gradient(#ff7a66,#d0352c)}.r-w,.r-u{--res:linear-gradient(#e0475a,#8f1626)}
 .r-h{--res:linear-gradient(#ffb057,#e0661c)}.r-c,.r-o{--res:linear-gradient(#ffc56b,#e28a22)}.r-g{--res:linear-gradient(#ffe07a,#e0a82c)}.r-s{--res:linear-gradient(#d5dde6,#93a0ad)}.r-l{--res:linear-gradient(#f2f6fa,#b9c6d2)}
-.mv.slow .tk.dead .tk-bars{display:none}
+.tk.dead .tk-bars{display:none}
 /* la Téléportation : l'incantation, en violet comme dans le jeu */
 .tk.tp{animation:tp .45s linear forwards}
 @keyframes tp{0%{box-shadow:0 0 0 2px var(--c),0 0 0 3px #010a13,0 0 0 18px rgba(176,132,255,0)}100%{box-shadow:0 0 0 2px #e9dcff,0 0 0 3px #010a13,0 0 0 6px rgba(176,132,255,.95)}}

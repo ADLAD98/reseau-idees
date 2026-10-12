@@ -142,12 +142,13 @@ export function runMatch({ data, cat, fx }) {
   const tokens = P.map((p) => {
     const d = document.createElement('div');
     d.className = 'tk s' + p.side;
-    /* le portrait ; la barre de vie au-dessus ne se montre que sur les combattants d'un temps fort, pour ne pas charger la carte */
-    d.innerHTML = '<span class="tk-i"><img src="' + iconUrl(cat, p.champ) + '" alt="" draggable="false"></span><span class="tk-bars"><i class="tk-hp"><b></b></i></span>';
+    /* le portrait et, au-dessus, discrètes, sa barre de vie et celle de sa ressource (quand son champion en a une) */
+    d.innerHTML = '<span class="tk-i"><img src="' + iconUrl(cat, p.champ) + '" alt="" draggable="false"></span>'
+      + '<span class="tk-bars"><i class="tk-hp"><b></b></i>' + (p.res === 'n' ? '' : '<i class="tk-mp r-' + p.res + '"><b></b></i>') + '</span>';
     mapIn.appendChild(d);
     return d;
   });
-  const hpEls = tokens.map((d) => d.querySelector('.tk-hp b'));
+  const hpEls = tokens.map((d) => d.querySelector('.tk-hp b')), mpEls = tokens.map((d) => d.querySelector('.tk-mp b'));
   const hpRows = P.map((p, i) => root.querySelector('[data-hp="' + i + '"]')), mpRows = P.map((p, i) => root.querySelector('[data-mp="' + i + '"]'));
   const hpLag = P.map((p, i) => root.querySelector('[data-hpl="' + i + '"]'));
   const sumEls = P.map((p, i) => p.sums.map((l, k) => root.querySelector('[data-sum="' + i + '-' + k + '"]')));
@@ -189,7 +190,7 @@ export function runMatch({ data, cat, fx }) {
     const v = Math.round(clamp(part, 0, 1) * 100);
     if (v === mpLook[i]) return;
     mpLook[i] = v;
-    mpRows[i].style.width = v + '%';
+    mpRows[i].style.width = v + '%'; mpEls[i].style.width = v + '%';
   }
   /** Les sorts d'invocateur du joueur i : prêts, ou grisés avec les secondes qui restent. */
   function setSums(i) {
