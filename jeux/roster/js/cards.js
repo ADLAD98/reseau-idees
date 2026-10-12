@@ -5,9 +5,33 @@ const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;
 /** Rend un texte inoffensif avant de l'insérer dans la page (les pseudos viennent des joueurs). */
 export const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ESC[c]);
 
-/** Ajoute au catalogue reçu du serveur de quoi retrouver vite une carte, une équipe ou un rang. */
+/* Les versions spéciales d'une carte : même joueur, même note, mêmes statistiques, un autre habillage.
+   L'identifiant d'une version est celui de la carte suivi de « ~h » ou « ~f » (comme sur le serveur). */
+export const VARIANTS = {
+  holo: { suffix: '~h', name: 'Holographique', mark: 'Holo', rank: 1 },
+  full: { suffix: '~f', name: 'Full art', mark: 'Full art', rank: 2 },
+};
+/** 0 pour une carte ordinaire, 1 pour une holographique, 2 pour une full art. */
+export const variantRank = (card) => (card.variant ? VARIANTS[card.variant].rank : 0);
+
+/** Ajoute au catalogue reçu du serveur de quoi retrouver vite une carte, une équipe ou un rang, et les versions spéciales des cartes. */
 export function prepare(raw) {
-  raw.cardById = new Map(raw.cards.map((c) => [c.id, c]));
+  const base = raw.base || raw.cards;
+  raw.base = base;
+  raw.cardById = new Map(base.map((c) => [c.id, c]));
+  /* le serveur ne donne que la liste des cartes qui existent en version spéciale : on fabrique ces cartes ici.
+     Toute carte se retrouve sous ses deux versions, même hors liste : une carte déjà obtenue ne doit jamais manquer. */
+  const special = [];
+  for (const [id, def] of Object.entries(VARIANTS)) {
+    const listed = new Set((raw.variants && raw.variants[id]) || []);
+    for (const c of base) {
+      const card = Object.assign({}, c, { id: c.id + def.suffix, variant: id, base: c.id });
+      raw.cardById.set(card.id, card);
+      if (listed.has(c.id)) special.push(card);
+    }
+  }
+  /* l'album : les cartes ordinaires, puis leurs versions spéciales */
+  raw.cards = base.concat(special);
   raw.teamById = new Map(raw.teams.map((t) => [t.id, t]));
   raw.tierById = new Map(raw.tiers.map((t) => [t.id, t]));
   return raw;
@@ -28,18 +52,20 @@ const SILHOUETTE = '<svg class="card-ph" viewBox="0 0 100 100" aria-hidden="true
 /** opts : back (ajoute le dos, pour pouvoir la retourner), eager (image chargée tout de suite), cls (classes en plus). */
 export function cardHTML(card, cat, opts = {}) {
   const team = cat.teamById.get(card.team);
-  const photo = photoUrl(card);
+  const photo = photoUrl(card), v = card.variant || '';
   /* un nom long est écrit plus petit pour tenir sur la carte */
   const len = Math.max(7, Array.from(card.name).length);
-  const picture = photo
-    ? '<img class="card-photo" src="' + photo + '" alt="" loading="' + (opts.eager ? 'eager' : 'lazy') + '" decoding="async" draggable="false">'
-    : SILHOUETTE;
+  const load = 'loading="' + (opts.eager ? 'eager' : 'lazy') + '" decoding="async" draggable="false"';
+  const picture = photo ? '<img class="card-photo" src="' + photo + '" alt="" ' + load + '>' : SILHOUETTE;
   const flag = card.country
     ? '<img class="card-flag" src="' + flagUrl(card.country) + '" alt="' + esc(cat.countries[card.country]) + '" title="' + esc(cat.countries[card.country]) + '" loading="lazy" draggable="false">'
     : '';
-  return '<article class="card t' + card.tier + (card.kind === 'c' ? ' is-coach' : '') + (opts.cls ? ' ' + opts.cls : '') + '" data-id="' + esc(card.id) + '">'
+  return '<article class="card t' + card.tier + (card.kind === 'c' ? ' is-coach' : '') + (v ? ' v-' + v : '') + (opts.cls ? ' ' + opts.cls : '') + '" data-id="' + esc(card.id) + '">'
     + '<div class="card-in"><div class="card-face card-front">'
-    + '<div class="card-bg"></div><span class="card-wm">' + esc(team ? team.short : '') + '</span>'
+    + '<div class="card-bg"></div>'
+    /* holographique : une feuille de métal irisée derrière le joueur, et ses paillettes */
+    + (v === 'holo' ? '<div class="card-foil"></div><div class="card-spark"></div>' : '')
+    + '<span class="card-wm">' + esc(team ? team.short : '') + '</span>'
     + picture
     + '<div class="card-shade"></div>'
     + '<div class="card-side"><span class="card-ovr">' + card.ovr + '</span><span class="card-role">' + ROLE_LABEL[card.role] + '</span><i></i>'
@@ -48,7 +74,26 @@ export function cardHTML(card, cat, opts = {}) {
     + '<div class="card-team">' + esc(team ? team.name : card.team) + '</div>'
     + '<ul class="card-stats">' + statsOf(card).map((s) => '<li><b>' + card.stats[s[0]] + '</b><span>' + s[1] + '</span></li>').join('') + '</ul></div>'
     + '<div class="card-holo"></div><div class="card-frame"></div>'
+    + (v ? '<span class="card-mark">' + VARIANTS[v].mark + '</span>' : '')
     + '</div>' + (opts.back ? BACK : '') + '</div><i class="card-gem"></i></article>';
+}
+
+/** La carte s'incline sous la souris ou le doigt ; les reflets d'une carte holographique suivent le mouvement.
+    Renvoie de quoi tout arrêter. */
+export function tiltCard(el, max = 20) {
+  const inner = el.querySelector('.card-in');
+  const move = (e) => {
+    const r = el.getBoundingClientRect();
+    const x = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), y = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
+    el.classList.add('tilting');
+    inner.style.transform = 'rotateY(' + ((x - 0.5) * max).toFixed(1) + 'deg) rotateX(' + ((0.5 - y) * max).toFixed(1) + 'deg)';
+    el.style.setProperty('--hx', (x * 100).toFixed(1) + '%');
+    el.style.setProperty('--hy', (y * 100).toFixed(1) + '%');
+  };
+  const leave = () => { el.classList.remove('tilting'); inner.style.transform = ''; el.style.removeProperty('--hx'); el.style.removeProperty('--hy'); };
+  el.addEventListener('pointermove', move);
+  el.addEventListener('pointerleave', leave);
+  return () => { el.removeEventListener('pointermove', move); el.removeEventListener('pointerleave', leave); leave(); };
 }
 
 /* une photo qui ne charge pas laisse place à la silhouette, sans icône d'image cassée */

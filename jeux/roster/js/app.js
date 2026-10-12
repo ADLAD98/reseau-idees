@@ -1,7 +1,7 @@
 /* Roster — le jeu. Cinq écrans : Packs, Jouer, Collection, Classement, Profil.
    Le serveur décide de tout (cartes tirées, délais, collection, matchs) ; cette page affiche et met en scène. */
 import { ApiError, call, clearSession, deriveKey, loadSession, saveSession } from './api.js';
-import { cardHTML, champName, esc, flagUrl, iconUrl, prepare, statsOf } from './cards.js';
+import { VARIANTS, cardHTML, champName, esc, flagUrl, iconUrl, prepare, statsOf, tiltCard, variantRank } from './cards.js';
 import { GAME_NAME, ROLE_NAME, ROLE_ORDER, STORE } from './config.js';
 import { packHTML, runOpening } from './opening.js';
 import { viewPlay } from './play.js';
@@ -25,7 +25,7 @@ const S = {
   skew: 0,                // heure du serveur − heure de cet appareil
   cat: null,              // catalogue des cartes
   owned: new Map(),       // identifiant de carte → { qty, at }
-  filters: { q: '', league: '', team: '', role: '', tier: '', own: '', sort: 'ovr' },
+  filters: { q: '', league: '', team: '', role: '', tier: '', variant: '', own: '', sort: 'ovr' },
   fx: true,               // animations
   filtersOpen: false,     // listes de filtres dépliées (téléphone)
   opening: false,
@@ -231,10 +231,9 @@ const packReady = () => timeLeft() <= 0 || S.free.spare > 0;
 const packSig = () => (timeLeft() <= 0 ? 'pret' : 'attente') + '/' + (S.free.spare || 0);
 function progressHTML() {
   const total = S.cat.cards.length, have = S.owned.size;
-  const tiers = [...S.cat.tiers].reverse().map((t) => {
-    const all = S.cat.cards.filter((c) => c.tier === t.id);
-    return '<span style="--tc:var(--t' + t.id + ')"><i></i>' + esc(t.name) + ' ' + all.filter((c) => S.owned.has(c.id)).length + '/' + all.length + '</span>';
-  }).join('');
+  const tally = (all) => all.filter((c) => S.owned.has(c.id)).length + '/' + all.length;
+  const tiers = [...S.cat.tiers].reverse().map((t) => '<span style="--tc:var(--t' + t.id + ')"><i></i>' + esc(t.name) + ' ' + tally(S.cat.base.filter((c) => c.tier === t.id)) + '</span>').join('')
+    + Object.entries(VARIANTS).map(([id, v]) => '<span class="v-' + id + '"><i></i>' + v.name + (id === 'holo' ? 's' : '') + ' ' + tally(S.cat.cards.filter((c) => c.variant === id)) + '</span>').join('');
   return '<div class="meter"><div class="meter-head"><span class="label">Collection</span><span><b>' + have + '</b> / ' + total + ' cartes</span></div>'
     + '<div class="bar"><i style="width:' + pct(have, total) + '%"></i></div><div class="tiers">' + tiers + '</div></div>';
 }
@@ -253,7 +252,7 @@ function viewPacks(main) {
   main.innerHTML = '<section class="home"><div class="home-pack" id="packBox">' + packHTML(packReady() ? 'ready' : 'waiting', S.cat.season, S.free.size) + '</div>'
     + '<div class="home-side"><div class="eyebrow">Pack gratuit · toutes les ' + Math.round(S.free.cooldownMs / 60000) + ' minutes</div>'
     + '<h1 class="h1">' + S.free.size + ' cartes à découvrir</h1>'
-    + '<p class="lead">Joueurs et coachs pros de la saison ' + S.cat.season + '. La dernière carte du pack est une carte bonus : rang Titulaire au minimum.</p>'
+    + '<p class="lead">Joueurs et coachs pros de la saison ' + S.cat.season + '. La dernière carte du pack est une carte bonus : rang Titulaire au minimum. Les plus belles cartes existent aussi en version holographique et en full art.</p>'
     + '<div id="packAction" data-sig="' + packSig() + '">' + packActionHTML() + '</div>' + progressHTML() + '</div></section>'
     + '<section><h2 class="h2">Dernières cartes obtenues</h2>'
     + (recent.length ? '<div class="row-cards">' + recent.map((c) => tile(c)).join('') + '</div>' : '<p class="empty">Ta collection est vide. Ouvre ton premier pack !</p>')
@@ -285,7 +284,7 @@ document.addEventListener('click', async (e) => {
         if (data.catalogVersion && data.catalogVersion !== S.cat.version) await loadCatalogue(data.catalogVersion);
         return data;
       },
-      getCat: () => S.cat, fx: S.fx, size: S.free.size,
+      getCat: () => S.cat, fx: S.fx, size: S.free.size, from: $('#packBox .pack'),
     });
     applyState(result.data);
     for (const p of result.data.pack.cards) {
@@ -314,6 +313,7 @@ function filteredCards() {
     if (f.team && c.team !== f.team) return false;
     if (f.role && c.role !== f.role) return false;
     if (f.tier && c.tier !== Number(f.tier)) return false;
+    if (f.variant && (c.variant || 'base') !== f.variant) return false;
     if (q) {
       const team = S.cat.teamById.get(c.team);
       if (!(c.name.toLowerCase().includes(q) || (team && (team.name.toLowerCase().includes(q) || team.short.toLowerCase() === q)))) return false;
@@ -323,11 +323,11 @@ function filteredCards() {
   const at = (c) => (S.owned.get(c.id) || { at: 0 }).at;
   const qty = (c) => (S.owned.get(c.id) || { qty: 0 }).qty;
   const sorts = {
-    ovr: (a, b) => b.ovr - a.ovr || a.name.localeCompare(b.name),
-    name: (a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }),
+    ovr: (a, b) => b.ovr - a.ovr || a.name.localeCompare(b.name) || variantRank(a) - variantRank(b),
+    name: (a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }) || variantRank(a) - variantRank(b),
     recent: (a, b) => at(b) - at(a) || b.ovr - a.ovr,
     qty: (a, b) => qty(b) - qty(a) || b.ovr - a.ovr,
-    team: (a, b) => a.league.localeCompare(b.league) || a.team.localeCompare(b.team) || ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role) || b.ovr - a.ovr,
+    team: (a, b) => a.league.localeCompare(b.league) || a.team.localeCompare(b.team) || ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role) || b.ovr - a.ovr || a.name.localeCompare(b.name) || variantRank(a) - variantRank(b),
   };
   return list.sort(sorts[f.sort] || sorts.ovr);
 }
@@ -356,6 +356,7 @@ function viewCollection(main) {
     + '<select class="sel" data-f="team" aria-label="Équipe">' + option('', 'Toutes les équipes', f.team) + teams.map((t) => option(t.id, t.name, f.team)).join('') + '</select>'
     + '<select class="sel" data-f="role" aria-label="Poste">' + option('', 'Tous les postes', f.role) + ROLE_ORDER.map((r) => option(r, ROLE_NAME[r], f.role)).join('') + '</select>'
     + '<select class="sel" data-f="tier" aria-label="Rang">' + option('', 'Tous les rangs', f.tier) + [...cat.tiers].reverse().map((t) => option(t.id, t.name, f.tier)).join('') + '</select>'
+    + '<select class="sel" data-f="variant" aria-label="Version">' + option('', 'Toutes les versions', f.variant) + option('base', 'Ordinaires', f.variant) + Object.entries(VARIANTS).map(([id, v]) => option(id, v.name + (id === 'holo' ? 's' : ''), f.variant)).join('') + '</select>'
     + '<select class="sel" data-f="sort" aria-label="Tri">' + [['ovr', 'Tri : note'], ['name', 'Tri : nom'], ['team', 'Tri : équipe'], ['recent', 'Tri : récentes'], ['qty', 'Tri : exemplaires']].map((s) => option(s[0], s[1], f.sort)).join('') + '</select>'
     + '</div></div><div class="filters-row"><div class="seg" id="fown">'
     + [['all', 'Toutes'], ['owned', 'Possédées'], ['missing', 'Manquantes']].map((o) => '<button type="button" data-own="' + o[0] + '"' + (f.own === o[0] ? ' class="on"' : '') + '>' + o[1] + '</button>').join('')
@@ -408,10 +409,11 @@ function showSheet(id) {
     + '<div class="sheet-info"><div class="sheet-title"><div><h2>' + esc(card.name) + '</h2>'
     + '<p>' + (card.country ? '<img src="' + flagUrl(card.country) + '" alt="">' + esc(cat.countries[card.country]) + ' · ' : '') + esc(ROLE_NAME[card.role]) + ' · ' + esc(team ? team.name : card.team) + '</p></div>'
     + '<span class="spacer"></span><button class="close" type="button" aria-label="Fermer">' + icon('i-close') + '</button></div>'
-    + '<div class="chips"><span class="chip">' + esc(tier.name) + ' · ' + card.ovr + '</span><span class="chip" style="--tc:var(--mut)">' + esc(card.league) + (league ? ' · ' + esc(league.region) : '') + '</span>' + titles + '</div>'
+    + '<div class="chips"><span class="chip">' + esc(tier.name) + ' · ' + card.ovr + '</span>' + (card.variant ? '<span class="chip v-' + card.variant + '">' + VARIANTS[card.variant].name + '</span>' : '') + '<span class="chip" style="--tc:var(--mut)">' + esc(card.league) + (league ? ' · ' + esc(league.region) : '') + '</span>' + titles + '</div>'
     + '<div><h3 class="h2">Statistiques de la carte</h3><div class="bars">' + statsOf(card).map((s) => '<div title="' + esc(s[3]) + '"><span>' + s[2] + '</span><span class="bar"><i style="width:' + card.stats[s[0]] + '%"></i></span><b>' + card.stats[s[0]] + '</b></div>').join('') + '</div></div>'
     + (facts ? '<div><h3 class="h2">Saison ' + cat.season + (card.kind === 'c' ? ' de son équipe' : ' en chiffres') + '</h3><div class="facts">' + facts + '</div></div>' : '<p class="note">Aucune partie officielle jouée cette saison : la note est celle d\'un remplaçant.</p>')
     + (card.champs && card.champs.length ? '<div><h3 class="h2">Champions fétiches</h3><div class="champs">' + card.champs.map((c) => '<div class="champ"><img src="' + iconUrl(cat, c[0]) + '" alt="" loading="lazy"><div><b>' + esc(champName(cat, c[0])) + '</b><span>' + c[1] + ' parties · ' + pct(c[2], c[1]) + ' %</span></div></div>').join('') + '</div></div>' : '')
+    + (card.variant ? '<p class="note">Version ' + (card.variant === 'holo' ? 'holographique' : 'full art') + ' de la carte de ' + esc(card.name) + ' : même joueur, même note, un autre habillage. Elle sort parfois d\'un pack à la place de la carte ordinaire, et se collectionne à part.</p>' : '')
     + '<p class="note">Note calculée à partir des statistiques officielles de la saison ' + cat.season + ' (ligue, tournois internationaux, palmarès). Données : Leaguepedia.</p>'
     + '</div></div>';
   const close = () => { sheet.remove(); document.removeEventListener('keydown', onKey); document.body.style.overflow = ''; };
@@ -420,16 +422,8 @@ function showSheet(id) {
   document.addEventListener('keydown', onKey);
   document.body.style.overflow = 'hidden';
   document.body.appendChild(sheet);
-  /* la carte s'incline sous le doigt ou la souris */
-  const el = $('.sheet-card .card', sheet), inner = $('.card-in', el);
-  if (S.fx && own) {
-    el.addEventListener('pointermove', (e) => {
-      const r = el.getBoundingClientRect();
-      const x = (e.clientX - r.left) / r.width - 0.5, y = (e.clientY - r.top) / r.height - 0.5;
-      inner.style.transform = 'rotateY(' + (x * 22).toFixed(1) + 'deg) rotateX(' + (-y * 22).toFixed(1) + 'deg)';
-    });
-    el.addEventListener('pointerleave', () => { inner.style.transform = ''; });
-  }
+  /* la carte s'incline sous le doigt ou la souris ; les reflets d'une version spéciale suivent le geste */
+  if (S.fx && own) tiltCard($('.sheet-card .card', sheet), 22);
 }
 
 /* ---------- écran Classement ---------- */
@@ -503,7 +497,12 @@ async function viewProfile(main) {
   const pack = data.packs[0], show = (x) => (x ? frNum(Math.round(1000 * x) / 10) + ' %' : '—');
   box.innerHTML = '<table class="odds"><thead><tr><th>Rang</th><th>Cartes 1 à ' + (pack.size - 1) + '</th><th>Carte bonus</th></tr></thead><tbody>'
     + [...S.cat.tiers].reverse().map((t) => '<tr style="--tc:var(--t' + t.id + ')"><td>' + esc(t.name) + '</td><td>' + show(pack.odds[t.id - 1]) + '</td><td>' + show(pack.lastOdds[t.id - 1]) + '</td></tr>').join('')
-    + '</tbody></table><p class="hint">Les cartes sont tirées au sort par le serveur. Un coach sort moins souvent qu\'un joueur.</p>';
+    + '</tbody></table>'
+    + (data.variants || []).map((v) => {
+      const from = S.cat.tiers.filter((t) => t.id >= v.minTier).map((t) => t.name);
+      return '<p class="hint"><b class="v-' + esc(v.id) + '">' + esc(v.name) + '</b> — ' + show(v.chance) + ' des cartes ' + esc(from.slice(0, -1).join(', ') + (from.length > 1 ? ' et ' : '') + from[from.length - 1]) + ' sortent dans cette version.</p>';
+    }).join('')
+    + '<p class="hint">Les cartes sont tirées au sort par le serveur. Un coach sort moins souvent qu\'un joueur.</p>';
 }
 
 boot();

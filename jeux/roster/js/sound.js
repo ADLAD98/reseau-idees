@@ -89,28 +89,6 @@ function bell(freq, t = 0, vol = 0.14, dur = 0.9) {
 const E5 = 659.25, G5 = 830.61, B5 = 987.77, C6 = 1108.73, E6 = 1318.51, G6 = 1661.22, B6 = 1975.53, E7 = 2637.02;
 
 export const sfx = {
-  /** Le sachet se charge : un souffle et une note qui montent. */
-  charge(dur = 1.2) {
-    tone(98, { dur, to: 392, vol: 0.13, type: 'triangle', swell: true });
-    tone(196, { dur, to: 784, vol: 0.05, swell: true });
-    noise({ dur, vol: 0.09, freq: 500, to: 5200, q: 1.4, swell: true });
-  },
-  /** Le sachet éclate. */
-  burst() {
-    tone(170, { dur: 0.55, to: 36, vol: 0.55 });
-    noise({ dur: 0.4, vol: 0.32, type: 'lowpass', freq: 2400, to: 160 });
-    noise({ dur: 0.9, vol: 0.05, type: 'highpass', freq: 5200 });
-    bell(E6, 0.03, 0.1, 1.3); bell(B6, 0.1, 0.07, 1.1);
-  },
-  /** Une carte qui vole vers sa place. */
-  deal(i = 0) {
-    noise({ dur: 0.16, vol: 0.09, freq: 1500 + i * 260, to: 3800 + i * 300, q: 0.8 });
-    tone(360 + i * 36, { t: 0.13, dur: 0.06, vol: 0.05, type: 'triangle' });
-  },
-  /** Le joueur touche une carte : une petite montée avant le retournement. */
-  arm(tier = 1) {
-    tone(260 + tier * 40, { dur: 0.26, to: 520 + tier * 90, vol: 0.05 + tier * 0.008, type: 'triangle' });
-  },
   /** Un indice apparaît avant une grosse carte. */
   clue(i = 0) {
     bell([E5, G5, B5][i % 3], 0, 0.1, 0.5);
@@ -145,6 +123,29 @@ export const sfx = {
   /** Toutes les cartes sont retournées. */
   done() { bell(E5, 0, 0.08, 0.9); bell(B5, 0.09, 0.07, 0.9); bell(E6, 0.18, 0.07, 1.2); },
   click() { tone(880, { dur: 0.05, vol: 0.05 }); },
+
+  /* ---------- le sachet ---------- */
+  /** Le papier crisse quand on saisit le sachet. */
+  crinkle() {
+    for (let i = 0; i < 4; i++) noise({ t: i * 0.04 + Math.random() * 0.02, dur: 0.035, vol: 0.03 + Math.random() * 0.03, type: 'highpass', freq: 3200 + Math.random() * 2600 });
+  },
+  /** Un grain de déchirure, joué au fil du doigt : plus fort quand le geste est vif (speed de 0 à 1). */
+  tearGrain(speed = 0.5) {
+    noise({ dur: 0.03 + Math.random() * 0.02, vol: 0.05 + speed * 0.11, freq: 2200 + Math.random() * 4200, q: 1.1 });
+    noise({ dur: 0.045, vol: 0.025 + speed * 0.05, type: 'lowpass', freq: 900 });
+  },
+  /** Le sachet se déchire d'un trait (un simple toucher). from : part déjà déchirée. */
+  tear(dur = 0.42, from = 0) {
+    const n = Math.max(4, Math.round(24 * (1 - from)));
+    for (let i = 0; i < n; i++) noise({ t: (i / n) * dur * (0.9 + Math.random() * 0.2), dur: 0.03 + Math.random() * 0.025, vol: 0.06 + Math.random() * 0.08, freq: 2400 + Math.random() * 4000 + i * 60, q: 1.1 });
+    noise({ dur, vol: 0.045, type: 'lowpass', freq: 1100, to: 700 });
+  },
+  /** La bande se détache. */
+  snap() { noise({ dur: 0.07, vol: 0.18, type: 'highpass', freq: 2600 }); tone(190, { dur: 0.12, to: 90, vol: 0.1 }); },
+  /** Les cartes glissent hors du sachet. */
+  slideOut() { noise({ dur: 0.55, vol: 0.07, freq: 700, to: 2600, q: 0.6, attack: 0.1 }); },
+  /** Une carte part se ranger. */
+  slide() { noise({ dur: 0.2, vol: 0.05, freq: 1300, to: 3000, q: 0.7 }); },
 
   /* ---------- le combat ---------- */
   /** C'est au joueur de choisir. */
