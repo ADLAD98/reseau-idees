@@ -22,10 +22,14 @@ const HELP = '<div class="dr-help-box panel"><h3>Gagner la draft</h3><ul>'
   + '<div class="actions"><button class="btn" type="button" data-act="help">Compris</button></div></div>';
 
 /** Joue la draft d'un match. act(body) envoie un choix au serveur ; resync() redemande l'état du match ;
-    help : ouvrir d'office l'explication des règles (première draft du joueur).
+    help : ouvrir d'office l'explication des règles (première draft du joueur) ; head : une ligne au-dessus du titre (série en cours).
+    live : draft en direct contre un autre joueur — { poll() : vient aux nouvelles auprès du serveur, deadline : échéance du choix en cours,
+    now() : heure du serveur }. L'adversaire ne répond pas dans la foulée : on attend son choix en interrogeant le serveur.
     Renvoie { final } (la réponse du serveur au dernier choix : la partie est jouée) ou { left: true } si le joueur quitte l'écran. */
-export function runDraft({ match, cat, fx, act, resync, toast, help }) {
+export function runDraft({ match, cat, fx, act, resync, toast, help, head, live }) {
   let m = match;
+  /* en direct : échéance du choix en cours, adversaire absent (l'ordinateur choisit alors pour lui) */
+  let deadline = live ? live.deadline : null, away = false, alive = true, asking = false, pollTimer = 0, clockTimer = 0;
   const you = m.you, foe = 1 - you;
   const champs = Object.entries(cat.champions).filter(([, c]) => c.r.length).sort((a, b) => a[1].n.localeCompare(b[1].n, 'fr'));
   const champ = (id) => cat.champions[id];
@@ -58,7 +62,8 @@ export function runDraft({ match, cat, fx, act, resync, toast, help }) {
   el.className = 'dr';
   el.dataset.you = you;
   el.innerHTML = '<header class="dr-head"><button class="op-icon" type="button" data-act="leave" aria-label="Quitter la draft">' + icon('i-close') + '</button>'
-    + '<div class="dr-phase"><span class="dr-step"></span><b class="dr-title" aria-live="polite"></b></div>'
+    + (head ? '<span class="dr-series">' + esc(head) + '</span>' : '')
+    + '<div class="dr-phase"><span class="dr-step"></span><span class="dr-titlerow"><b class="dr-title" aria-live="polite"></b><span class="dr-timer" hidden></span></span></div>'
     + '<button class="op-icon" type="button" data-act="help" aria-label="Comment gagner la draft">?</button>'
     + '<button class="op-icon" type="button" data-act="sound" aria-label="Couper ou remettre le son"></button></header>'
     + '<div class="dr-track" aria-hidden="true">' + ORDER.map((o, k) => '<i class="s' + o.side + ' ' + o.type + (PHASES.some((p) => p[0] === k && k) ? ' gap' : '') + '"></i>').join('') + '</div>'
@@ -204,7 +209,7 @@ export function runDraft({ match, cat, fx, act, resync, toast, help }) {
     btn.textContent = t.type === 'ban' ? 'Bannir' : 'Verrouiller';
     btn.disabled = !my || !sel;
     if (!sel || !my) {
-      box.innerHTML = '<p class="dr-tip">' + (t.side !== you ? esc(m.teams[foe].name) + ' réfléchit…' : busy ? 'Un instant…'
+      box.innerHTML = '<p class="dr-tip">' + (t.side !== you ? esc(m.teams[foe].name) + (away ? ' est absent : l\'ordinateur choisit à sa place…' : ' réfléchit…') : busy ? 'Un instant…'
         : t.type === 'ban' ? 'Désigne un champion à interdire aux deux équipes.' : 'Désigne un poste, puis le champion de ton joueur.') + '</p>' + compHTML();
       return;
     }
@@ -230,7 +235,8 @@ export function runDraft({ match, cat, fx, act, resync, toast, help }) {
   async function playLog() {
     while (shown < m.log.length) {
       const a = m.log[shown], auto = a.side !== you;
-      if (auto && fx) { syncAll(); await wait(620 + Math.random() * 480); }
+      /* contre l'ordinateur, un temps de réflexion feint ; en direct, l'adversaire a déjà pris le sien */
+      if (auto && fx && !live) { syncAll(); await wait(620 + Math.random() * 480); }
       apply(a);
       shown++;
       if (a.type === 'ban') sfx.ban(); else sfx.pick();
@@ -256,7 +262,8 @@ export function runDraft({ match, cat, fx, act, resync, toast, help }) {
     const t = turn();
     if (!sel || !t || !myTurn()) return;
     busy = true;
-    const body = { id: m.id, champ: sel };
+    /* step : le nombre de choix déjà faits que cet écran connaît (un choix fait trop tard est refusé par le serveur) */
+    const body = { id: m.id, champ: sel, step: m.log.length };
     if (t.type === 'pick') body.role = role;
     syncFoot();
     let res;
@@ -277,11 +284,19 @@ export function runDraft({ match, cat, fx, act, resync, toast, help }) {
       startTurn();
       return;
     }
-    m = res.match;
-    sel = null;
     query = '';
     $('.dr-q').value = '';
+    await absorb(res);
+  }
+  /** Prend en compte une réponse du serveur : nouveaux choix à montrer, échéance, et la partie si la draft est finie. */
+  async function absorb(res) {
+    busy = true;
+    m = res.match;
+    sel = null;
+    if (res.deadline !== undefined) deadline = res.deadline;
+    if (res.away !== undefined) away = !!res.away;
     await playLog();
+    if (!alive) return;
     if (res.sim) {
       syncAll();
       if (fx) await wait(1200);
@@ -290,6 +305,36 @@ export function runDraft({ match, cat, fx, act, resync, toast, help }) {
       return;
     }
     startTurn();
+  }
+  /* ---------- en direct : on vient aux nouvelles tant que la draft dure ---------- */
+  async function ask() {
+    if (!alive || asking || busy) return;
+    asking = true;
+    try {
+      const res = await live.poll();
+      if (!alive || busy) return;
+      if (res.deadline !== undefined) deadline = res.deadline;
+      const wasAway = away;
+      away = !!res.away;
+      /* l'adversaire a choisi (ou l'ordinateur a choisi pour l'un de nous, le temps écoulé) */
+      if (res.match && (res.sim || res.match.log.length > m.log.length)) await absorb(res);
+      else if (wasAway !== away) syncFoot();
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) { close(); fail(e); }
+      /* une coupure passagère : on réessaiera au prochain tour */
+    } finally {
+      asking = false;
+    }
+  }
+  function drawClock() {
+    const box = $('.dr-timer'), t = turn();
+    if (!deadline || !t) { box.hidden = true; return; }
+    const left = deadline - live.now();
+    box.hidden = false;
+    box.classList.toggle('low', left < 10000);
+    box.classList.toggle('mine', t.side === you);
+    const text = String(Math.max(0, Math.ceil(left / 1000)));
+    if (box.textContent !== text) box.textContent = text;
   }
 
   el.addEventListener('click', (e) => {
@@ -322,6 +367,9 @@ export function runDraft({ match, cat, fx, act, resync, toast, help }) {
   }
   const scroll = document.body.style.overflow;
   function close() {
+    alive = false;
+    clearInterval(pollTimer);
+    clearInterval(clockTimer);
     document.removeEventListener('keydown', onKey);
     el.remove();
     document.body.style.overflow = scroll;
@@ -335,6 +383,12 @@ export function runDraft({ match, cat, fx, act, resync, toast, help }) {
   m.log.forEach((a, k) => { if (a.side === you) lastMine = k; });
   rebuild(lastMine + 1);
   syncAll();
+  if (live) {
+    /* toutes les deux secondes quand on attend l'adversaire ; plus rarement pendant son propre tour (au cas où le temps s'écoule) */
+    let beat = 0;
+    pollTimer = setInterval(() => { beat++; if (!myTurn() || beat % 2 === 0) ask(); }, 2000);
+    clockTimer = setInterval(drawClock, 250);
+  }
   return new Promise((resolve, reject) => {
     settle = resolve;
     fail = reject;

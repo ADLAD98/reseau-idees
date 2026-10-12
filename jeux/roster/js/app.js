@@ -1,11 +1,15 @@
-/* Roster — le jeu. Cinq écrans : Packs, Jouer, Collection, Classement, Profil.
-   Le serveur décide de tout (cartes tirées, délais, collection, matchs) ; cette page affiche et met en scène. */
+/* Roster — le jeu. Six écrans : Packs, Jouer (matchs, Mondial), Collection, Marché, Joueurs (amis, échanges, défis, classement), Profil.
+   Le serveur décide de tout (cartes tirées, délais, collection, matchs, ventes, échanges) ; cette page affiche et met en scène. */
 import { ApiError, call, clearSession, deriveKey, loadSession, saveSession } from './api.js';
 import { VARIANTS, cardHTML, champName, esc, flagUrl, iconUrl, karmineEra, prepare, statsOf, tiltCard, variantRank } from './cards.js';
 import { GAME_NAME, ROLE_NAME, ROLE_ORDER, STORE } from './config.js';
+import { createDuels } from './duel.js';
+import { sellCard, showOnMarket, viewMarket } from './market.js';
 import { packHTML, runOpening } from './opening.js';
 import { viewPlay } from './play.js';
+import { viewSocial } from './social.js';
 import { setSound, sfx, soundOn } from './sound.js';
+import { viewWorlds } from './worlds.js';
 
 const app = document.getElementById('app');
 const $ = (sel, root) => (root || document).querySelector(sel);
@@ -14,9 +18,15 @@ const TABS = [
   ['packs', 'Packs', 'i-pack'],
   ['jouer', 'Jouer', 'i-play'],
   ['collection', 'Collection', 'i-cards'],
-  ['classement', 'Classement', 'i-board'],
+  ['marche', 'Marché', 'i-market'],
+  ['joueurs', 'Joueurs', 'i-friends'],
   ['profil', 'Profil', 'i-user'],
 ];
+/* tant que le serveur n'a pas reçu la vie en ligne (marché, amis, défis), le jeu garde ses anciens onglets */
+const TABS_BEFORE = [TABS[0], TABS[1], TABS[2], ['classement', 'Classement', 'i-board'], TABS[5]];
+const tabs = () => (S.live ? TABS : TABS_BEFORE);
+/** Le jeu donne signe de vie au serveur à ce rythme : c'est ce qui compte les joueurs en ligne et apporte les nouvelles. */
+const PULSE_MS = 20000;
 
 const S = {
   session: null,          // { token, name } gardé dans ce navigateur
@@ -34,6 +44,11 @@ const S = {
   playLeague: '',         // ligue affichée dans la liste des adversaires
   autoDeck: false,        // la meilleure équipe a déjà été alignée d'office pendant cette visite
   busy: false,            // une draft ou une partie est à l'écran
+  live: false,            // le serveur connaît la vie en ligne (marché, amis, défis, Mondial)
+  pulse: null,            // dernières nouvelles du serveur : joueurs en ligne, demandes, invitations
+  social: null,           // l'écran Joueurs
+  market: null,           // l'écran Marché
+  worlds: null,           // l'écran Mondial
 };
 
 /* ---------- petits outils ---------- */
@@ -92,12 +107,71 @@ async function loadCatalogue(version) {
   }
   S.cat = prepare(raw);
 }
-async function loadGame() {
+async function loadCollection() {
   const data = await call('GET', '/api/collection');
   applyState(data);
   S.owned = new Map(data.cards.map((row) => [row[0], { qty: row[1], at: row[2] }]));
-  await loadCatalogue(data.catalogVersion);
+  return data;
 }
+async function loadGame() {
+  const data = await loadCollection();
+  await loadCatalogue(data.catalogVersion);
+  /* le serveur connaît-il la vie en ligne ? (un serveur plus ancien répond « adresse inconnue ») */
+  try {
+    S.pulse = await call('GET', '/api/pulse');
+    S.live = true;
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 401) throw e;
+    S.live = false;
+  }
+}
+
+/* ---------- le pouls : joueurs en ligne, nouvelles du serveur ---------- */
+let pulsing = false;
+async function pulse() {
+  if (!S.session || !S.live || pulsing || document.hidden) return;
+  pulsing = true;
+  try {
+    const data = await call('GET', '/api/pulse');
+    S.pulse = data;
+    drawPulse();
+    /* ma collection ou mes crédits ont bougé sans moi (une vente, un échange accepté, un défi fini) : on se remet à jour */
+    if (data.me && S.player && !S.busy && !S.opening && (data.me.coins !== S.player.coins || data.me.cards !== S.player.cardsTotal || data.me.spare !== (S.free ? S.free.spare : data.me.spare))) {
+      await loadCollection();
+      /* l'écran est redessiné, sauf si le joueur est en train d'écrire ou qu'une fenêtre est ouverte */
+      const typing = document.activeElement && /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName);
+      if (!S.busy && !S.opening && !document.querySelector('.sheet') && !typing) route();
+    }
+    if (!S.busy) DUELS.incoming(data.inbox.duels);
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 401) { clearSession(); S.session = null; showAuth('Ta connexion a expiré. Reconnecte-toi.'); }
+  } finally {
+    pulsing = false;
+  }
+}
+function drawPulse() {
+  const p = S.pulse, chip = document.getElementById('online');
+  if (!p || !chip) return;
+  chip.hidden = false;
+  chip.querySelector('b').textContent = p.online;
+  chip.title = p.online > 1 ? p.online + ' joueurs en ligne' : 'Tu es seul en ligne pour l\'instant';
+  const pips = { joueurs: p.inbox.friends + p.inbox.trades + p.inbox.duels.length, marche: p.inbox.sales };
+  document.querySelectorAll('[data-pip]').forEach((el) => { const n = pips[el.dataset.pip] || 0; el.textContent = n ? String(n) : ''; el.hidden = !n; });
+  /* un défi en cours que le joueur a quitté : un bandeau pour y revenir */
+  let bar = document.getElementById('duelBar');
+  if (p.duel && !S.busy) {
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'duelBar';
+      bar.className = 'bar-note';
+      bar.innerHTML = '<span>Un défi est en cours.</span><button class="btn primary slim" type="button">Reprendre</button>';
+      bar.querySelector('button').addEventListener('click', () => { bar.remove(); DUELS.resume(S.pulse.duel); });
+      document.body.appendChild(bar);
+    }
+  } else if (bar) bar.remove();
+}
+setInterval(pulse, PULSE_MS);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) pulse(); });
 async function boot() {
   try { S.fx = localStorage.getItem(STORE + 'fx') !== '0'; } catch (e) { S.fx = true; }
   try {
@@ -194,27 +268,49 @@ function showAuth(message) {
 
 /* ---------- ossature et navigation ---------- */
 function shell() {
-  app.innerHTML = '<header class="top"><a class="brand" href="#/packs"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#mark"/></svg>' + esc(GAME_NAME) + '<small>saison ' + S.cat.season + '</small></a>'
-    + '<nav class="nav">' + TABS.map((t) => '<a href="#/' + t[0] + '" data-tab="' + t[0] + '">' + t[1] + '</a>').join('') + '</nav>'
-    + '<span class="spacer"></span><a class="purse" href="#/jouer" title="Crédits gagnés en jouant">' + icon('i-coin') + '<b id="credits">' + S.player.coins + '</b></a>'
+  const pip = (id) => '<i class="pip" data-pip="' + id + '" hidden></i>';
+  app.innerHTML = '<header class="top' + (S.live ? ' wide' : '') + '"><a class="brand" href="#/packs"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#mark"/></svg>' + esc(GAME_NAME) + '<small>saison ' + S.cat.season + '</small></a>'
+    + '<nav class="nav">' + tabs().map((t) => '<a href="#/' + t[0] + '" data-tab="' + t[0] + '">' + t[1] + pip(t[0]) + '</a>').join('') + '</nav>'
+    + '<span class="spacer"></span><a class="online" id="online" href="#/joueurs" hidden><i></i><b>1</b><span>en ligne</span></a>'
+    + '<a class="purse" href="#/' + (S.live ? 'marche' : 'jouer') + '" title="Tes crédits : gagnés en jouant, dépensés au marché">' + icon('i-coin') + '<b id="credits">' + S.player.coins + '</b></a>'
     + '<a class="who" href="#/profil">' + icon('i-user') + '<b>' + esc(S.player.name) + '</b></a></header>'
     + '<main class="main" id="main"></main>'
-    + '<nav class="tabs">' + TABS.map((t) => '<a href="#/' + t[0] + '" data-tab="' + t[0] + '">' + icon(t[2]) + t[1] + '</a>').join('') + '</nav>';
+    + '<nav class="tabs">' + tabs().map((t) => '<a href="#/' + t[0] + '" data-tab="' + t[0] + '">' + icon(t[2]) + t[1] + pip(t[0]) + '</a>').join('') + '</nav>';
+  drawPulse();
 }
-/* ce que l'application prête à l'écran Jouer */
+/* ce que l'application prête aux autres écrans (Jouer, Marché, Joueurs, Mondial) */
 const PLAY = {
-  S, call, guard, toast, applyState, icon,
+  S, call, guard, toast, applyState, icon, now,
   refresh: () => route(),
   expired: () => { clearSession(); S.session = null; showAuth('Ta connexion a expiré. Reconnecte-toi.'); },
+  /** Note ce que le serveur dit d'une carte de ma collection : qty exemplaires (0 : je ne l'ai plus). */
+  owned: (id, qty) => { if (qty > 0) S.owned.set(id, { qty, at: (S.owned.get(id) || { at: now() }).at }); else S.owned.delete(id); },
+  /** Redemande au serveur mes crédits et ma collection. */
+  refreshMe: async () => { try { await loadCollection(); } catch (e) { /* on se remettra à jour au prochain passage */ } },
+  pulse: () => pulse(),
 };
-const VIEWS = { packs: viewPacks, jouer: (main) => viewPlay(main, PLAY), collection: viewCollection, classement: viewBoard, profil: viewProfile };
+const DUELS = createDuels(PLAY);
+PLAY.duel = DUELS;
+const VIEWS = {
+  packs: viewPacks, collection: viewCollection, classement: viewBoard, profil: viewProfile,
+  jouer: (main, sub) => (sub === 'mondial' && S.live ? viewWorlds(main, PLAY) : viewPlay(main, PLAY)),
+  marche: (main) => viewMarket(main, PLAY),
+  joueurs: (main) => viewSocial(main, PLAY),
+};
 function route() {
   if (!S.session || !S.cat || !$('#main') || S.busy) return;
-  const name = (location.hash.replace(/^#\/?/, '').split('/')[0]) || 'packs';
-  const tab = VIEWS[name] ? name : 'packs';
+  const parts = location.hash.replace(/^#\/?/, '').split('/');
+  let name = parts[0] || 'packs';
+  /* le classement vit maintenant dans l'onglet Joueurs */
+  if (S.live && name === 'classement') {
+    S.social = Object.assign(S.social || { friends: null, trades: null, board: null, duels: null }, { tab: 'classement' });
+    name = 'joueurs';
+    history.replaceState(null, '', '#/joueurs');
+  }
+  const tab = tabs().some((t) => t[0] === name) && VIEWS[name] ? name : 'packs';
   document.querySelectorAll('[data-tab]').forEach((a) => a.classList.toggle('on', a.dataset.tab === tab));
   window.scrollTo(0, 0);
-  VIEWS[tab]($('#main'));
+  VIEWS[tab]($('#main'), parts[1] || '');
 }
 window.addEventListener('hashchange', route);
 
@@ -239,7 +335,7 @@ function progressHTML() {
   const total = S.cat.cards.length, have = S.owned.size;
   const tally = (all) => all.filter((c) => S.owned.has(c.id)).length + '/' + all.length;
   const tiers = [...S.cat.tiers].reverse().map((t) => '<span style="--tc:var(--t' + t.id + ')"><i></i>' + esc(t.name) + ' ' + tally(S.cat.base.filter((c) => c.tier === t.id)) + '</span>').join('')
-    + Object.entries(VARIANTS).map(([id, v]) => '<span class="v-' + id + '"><i></i>' + v.name + (id === 'holo' ? 's' : '') + ' ' + tally(S.cat.cards.filter((c) => c.variant === id)) + '</span>').join('');
+    + Object.entries(VARIANTS).filter(([id]) => S.cat.cards.some((c) => c.variant === id)).map(([id, v]) => '<span class="v-' + id + '"><i></i>' + v.name + (id === 'holo' ? 's' : '') + ' ' + tally(S.cat.cards.filter((c) => c.variant === id)) + '</span>').join('');
   return '<div class="meter"><div class="meter-head"><span class="label">Collection</span><span><b>' + have + '</b> / ' + total + ' cartes</span></div>'
     + '<div class="bar"><i style="width:' + pct(have, total) + '%"></i></div><div class="tiers">' + tiers + '</div></div>';
 }
@@ -258,7 +354,7 @@ function viewPacks(main) {
   main.innerHTML = '<section class="home"><div class="home-pack" id="packBox">' + packHTML(packReady() ? 'ready' : 'waiting', S.cat.season, S.free.size) + '</div>'
     + '<div class="home-side"><div class="eyebrow">Pack gratuit · toutes les ' + Math.round(S.free.cooldownMs / 60000) + ' minutes</div>'
     + '<h1 class="h1">' + S.free.size + ' cartes à découvrir</h1>'
-    + '<p class="lead">Joueurs et coachs pros de la saison ' + S.cat.season + '. La dernière carte du pack est une carte bonus : rang Titulaire au minimum. Les plus belles cartes existent aussi en version holographique et en full art, et les joueurs passés par la Karmine en édition KC.</p>'
+    + '<p class="lead">Joueurs et coachs pros de la saison ' + S.cat.season + '. La dernière carte du pack est une carte bonus : rang Titulaire au minimum. Les plus belles cartes existent aussi en version holographique et en full art' + (S.cat.cards.some((c) => c.variant === 'kc') ? ', et les joueurs passés par la Karmine en édition KC' : '') + '.</p>'
     + '<div id="packAction" data-sig="' + packSig() + '">' + packActionHTML() + '</div>' + progressHTML() + '</div></section>'
     + '<section><h2 class="h2">Dernières cartes obtenues</h2>'
     + (recent.length ? '<div class="row-cards">' + recent.map((c) => tile(c)).join('') + '</div>' : '<p class="empty">Ta collection est vide. Ouvre ton premier pack !</p>')
@@ -486,10 +582,21 @@ function showSheet(id) {
     + (card.variant ? '<p class="note">' + (card.variant === 'kc' ? 'Édition Karmine Corp de la carte de ' + esc(card.name) + ' (' + esc(karmineEra(cat, card)) + '), réservée à celles et ceux qui portent ou ont porté ses couleurs'
       : 'Version ' + (card.variant === 'holo' ? 'holographique' : 'full art') + ' de la carte de ' + esc(card.name)) + ' : même joueur, même note, un autre habillage. Elle sort parfois d\'un pack à la place de la carte ordinaire, et se collectionne à part.</p>' : '')
     + '<p class="note">Note calculée à partir des statistiques officielles de la saison ' + cat.season + ' (ligue, tournois internationaux, palmarès). Données : Leaguepedia.</p>'
+    /* le marché : vendre un exemplaire, ou chercher qui vend cette carte */
+    + (S.live && !S.busy && !S.opening ? '<div class="actions sheet-acts">' + (own ? '<button class="btn" type="button" data-sheet="sell">Vendre un exemplaire</button>' : '')
+      + '<button class="btn" type="button" data-sheet="market">' + (own ? 'Voir sur le marché' : 'La chercher au marché') + '</button></div>' : '')
     + '</div></div>';
   const close = () => { sheet.remove(); document.removeEventListener('keydown', onKey); document.body.style.overflow = ''; };
   const onKey = (e) => { if (e.key === 'Escape') close(); };
-  sheet.addEventListener('click', (e) => { if (e.target === sheet || e.target.closest('.close')) close(); });
+  sheet.addEventListener('click', (e) => {
+    if (e.target === sheet || e.target.closest('.close')) { close(); return; }
+    const act = e.target.closest('[data-sheet]');
+    if (!act) return;
+    close();
+    /* les fenêtres ouvertes derrière (échange, marché) se referment : on change d'écran */
+    document.querySelectorAll('.sheet').forEach((el) => { const x = el.querySelector('.close'); if (x) x.click(); });
+    if (act.dataset.sheet === 'sell') sellCard(id, PLAY); else showOnMarket(card.base || card.id, PLAY);
+  });
   document.addEventListener('keydown', onKey);
   document.body.style.overflow = 'hidden';
   document.body.appendChild(sheet);
@@ -513,7 +620,9 @@ async function viewBoard(main) {
 async function viewProfile(main) {
   const p = S.player;
   main.innerHTML = '<div class="col-head"><div><h1 class="h1">' + esc(p.name) + '</h1><p>Joueur depuis le ' + frDate(p.createdAt) + '</p></div></div><div class="panels">'
-    + '<section class="panel"><h3>Mon compte</h3><div class="kv"><span>Packs ouverts</span><b>' + p.packsOpened + '</b><span>Cartes différentes</span><b>' + p.cardsUnique + ' / ' + S.cat.cards.length + '</b><span>Exemplaires</span><b>' + p.cardsTotal + '</b><span>Parties gagnées</span><b>' + p.wins + ' sur ' + (p.wins + p.losses) + '</b><span>Crédits</span><b>' + p.coins + '</b></div>'
+    + '<section class="panel"><h3>Mon compte</h3><div class="kv"><span>Packs ouverts</span><b>' + p.packsOpened + '</b><span>Cartes différentes</span><b>' + p.cardsUnique + ' / ' + S.cat.cards.length + '</b><span>Exemplaires</span><b>' + p.cardsTotal + '</b><span>Parties gagnées</span><b>' + p.wins + ' sur ' + (p.wins + p.losses) + '</b>'
+    + (S.live ? '<span>Défis entre joueurs</span><b>' + (p.duelWins || 0) + ' V – ' + (p.duelLosses || 0) + ' D</b><span>Mondiaux remportés</span><b>' + (p.titles || 0) + '</b>' : '')
+    + '<span>Crédits</span><b>' + p.coins + '</b></div>'
     + '<div class="switch"><span>Animations</span><button type="button" id="fxSwitch" aria-pressed="' + S.fx + '" aria-label="Animations"></button></div>'
     + '<div class="switch"><span>Sons</span><button type="button" id="soundSwitch" aria-pressed="' + soundOn() + '" aria-label="Sons"></button></div>'
     + '<div class="actions"><button class="btn" type="button" id="logout">Se déconnecter</button><button class="btn danger" type="button" id="askDelete">Supprimer mon compte</button></div>'

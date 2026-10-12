@@ -130,6 +130,16 @@
 .dr-step{padding:4px 10px 3px;font:600 12px/1 var(--text);letter-spacing:.2em;text-indent:.2em;text-transform:uppercase;color:var(--act);transition:color .3s,background .3s}
 .dr[data-mode="ban"] .dr-step{background:var(--act);color:#1b0409}
 .dr-title{font:400 24px/1 var(--title);letter-spacing:.14em;text-indent:.14em;text-transform:uppercase;color:var(--gold);white-space:nowrap;transition:color .2s}
+/* série en cours (défi, Mondial) et, en direct, le temps qu'il reste pour choisir */
+.dr-head{position:relative}
+.dr-series{position:absolute;left:calc(max(16px,env(safe-area-inset-left)) + 56px);top:50%;max-width:calc(50% - 300px);transform:translateY(-50%);
+  font:600 12px/1.3 var(--text);letter-spacing:.1em;text-transform:uppercase;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dr-titlerow{display:flex;align-items:baseline;justify-content:center;gap:14px;max-width:100%}
+/* le compte à rebours, à côté du titre : les secondes qu'il reste pour choisir */
+.dr-timer{flex:none;min-width:32px;padding:3px 7px 2px;border:1px solid var(--line2);font:700 17px/1 var(--text);color:var(--mut);text-align:center;font-variant-numeric:tabular-nums}
+.dr-timer.mine{border-color:var(--act);color:var(--act-hi)}
+.dr-timer.low{border-color:#ff5468;color:#ffd9de;animation:pulse .8s ease-in-out infinite}
+@media (max-width:1100px){.dr-series{display:none}}
 .dr[data-mode="ban"] .dr-title{color:#ff9aa7}
 .dr[data-turn="me"] .dr-title{color:#fff;text-shadow:0 0 18px var(--act-glow)}
 .dr-track{display:flex;justify-content:center;align-items:center;gap:4px;height:8px;margin-bottom:12px;flex:none}
@@ -432,6 +442,8 @@
 .end-title{text-align:center;font:400 clamp(44px,9vw,84px)/1 var(--title);letter-spacing:.24em;text-indent:.24em;text-transform:uppercase}
 .end-box.win .end-title{background:linear-gradient(#fff,#f0e6d2 35%,#c8aa6e);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 26px rgba(200,170,110,.5))}
 .end-box.lose .end-title{color:#8f96a3}
+.end-title.long{font-size:clamp(30px,6.4vw,58px);letter-spacing:.16em;text-indent:.16em}
+.end-sub b{color:var(--gold-hi);font-weight:600}
 .end-score{display:flex;align-items:baseline;justify-content:center;gap:18px}
 .end-score b{font:700 44px/1 var(--text);color:#fff;font-variant-numeric:tabular-nums;white-space:nowrap}
 .end-score span{font:400 20px/1 var(--title);letter-spacing:.12em}
@@ -538,6 +550,8 @@
   .dr-phase{gap:5px}
   .dr-step{font-size:10.5px;letter-spacing:.14em}
   .dr-title{font-size:17px;letter-spacing:.1em;text-indent:.1em}
+  .dr-titlerow{gap:9px}
+  .dr-timer{min-width:26px;padding:2px 5px 1px;font-size:14px}
   .dr-track{gap:3px;margin-bottom:8px}
   .dr-track i{width:11px}
   .dr-track i.gap{margin-left:7px}

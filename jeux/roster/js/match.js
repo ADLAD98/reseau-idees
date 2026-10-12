@@ -49,7 +49,9 @@ function mapSVG() {
   return s + '</svg>';
 }
 
-/** Montre un match. data : { match, report, sim, rewards } tel que le serveur l'envoie. Renvoie { goTo } quand le joueur referme l'écran. */
+/** Montre un match. data : { match, report, sim, rewards } tel que le serveur l'envoie. Renvoie { goTo } quand le joueur referme l'écran.
+    Pour une manche de série (défi, Mondial), rewards peut porter son propre habillage du résultat : title (« Manche gagnée »),
+    sub (« BO3 · 1 – 0 »), html (le cadre de la récompense), next (le libellé du bouton pour continuer). */
 export function runMatch({ data, cat, fx }) {
   const M = data.match, sim = data.sim, events = sim.events, you = M.you, rewards = data.rewards || {};
   /* les dix joueurs : 0 à 4 pour les bleus (TOP, JGL, MID, ADC, SUP), 5 à 9 pour les rouges */
@@ -434,22 +436,23 @@ export function runMatch({ data, cat, fx }) {
       + '<tbody>' + [0, 1, 2, 3, 4].map((r) => pickRow(s, r)).join('') + '</tbody>'
       + '<tfoot><tr><td colspan="6">Composition ' + signed(data.report.comp[s].bonus) + ' par joueur' + (data.report.comp[s].notes.length ? ' : ' + esc(data.report.comp[s].notes.join(', ').toLowerCase()) : '') + '</td></tr></tfoot></table>';
     let prize;
-    if (rewards.replay) prize = '<div class="prize"><span>Rediffusion</span><b>' + (won ? 'Victoire' : 'Défaite') + '</b><i>Les récompenses ont déjà été versées.</i></div>';
+    if (rewards.html) prize = rewards.html;
+    else if (rewards.replay) prize = '<div class="prize"><span>Rediffusion</span><b>' + (won ? 'Victoire' : 'Défaite') + '</b><i>Les récompenses ont déjà été versées.</i></div>';
     else {
       prize = '<div class="prize"><span>' + (won ? 'Récompense' : 'Lot de consolation') + '</span><b>+' + rewards.coins + ' crédits</b>'
         + (rewards.easy ? '<i>Adversaire bien plus faible : gain réduit.</i>' : '') + '</div>'
         + (rewards.pack ? '<div class="prize bonus"><span>Première victoire contre ' + esc(foeTeam ? foeTeam.name : M.opp) + '</span><b>+1 pack</b><i>Il t\'attend dans l\'onglet Packs.</i></div>' : '');
     }
-    endEl.innerHTML = '<div class="end-box panel ' + (won ? 'win' : 'lose') + '"><div class="end-title">' + (won ? 'Victoire' : 'Défaite') + '</div>'
+    endEl.innerHTML = '<div class="end-box panel ' + (won ? 'win' : 'lose') + '"><div class="end-title' + (rewards.title && rewards.title.length > 9 ? ' long' : '') + '">' + esc(rewards.title || (won ? 'Victoire' : 'Défaite')) + '</div>'
       + '<div class="end-score"><span class="s0">' + esc(short(0)) + '</span><b>' + sim.kills[0] + ' – ' + sim.kills[1] + '</b><span class="s1">' + esc(short(1)) + '</span></div>'
-      + '<p class="end-sub">' + clockText(sim.duration) + ' de jeu · côté ' + (you === 0 ? 'bleu' : 'rouge') + '</p>'
+      + '<p class="end-sub">' + (rewards.sub ? '<b>' + esc(rewards.sub) + '</b> · ' : '') + clockText(sim.duration) + ' de jeu · côté ' + (you === 0 ? 'bleu' : 'rouge') + '</p>'
       + '<div class="end-top"><div class="end-mvp">' + (mvp.card ? cardHTML(mvp.card, cat, { eager: true }) : '<img class="end-mvp-i" src="' + iconUrl(cat, mvp.champ) + '" alt="">')
       + '<div><span>MVP de la partie</span><b>' + esc(mvp.name) + '</b><i>' + ms.k + ' / ' + ms.d + ' / ' + ms.a + ' sur ' + esc(mvp.champName) + '</i></div></div>'
       + '<div class="end-side">' + prize
       + '<table class="end-stats"><thead><tr><td class="num s0">' + esc(short(0)) + '</td><th></th><td class="num s1">' + esc(short(1)) + '</td></tr></thead><tbody>'
       + line('Éliminations', sim.kills[0], sim.kills[1]) + line('Or', kilo(sim.gold[0]), kilo(sim.gold[1])) + line('Tours', sim.towers[0], sim.towers[1])
       + line('Dragons', sim.dragons[0], sim.dragons[1]) + line('Barons', sim.barons[0], sim.barons[1]) + '</tbody></table></div></div>'
-      + '<div class="end-actions actions"><button class="btn primary big" type="button" data-go="' + (rewards.pack ? 'packs' : 'jouer') + '">' + (rewards.pack ? 'Ouvrir mon pack' : 'Continuer') + '</button>'
+      + '<div class="end-actions actions"><button class="btn primary big" type="button" data-go="' + (rewards.pack ? 'packs' : 'jouer') + '">' + (rewards.pack ? 'Ouvrir mon pack' : esc(rewards.next || 'Continuer')) + '</button>'
       + (rewards.pack ? '<button class="btn big" type="button" data-go="jouer">Continuer</button>' : '')
       + '<button class="btn big" type="button" data-act="again">' + (fx ? 'Revoir la partie' : 'Voir la partie') + '</button></div>'
       + '<details class="more" open><summary>Joueurs</summary><div class="end-boards">' + board(0) + board(1) + '</div></details>'

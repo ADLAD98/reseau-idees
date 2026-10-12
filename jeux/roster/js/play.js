@@ -6,6 +6,7 @@ import { ROLE_LABEL, ROLE_NAME } from './config.js';
 import { runDraft } from './draft.js';
 import { runMatch } from './match.js';
 import { winChance } from './rules.js';
+import { worldsBanner } from './worlds.js';
 
 const SLOTS = [['top', 'TOP'], ['jgl', 'JGL'], ['mid', 'MID'], ['bot', 'BOT'], ['sup', 'SUP'], ['coach', 'COACH']];
 const POSTE = { TOP: 'ton toplaner', JGL: 'ton jungler', MID: 'ton midlaner', BOT: 'ton ADC', SUP: 'ton support', COACH: 'ton coach' };
@@ -60,6 +61,7 @@ function draw(main) {
   main.innerHTML = '<div class="col-head"><div><h1 class="h1">Jouer</h1><p>Compose ton équipe, mène la draft, regarde la partie.</p></div>'
     + '<div class="tally"><div><b>' + S.player.wins + '</b><span>' + (S.player.wins > 1 ? 'victoires' : 'victoire') + '</span></div><div><b>' + S.player.losses + '</b><span>' + (S.player.losses > 1 ? 'défaites' : 'défaite') + '</span></div>'
     + '<div class="gold"><b>' + S.player.coins + '</b><span>crédits</span></div></div></div>'
+    + (S.live ? worldsBanner(S) : '')
     + (active ? '<div class="resume panel"><div><b>Draft en cours</b><span>contre ' + esc(foeName(active.opp)) + ' · ' + plural(active.step, 'choix fait', 'choix faits') + ' sur 20</span></div>'
       + '<button class="btn primary" type="button" id="resume">Reprendre</button></div>' : '')
     + '<section class="squad panel"><div class="sq-head"><div class="sq-rating"><b>' + L.rating + '</b><span>Note<br>d\'équipe</span></div>'
