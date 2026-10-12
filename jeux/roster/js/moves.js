@@ -244,13 +244,15 @@ export function deathTime(level, g) {
   const more = m < 15 ? 0 : m < 30 ? halves(15) * 0.425 : m < 45 ? 12.75 + halves(30) * 0.3 : Math.min(50, 21.75 + halves(45) * 1.45);
   return RESPAWN[clamp(Math.round(level), 1, 20)] * (1 + more / 100);
 }
-/* La Téléportation du toplaner : au-delà de TP_MIN (distance par les couloirs), il ne vient plus à pied ; TP_COST : l'incantation, à l'écran ;
-   TP_EVERY : le délai entre deux Téléportations, en secondes de jeu. */
-const TP_MIN = 520, TP_COST = 560, TP_EVERY = 300;
+/* La Téléportation, pour ceux qui l'ont prise (toplaners et midlaners, le plus souvent) : au-delà de TP_MIN (distance par les couloirs), on ne
+   vient plus à pied ; TP_COST : l'incantation, à l'écran. Son délai de récupération est celui du sort : cinq minutes de jeu. */
+const TP_MIN = 520, TP_COST = 560;
 
 /** Prépare tous les déplacements d'une partie. sim : ce que le serveur renvoie (events, duration, kills).
     kits : pour chacun des dix joueurs, ce qu'on sait de son champion — { res: 'mana' | 'energy' | 'build' | 'none' (sa ressource),
-    cd: [délais de son ultime par rang], early: l'ultime sert dès le niveau 1, split: champion de duel, qui tient une voie de côté }. */
+    cd: [délais de son ultime par rang], early: l'ultime sert dès le niveau 1, split: champion de duel, qui tient une voie de côté,
+    sums: ses deux sorts d'invocateur, [[lettre, délai de récupération], …] — F Saut éclair, T Téléportation, S Châtiment, I Embrasement,
+    H Soins, B Barrière, E Fatigue, C Purge, G Fantôme }. Sans « kits », seul le toplaner se téléporte. */
 export function planMoves(sim, kits = []) {
   const ev = sim.events, N = ev.length;
   const rnd = mulberry32((Math.round(sim.duration) * 7919 + N * 104729 + (sim.kills ? sim.kills[0] * 31 + sim.kills[1] : 0)) >>> 0);
@@ -625,6 +627,45 @@ export function planMoves(sim, kits = []) {
     return true;
   };
 
+  /* ---------- les sorts d'invocateur ---------- */
+  /* Là encore le serveur ne les suit pas. Chacun a les deux sorts que les pros prennent sur son champion ; il s'en sert dans les actions où ils
+     comptent — le Saut éclair pour fuir ou pour conclure, l'Embrasement pour achever, les Soins et la Barrière quand ça chauffe, le Châtiment
+     sur les objectifs — puis attend leur vrai délai de récupération. La Téléportation, elle, sert dans les trajets (plus bas). */
+  const sums = Array.from({ length: 10 }, (x, i) => ((kits[i] && kits[i].sums) || []).slice(0, 2).map(([id, cd]) => ({ id, cd, used: [] })));
+  const sumOf = (i, id) => sums[i].find((s) => s.id === id);
+  const sumFree = (i, id, when) => { const s = sumOf(i, id), last = s && s.used[s.used.length - 1]; return !!s && (!last || last[1] <= when); };
+  const sumUse = (i, id, when) => { if (!sumFree(i, id, when)) return false; const s = sumOf(i, id); s.used.push([when, tauOfGame(gameAt(when) + s.cd)]); return true; };
+  for (let i = 0; i < 10; i++) {
+    if (!sums[i].length) continue;
+    const side = i < 5 ? 0 : 1;
+    for (const A of appts[i]) {
+      const n = A.n, e = ev[n], a = at[n];
+      if (e.k === 'nexus') continue;
+      const fought = e.kills.length, won = e.s === side, dies = A.dies !== undefined;
+      const mine = e.kills.findIndex((k) => k[0] === i), helped = e.kills.some((k) => k[0] === i || k[2].includes(i));
+      const when = dies ? Math.max(a.tau, A.dies - 220) : mine >= 0 ? Math.max(a.tau, a.kills[mine] - 180) : a.tau + rand(80, SHOW_LEAD);
+      /* les chances qu'il s'en serve ici, sort par sort */
+      const odds = {
+        F: dies ? 0.55 : e.k === 'gank' && !fought && casts[n][2] === i ? 0.85 : fought >= 2 && !won ? 0.45 : mine >= 0 ? 0.3 : e.k === 'duel' && !won && LANE_INDEX[e.z] !== undefined ? 0.2 : 0.03,
+        I: helped ? 0.75 : fought ? 0.2 : 0,
+        H: dies ? 0.7 : fought ? (won ? 0.35 : 0.6) : 0,
+        B: dies ? 0.7 : fought ? (won ? 0.3 : 0.6) : 0,
+        E: fought ? 0.55 : e.k === 'gank' ? 0.3 : 0,
+        C: dies ? 0.5 : fought >= 2 ? 0.45 : 0,
+        G: fought >= 2 ? 0.6 : fought ? 0.35 : 0,
+        S: OBJECTIVE[e.k] && i % 5 === 1 ? 1 : 0,
+      };
+      for (const s of sums[i]) if ((odds[s.id] || 0) > 0 && rnd() < odds[s.id]) sumUse(i, s.id, when);
+    }
+  }
+  /** Secondes de jeu avant que le sort n° « slot » du joueur i soit de nouveau prêt, à l'instant tau (0 : il l'est). */
+  const sumLeft = (i, slot, x) => {
+    const s = sums[i][slot];
+    if (!s) return 0;
+    for (const [a, b] of s.used) { if (x < a) return 0; if (x < b) return Math.max(0, gameAt(b) - gameAt(x)); }
+    return 0;
+  };
+
   /* ---------- 7. la vie et la ressource ---------- */
   /* Le serveur ne compte ni les points de vie ni le mana : la mise en scène en tire une histoire plausible, écrite au fil du trajet de chacun.
      On perd de la vie dans les actions où l'on se trouve (beaucoup quand on les perd, tout quand on y meurt) ; elle remonte doucement, et un
@@ -713,8 +754,25 @@ export function planMoves(sim, kits = []) {
     const pace = 0.93 + rnd() * 0.14;
     let queue = [], cleared = 0, lastHover = null, opened = false, tpAt = -Infinity;
     const vit = vitalsOf(i);
-    /* la Téléportation du toplaner : passé la phase de lane, prête toutes les cinq minutes de jeu */
-    const canTp = (x) => role === 0 && gameAt(x) > LANING_END && gameAt(x) - tpAt >= TP_EVERY;
+    /* la Téléportation, pour qui l'a prise (sans « kits » : le toplaner, toutes les cinq minutes de jeu). Passé la phase de lane, elle sert à
+       rejoindre une action lointaine ; avant, à regagner sa voie */
+    const hasTp = sums[i].length ? !!sumOf(i, 'T') : role === 0;
+    const tpFree = (x) => (sums[i].length ? sumFree(i, 'T', x) : gameAt(x) - tpAt >= 300);
+    const tpUse = (x) => { if (sums[i].length) sumUse(i, 'T', x); else tpAt = gameAt(x); stats.tps++; };
+    const canTp = (x) => hasTp && gameAt(x) > LANING_END && tpFree(x - TP_COST);
+    /** Après une mort en phase de lane : il regagne sa voie à la Téléportation — c'est à cela qu'elle sert le plus, en début de partie.
+        until : l'instant où il doit être libre de ses mouvements (son prochain rendez-vous). */
+    function laneTp(until) {
+      const s = sOf(cur.t), duty = dutyOf(role, s, side);
+      if (!hasTp || !duty || s.phase !== 'lane' || gameAt(cur.t) < 200 || !tpFree(cur.t + 260) || cur.t + 1100 > until || rnd() >= 0.7) return;
+      const spot = laneAt(duty.lane, s.front[duty.lane] + sg * (duty.back + 70), duty.lat);
+      if (routeLen(home, spot) < 500) return;
+      stay(cur.t + 260, 'h');
+      tpUse(cur.t);
+      stay(cur.t + TP_COST - 110, 't');
+      jump(spot);
+      stay(cur.t + 120, 'h');
+    }
     const push = (t, p, k = 'h') => { keys.push({ t, x: p[0], y: p[1], k }); cur.t = t; cur.p = p; };
     /* ses chemins : dans la base adverse, il n'entre que par une voie ouverte — celles dont l'inhibiteur sera tombé quand commencera
        l'événement où il se rend (aim : l'état de la carte à ce moment-là) */
@@ -865,10 +923,9 @@ export function planMoves(sim, kits = []) {
       if (tp && len > TP_MIN && len / VFAST > left - 40) {
         const cost = Math.min(TP_COST, left);
         stay(deadline - cost, 'h');
+        tpUse(cur.t);
         stay(deadline - Math.min(110, cost / 3), 't');
-        tpAt = gameAt(cur.t);
         jump(target);
-        stats.tps++;
         stay(deadline, 'h');
         return;
       }
@@ -911,6 +968,10 @@ export function planMoves(sim, kits = []) {
         push(back, cur.p);
         jump(home);
         cleared = 0;
+        {
+          const next = appts[i][appts[i].indexOf(A) + 1];
+          laneTp(next ? at[next.n].tau - (next.spot ? next.margin + 600 : 0) : total);
+        }
         continue;
       }
       /* ce que l'action lui coûte de vie : peu quand on prend une tour ou un objectif laissé libre, beaucoup quand on perd un combat */
@@ -937,7 +998,7 @@ export function planMoves(sim, kits = []) {
   /** La part de vie (de 0 à 1) du joueur i à l'instant tau, et celle de sa ressource. */
   const hpAt = (i, x) => valueAt(life[i], x), resAt = (i, x) => valueAt(mana[i], x);
 
-  return { total, at, anchors, casts, tracks, deaths, camps: CAMPS.map((c) => ({ id: c.id, p: c.p, side: c.side, kind: c.kind, hold: c.hold, down: campDown.get(c.id) })), gameAt, tauOfGame, stats, ults, ultReady, levels, levelAt, life, mana, hpAt, resAt };
+  return { total, at, anchors, casts, tracks, deaths, camps: CAMPS.map((c) => ({ id: c.id, p: c.p, side: c.side, kind: c.kind, hold: c.hold, down: campDown.get(c.id) })), gameAt, tauOfGame, stats, ults, ultReady, levels, levelAt, life, mana, hpAt, resAt, sums, sumLeft };
 }
 
 /** Où se trouve un joueur à l'instant tau : { x, y, k } (k : ce qu'il fait — w marche, d court, h attend, f combat, c tue un camp, r rentre, g parti, t se téléporte, x mort). */

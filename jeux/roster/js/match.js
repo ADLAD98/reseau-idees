@@ -4,7 +4,7 @@ import { cardHTML, esc, iconUrl } from './cards.js';
 import { DDRAGON, ROLE_LABEL, STORE } from './config.js';
 import { createFans } from './fans.js';
 import { createFx } from './fx.js';
-import { KITS, RESOURCES } from './kits.js';
+import { KITS, RESOURCES, SPELLS, SPELL_DEFAULT, SPELL_PICKS } from './kits.js';
 import { CAMPS, KILL_GAP, NEXUS, NEXUS_TOWERS, PIT, SHOW_LEAD, STRUCT, TRAILS, planMoves, sample } from './moves.js';
 import { ROLES, signed } from './rules.js';
 import { setSound, sfx, soundOn } from './sound.js';
@@ -68,7 +68,9 @@ export function runMatch({ data, cat, fx }) {
       P.push({ side, role: ROLES[r], name: p.name || 'Remplaçant', card: (p.id && cat.cardById.get(p.id)) || null, champ, champName: info.n || champ,
         res: kit ? kit[0] : 'm', ult: kit ? kit[1] : '', ultCd: kit ? kit[2] : null, ultEarly: !!(kit && kit[3]),
         /* un champion de duel (combattant, assassin) : au milieu, il ira tenir une voie de côté en fin de partie */
-        split: info.t === 'Fighter' || info.t === 'Assassin' });
+        split: info.t === 'Fighter' || info.t === 'Assassin',
+        /* ses deux sorts d'invocateur : ceux que les pros prennent sur ce champion à ce poste, sinon ceux du poste */
+        sums: ((SPELL_PICKS[champ] && SPELL_PICKS[champ][ROLES[r]]) || SPELL_DEFAULT[ROLES[r]] || '').split('').filter((l) => SPELLS[l]) });
     });
   }
   const short = (s) => M.teams[s].short;
@@ -95,10 +97,13 @@ export function runMatch({ data, cat, fx }) {
     return '<div class="mv-p" data-p="' + i + '"><span class="mv-pw"><span class="mv-pi"><img src="' + iconUrl(cat, p.champ) + '" alt="" draggable="false"></span><i class="mv-r" data-r="' + i + '" title="Ultime (R)' + (p.ult ? ' : ' + esc(p.ult) : '') + '"></i>'
       /* le niveau du champion, comme sur le tableau des scores du jeu */
       + '<b class="mv-lv" data-lv="' + i + '" title="Niveau">1</b></span>'
+      /* ses deux sorts d'invocateur : grisés, avec les secondes qui restent, tant qu'ils ne sont pas revenus */
+      + '<span class="mv-sp">' + p.sums.map((l, k) => '<i class="mv-sum" data-sum="' + i + '-' + k + '" title="' + esc(SPELLS[l][0]) + '">'
+        + '<img src="' + DDRAGON + '/' + cat.ddragon + '/img/spell/' + SPELLS[l][2] + '.png" alt="" draggable="false"><b></b></i>').join('') + '</span>'
       + '<span class="mv-pn"><b>' + esc(p.name) + '</b><i>' + ROLE_LABEL[p.role] + ' · ' + esc(p.champName) + '</i></span>'
       + '<span class="mv-pk"><b data-kda="' + i + '">0/0/0</b><i data-cs="' + i + '" title="Sbires tués">0 CS</i></span>'
       /* sa vie, et sa ressource quand son champion en a une (mana, énergie, rage…) */
-      + '<span class="mv-bars"><i class="mv-hp" title="Vie"><b data-hp="' + i + '"></b></i>'
+      + '<span class="mv-bars"><i class="mv-hp" title="Vie"><u data-hpl="' + i + '"></u><b data-hp="' + i + '"></b></i>'
       + (p.res === 'n' ? '' : '<i class="mv-mp r-' + p.res + '" title="' + esc(RESOURCES[p.res] || 'Ressource') + '"><b data-mp="' + i + '"></b></i>') + '</span></div>';
   }).join('') + '</aside>';
 
@@ -137,14 +142,15 @@ export function runMatch({ data, cat, fx }) {
   const tokens = P.map((p) => {
     const d = document.createElement('div');
     d.className = 'tk s' + p.side;
-    /* le portrait et, au-dessus, la barre de vie et celle de la ressource */
-    d.innerHTML = '<span class="tk-i"><img src="' + iconUrl(cat, p.champ) + '" alt="" draggable="false"></span>'
-      + '<span class="tk-bars"><i class="tk-hp"><b></b></i>' + (p.res === 'n' ? '' : '<i class="tk-mp r-' + p.res + '"><b></b></i>') + '</span>';
+    /* le portrait ; la barre de vie au-dessus ne se montre que sur les combattants d'un temps fort, pour ne pas charger la carte */
+    d.innerHTML = '<span class="tk-i"><img src="' + iconUrl(cat, p.champ) + '" alt="" draggable="false"></span><span class="tk-bars"><i class="tk-hp"><b></b></i></span>';
     mapIn.appendChild(d);
     return d;
   });
-  const hpEls = tokens.map((d) => d.querySelector('.tk-hp b')), mpEls = tokens.map((d) => d.querySelector('.tk-mp b'));
+  const hpEls = tokens.map((d) => d.querySelector('.tk-hp b'));
   const hpRows = P.map((p, i) => root.querySelector('[data-hp="' + i + '"]')), mpRows = P.map((p, i) => root.querySelector('[data-mp="' + i + '"]'));
+  const hpLag = P.map((p, i) => root.querySelector('[data-hpl="' + i + '"]'));
+  const sumEls = P.map((p, i) => p.sums.map((l, k) => root.querySelector('[data-sum="' + i + '-' + k + '"]')));
   const scroll = document.body.style.overflow;
   document.body.style.overflow = 'hidden';
   document.body.appendChild(root);
@@ -157,28 +163,43 @@ export function runMatch({ data, cat, fx }) {
   let clockT = 0, lost = [[0, 0, 0, 0], [0, 0, 0, 0]];
   const pos = P.map(() => [500, 500]), kda = P.map(() => ({ k: 0, d: 0, a: 0 })), score = [0, 0];
   /* Les déplacements de toute la partie sont calculés d'avance (moves.js). tau : l'instant affiché, en millisecondes à vitesse ×1. */
-  const plan = planMoves(sim, P.map((p) => ({ res: p.res === 'm' ? 'mana' : p.res === 'e' ? 'energy' : p.res === 'n' ? 'none' : 'build', cd: p.ultCd, early: p.ultEarly, split: p.split })));
+  const plan = planMoves(sim, P.map((p) => ({ res: p.res === 'm' ? 'mana' : p.res === 'e' ? 'energy' : p.res === 'n' ? 'none' : 'build', cd: p.ultCd, early: p.ultEarly, split: p.split,
+    sums: p.sums.map((l) => [l, SPELLS[l][1]]) })));
   let tau = 0, lastDraw = 0;
   const cursor = P.map(() => 0), shown = P.map(() => null), look = P.map(() => '?');
 
   /* ---------- ce que le serveur ne compte pas, et qu'une vraie partie affiche : farm, niveau, vie et ressource de chacun, retour des monstres épiques ---------- */
   const csLook = P.map(() => -1), ultLook = P.map(() => null), lvLook = P.map(() => 0), timerLook = { drake: '?', baron: '?' };
-  const hpLook = P.map(() => -1), mpLook = P.map(() => -1);
-  /** Règle la barre de vie du joueur i, sur son pion et sur son portrait (part : de 0 à 1) ; de même sa ressource, s'il en a une. */
+  const hpLook = P.map(() => -1), mpLook = P.map(() => -1), sumLook = P.map(() => [-1, -1]);
+  /** Règle la barre de vie du joueur i, sur son portrait (et sur son pion, pour les temps forts) : part, de 0 à 1. Quand il prend un coup,
+      la vie perdue reste marquée un instant avant de fondre : on lit l'échange d'un coup d'œil. De même sa ressource, s'il en a une. */
   function setHp(i, part) {
-    const v = Math.round(clamp(part, 0, 1) * 100);
-    if (v === hpLook[i]) return;
+    const v = Math.round(clamp(part, 0, 1) * 100), was = hpLook[i];
+    if (v === was) return;
     hpLook[i] = v;
     hpEls[i].style.width = v + '%'; hpRows[i].style.width = v + '%';
+    /* la vie qui remonte ne laisse pas de trace : la marque suit aussitôt */
+    if (v > was) { hpLag[i].style.transition = 'none'; hpLag[i].style.width = v + '%'; void hpLag[i].offsetWidth; hpLag[i].style.transition = ''; }
+    else hpLag[i].style.width = v + '%';
     const low = v > 0 && v < 30;
     hpEls[i].classList.toggle('low', low); hpRows[i].classList.toggle('low', low);
   }
   function setMp(i, part) {
-    if (!mpEls[i]) return;
+    if (!mpRows[i]) return;
     const v = Math.round(clamp(part, 0, 1) * 100);
     if (v === mpLook[i]) return;
     mpLook[i] = v;
-    mpEls[i].style.width = v + '%'; mpRows[i].style.width = v + '%';
+    mpRows[i].style.width = v + '%';
+  }
+  /** Les sorts d'invocateur du joueur i : prêts, ou grisés avec les secondes qui restent. */
+  function setSums(i) {
+    for (let k = 0; k < sumEls[i].length; k++) {
+      const left = Math.ceil(plan.sumLeft(i, k, tau));
+      if (left === sumLook[i][k]) continue;
+      sumLook[i][k] = left;
+      sumEls[i][k].classList.toggle('cd', left > 0);
+      sumEls[i][k].lastChild.textContent = left > 0 ? left : '';
+    }
   }
   const frac = (x) => x - Math.floor(x), jitter = (i) => frac(Math.sin((sim.duration + 7) * (i + 1) * 12.9898) * 43758.5453);
   /* sbires par minute : ceux du joueur cette saison quand on les connaît, sinon l'ordinaire de son poste */
@@ -236,6 +257,7 @@ export function runMatch({ data, cat, fx }) {
       if (cs !== csLook[i]) { csLook[i] = cs; csEls[i].textContent = cs + ' CS'; }
       if (lv !== lvLook[i]) { if (lvLook[i] && lv > lvLook[i]) pop(lvEls[i]); lvLook[i] = lv; lvEls[i].textContent = lv; }
       if (ult !== ultLook[i]) { ultLook[i] = ult; ultEls[i].classList.toggle('on', ult); }
+      setSums(i);
     }
     /* pendant un temps fort, c'est l'action qui règle les barres de vie */
     if (!root.classList.contains('slow')) for (let i = 0; i < 10; i++) { setHp(i, plan.hpAt(i, tau)); setMp(i, plan.resAt(i, tau)); }
@@ -399,7 +421,11 @@ export function runMatch({ data, cat, fx }) {
   function react(ev) {
     const n = events.indexOf(ev), r = n >= 0 && fans ? fans(ev, n, kda) : null;
     /* une réaction ne reste pas à l'écran quand la partie est passée à autre chose : elle s'efface après quatre actions */
-    if (!r) { if (socialEl.firstChild && n - postAt >= 4) socialEl.firstChild.classList.add('gone'); return; }
+    if (!r) {
+      const old = socialEl.firstChild;
+      if (old && n - postAt >= 4 && !old.classList.contains('gone')) { old.classList.add('gone'); setTimeout(() => { if (old.parentNode === socialEl) old.remove(); }, 900); }
+      return;
+    }
     postAt = n;
     socialEl.innerHTML = '<article class="mv-post"><span class="mv-post-a" style="--av:' + r.color + '">' + esc(r.name.charAt(0)) + '</span>'
       + '<div class="mv-post-h"><b>' + esc(r.name) + '</b><i>' + esc(r.handle) + '</i></div><p>' + rich(r.text) + '</p>'
@@ -635,7 +661,7 @@ export function runMatch({ data, cat, fx }) {
     score[0] = 0; score[1] = 0;
     setClock(0);
     tau = 0;
-    cursor.fill(0); look.fill('?'); campLook.fill('?'); csLook.fill(-1); ultLook.fill(null); lvLook.fill(0); hpLook.fill(-1); mpLook.fill(-1);
+    cursor.fill(0); look.fill('?'); campLook.fill('?'); csLook.fill(-1); ultLook.fill(null); lvLook.fill(0); hpLook.fill(-1); mpLook.fill(-1); sumLook.forEach((l) => l.fill(-1));
     P.forEach((p, i) => { kda[i] = { k: 0, d: 0, a: 0 }; setDead(i, false); drawKda(i); tokens[i].classList.remove('fight', 'ulting', 'hurt'); });
     banner.classList.remove('done');
     draw(true);

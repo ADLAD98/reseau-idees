@@ -388,18 +388,18 @@
 /* pendant un ralenti : les pions bougent (ils se jettent l'un sur l'autre, le tueur fond sur sa cible), ceux qui se battent ont une barre de vie,
    un ultime qui part fait éclater un anneau, un coup reçu fait tressaillir */
 .mv.slow .tk{transition:left .26s cubic-bezier(.2,.8,.2,1),top .26s cubic-bezier(.2,.8,.2,1),filter .3s,opacity .3s}
-/* au-dessus de chaque pion, comme dans le jeu : sa vie (verte), et sa ressource quand son champion en a une */
-.tk-bars{position:absolute;left:1%;right:1%;bottom:106%;display:flex;flex-direction:column;gap:1px;padding:1px;background:rgba(1,10,19,.94);pointer-events:none}
-.tk-hp,.tk-mp{display:block;height:3px;background:#0c1826;overflow:hidden}
-.tk-mp{height:2px}
-.tk-hp b,.tk-mp b,.mv-hp b,.mv-mp b{display:block;width:100%;height:100%;transition:width .26s ease-out}
+/* sur la carte, pas de barres en temps normal (la vie se lit sur les côtés) ; pendant un temps fort, les combattants ont leur barre de vie */
+.tk-bars{display:none;position:absolute;left:1%;right:1%;bottom:106%;padding:1px;background:rgba(1,10,19,.94);pointer-events:none}
+.mv.slow .tk.fight .tk-bars{display:block}
+.tk-hp{display:block;height:3px;background:#0c1826;overflow:hidden}
+.tk-hp b,.mv-hp b,.mv-mp b{display:block;width:100%;height:100%;transition:width .22s ease-out}
 .tk-hp b,.mv-hp b{background:linear-gradient(#8bf07a,#3fbf3a)}
 .tk-hp b.low,.mv-hp b.low{background:linear-gradient(#ffb36b,#e2553a)}
-.tk-mp b,.mv-mp b{background:var(--res,#3d9bf0)}
+.mv-mp b{background:var(--res,#3d9bf0)}
 /* la couleur de chaque ressource : mana, énergie, fureur et rage, puits de sang et afflux sanguin, vapeur, courage et férocité, agressivité, bouclier, impulsion */
 .r-m{--res:linear-gradient(#6fbcff,#2f7fd8)}.r-e{--res:linear-gradient(#f6e98a,#d9bb2c)}.r-f,.r-r{--res:linear-gradient(#ff7a66,#d0352c)}.r-w,.r-u{--res:linear-gradient(#e0475a,#8f1626)}
 .r-h{--res:linear-gradient(#ffb057,#e0661c)}.r-c,.r-o{--res:linear-gradient(#ffc56b,#e28a22)}.r-g{--res:linear-gradient(#ffe07a,#e0a82c)}.r-s{--res:linear-gradient(#d5dde6,#93a0ad)}.r-l{--res:linear-gradient(#f2f6fa,#b9c6d2)}
-.tk.dead .tk-bars{display:none}
+.mv.slow .tk.dead .tk-bars{display:none}
 /* la Téléportation : l'incantation, en violet comme dans le jeu */
 .tk.tp{animation:tp .45s linear forwards}
 @keyframes tp{0%{box-shadow:0 0 0 2px var(--c),0 0 0 3px #010a13,0 0 0 18px rgba(176,132,255,0)}100%{box-shadow:0 0 0 2px #e9dcff,0 0 0 3px #010a13,0 0 0 6px rgba(176,132,255,.95)}}
@@ -438,7 +438,8 @@
 .mv-map::after{bottom:0}
 .mv.slow .mv-map::before,.mv.slow .mv-map::after{height:9%}
 .mv.slow{--k:1!important}
-.mv.slow .mv-side,.mv.slow .mv-ctrl{opacity:.32}
+/* (les portraits des côtés restent bien visibles : c'est là qu'on lit la vie de chacun) */
+.mv.slow .mv-ctrl{opacity:.32}
 /* le score reste lisible : pendant un temps fort, les éliminations comptent pour de bon */
 .mv.slow .mv-hud{opacity:.82}
 .mv-replay{position:absolute;inset:0;z-index:6;display:flex;flex-direction:column;align-items:center;justify-content:space-between;opacity:0;pointer-events:none;transition:opacity .35s}
@@ -465,14 +466,24 @@
 .mv-kill em.r::before{content:"R";display:inline-block;margin-right:5px;padding:2px 4px;border:1px solid currentColor;font-size:9.5px;line-height:1}
 .mv-side{--c:var(--s0);display:flex;flex-direction:column;gap:8px;min-width:0;transition:opacity .4s}
 .mv-side.s1{--c:var(--s1)}
-.mv-p{display:grid;grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"pw pn pk" "pw bars bars";align-items:center;gap:6px 11px;padding:6px 10px;border:1px solid var(--line);background:linear-gradient(90deg,rgba(11,24,44,.8),rgba(6,14,27,.4));transition:filter .3s,opacity .3s}
-.mv-side.s0 .mv-p{grid-template-areas:"pk pn pw" "bars bars pw";text-align:right;border-right:2px solid var(--c);background:linear-gradient(270deg,rgba(11,24,44,.8),rgba(6,14,27,.4))}
+.mv-p{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;grid-template-areas:"pw sp pn pk" "pw sp bars bars";align-items:center;gap:6px 9px;padding:6px 10px;border:1px solid var(--line);background:linear-gradient(90deg,rgba(11,24,44,.8),rgba(6,14,27,.4));transition:filter .3s,opacity .3s}
+.mv-side.s0 .mv-p{grid-template-columns:auto minmax(0,1fr) auto auto;grid-template-areas:"pk pn sp pw" "bars bars sp pw";text-align:right;border-right:2px solid var(--c);background:linear-gradient(270deg,rgba(11,24,44,.8),rgba(6,14,27,.4))}
 .mv-pw{grid-area:pw}.mv-pn{grid-area:pn}.mv-pk{grid-area:pk}
+/* les deux sorts d'invocateur, l'un sous l'autre contre le portrait : grisés, avec les secondes qui restent, tant qu'ils ne sont pas revenus */
+.mv-sp{grid-area:sp;display:flex;flex-direction:column;gap:3px}
+.mv-sum{position:relative;display:block;width:20px;height:20px;overflow:hidden;box-shadow:0 0 0 1px #2c3b4e}
+.mv-sum img{display:block;width:100%;height:100%;transition:filter .3s}
+.mv-sum.cd img{filter:grayscale(1) brightness(.4)}
+.mv-sum b{position:absolute;inset:0;display:grid;place-items:center;font:700 9.5px/1 var(--text);letter-spacing:-.02em;color:#fff;text-shadow:0 0 3px #000,0 0 2px #000;font-variant-numeric:tabular-nums}
 /* sous le nom : la vie, puis la ressource du champion (mana, énergie, rage… ou rien) */
 .mv-bars{grid-area:bars;display:flex;flex-direction:column;gap:2px;min-width:0}
-.mv-hp,.mv-mp{display:flex;height:5px;background:#0a1624;box-shadow:0 0 0 1px rgba(1,10,19,.9);overflow:hidden}
+.mv-hp,.mv-mp{position:relative;display:flex;height:5px;background:#0a1624;box-shadow:0 0 0 1px rgba(1,10,19,.9);overflow:hidden}
 .mv-mp{height:3px}
 .mv-side.s0 .mv-hp,.mv-side.s0 .mv-mp{justify-content:flex-end}
+/* la vie qui vient d'être perdue : elle reste marquée un instant, puis fond */
+.mv-hp u{position:absolute;top:0;bottom:0;left:0;width:100%;background:linear-gradient(#ffd9c9,#ff8a6b);transition:width .55s ease-in .4s}
+.mv-side.s0 .mv-hp u{left:auto;right:0}
+.mv-hp b{position:relative}
 .mv-side.s1 .mv-p{border-left:2px solid var(--c)}
 .mv-pw{position:relative;display:block}
 .mv-pi{display:block;flex:none;width:42px;height:42px;overflow:hidden;border-radius:50%;box-shadow:0 0 0 1px var(--c)}
@@ -764,7 +775,10 @@
   .mv-mid{flex:none;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start;gap:8px 14px}
   .mv-map{grid-column:1/-1;grid-row:1;justify-self:center}
   .mv-side{flex-direction:row;justify-content:space-between;gap:0}
-  .mv-side .mv-p,.mv-side.s0 .mv-p,.mv-side.s1 .mv-p{flex:1;grid-template-columns:minmax(0,1fr);grid-template-areas:"pw" "bars" "pk";justify-items:center;gap:4px;padding:0;border:0;background:none;text-align:center}
+  .mv-side .mv-p,.mv-side.s0 .mv-p,.mv-side.s1 .mv-p{flex:1;grid-template-columns:minmax(0,1fr);grid-template-areas:"pw" "bars" "sp" "pk";justify-items:center;gap:4px;padding:0;border:0;background:none;text-align:center}
+  .mv-sp{flex-direction:row;gap:2px}
+  .mv-sum{width:14px;height:14px}
+  .mv-sum b{font-size:0}
   .mv-bars{width:32px;gap:1px}
   .mv-hp{height:4px}
   .mv-mp{height:2px}
