@@ -454,6 +454,33 @@
 .mv.slow .mv-ctrl{opacity:.32}
 /* le score reste lisible : pendant un temps fort, les éliminations comptent pour de bon */
 .mv.slow .mv-hud{opacity:.82}
+/* le pentakill : la carte s'assombrit, des rayons tournent, le mot tombe en lettres d'or devant le champion */
+.mv-penta{--c:var(--s0);position:absolute;inset:0;z-index:7;display:grid;place-items:center;overflow:hidden;pointer-events:none;
+  background:radial-gradient(closest-side,rgba(1,8,16,.84),rgba(1,8,16,.96));animation:pentaIn .35s ease-out;transition:opacity .4s}
+.mv-penta.s1{--c:var(--s1)}
+.mv-penta.out{opacity:0}
+.mv-penta-rays{position:absolute;left:50%;top:44%;width:180%;aspect-ratio:1;margin:-90% 0 0 -90%;opacity:.5;animation:turn 30s linear infinite;
+  background:repeating-conic-gradient(from 0deg,rgba(240,205,120,.34) 0 4deg,transparent 4deg 15deg);
+  -webkit-mask-image:radial-gradient(closest-side,#000 6%,transparent 70%);mask-image:radial-gradient(closest-side,#000 6%,transparent 70%)}
+.mv-penta-art{position:absolute;left:50%;top:6%;width:46%;height:74%;margin-left:-23%;background:center 16%/cover no-repeat;
+  -webkit-mask-image:radial-gradient(ellipse 60% 56% at 50% 40%,#000 44%,transparent 76%);mask-image:radial-gradient(ellipse 60% 56% at 50% 40%,#000 44%,transparent 76%);
+  filter:saturate(1.08) drop-shadow(0 0 calc(var(--map) * .03) color-mix(in srgb,var(--c) 60%,transparent));animation:pentaArt 2.9s cubic-bezier(.2,.7,.2,1) both}
+.mv-penta-text{position:relative;display:flex;flex-direction:column;align-items:center;gap:calc(var(--map) * .02);margin-top:calc(var(--map) * .46)}
+.mv-penta-text b{font:400 calc(var(--map) * .132)/1 var(--title);letter-spacing:.12em;text-indent:.12em;text-transform:uppercase;color:transparent;
+  background:linear-gradient(#fff6d8,#f0d78a 46%,#b8892f);-webkit-background-clip:text;background-clip:text;
+  filter:drop-shadow(0 0 calc(var(--map) * .028) rgba(240,200,110,.6)) drop-shadow(0 3px 0 rgba(0,0,0,.6));animation:pentaWord .75s cubic-bezier(.16,.9,.3,1.15) .12s both}
+.mv-penta-text em{display:flex;align-items:baseline;gap:.6em;font:600 calc(var(--map) * .04)/1 var(--text);font-style:normal;letter-spacing:.04em;color:#fff;text-shadow:0 2px 8px #000;animation:rise .5s .6s both}
+.mv-penta-text u{text-decoration:none;font-weight:400;color:var(--gold-hi);opacity:.85}
+.mv-penta-pips{display:flex;gap:calc(var(--map) * .022)}
+.mv-penta-pips i{width:calc(var(--map) * .022);aspect-ratio:1;transform:rotate(45deg);background:var(--c);box-shadow:0 0 calc(var(--map) * .022) var(--c);animation:pentaPip .32s cubic-bezier(.2,.8,.3,1.5) both}
+.mv-penta-pips i:nth-child(2){animation-delay:.08s}
+.mv-penta-pips i:nth-child(3){animation-delay:.16s}
+.mv-penta-pips i:nth-child(4){animation-delay:.24s}
+.mv-penta-pips i:nth-child(5){animation-delay:.32s}
+@keyframes pentaIn{from{opacity:0}}
+@keyframes pentaWord{from{opacity:0;transform:scale(2.3);filter:blur(10px)}}
+@keyframes pentaArt{from{opacity:0;transform:scale(1.14)}}
+@keyframes pentaPip{from{opacity:0;transform:rotate(45deg) scale(0)}}
 .mv-replay{position:absolute;inset:0;z-index:6;display:flex;flex-direction:column;align-items:center;justify-content:space-between;opacity:0;pointer-events:none;transition:opacity .35s}
 .mv.slow .mv-replay{opacity:1}
 .mv-replay-top{display:flex;align-items:center;justify-content:center;gap:14px;flex:none;height:9%}

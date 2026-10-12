@@ -209,6 +209,18 @@ export const sfx = {
     [E5 / 2, B5 / 2].forEach((f, k) => tone(f, { t: k * 0.12, dur: 0.7, vol: 0.12, type: 'triangle', attack: 0.03 }));
     if (big) { tone(82.4, { dur: 1.2, vol: 0.22, attack: 0.03 }); bell(E6, 0.26, 0.08, 1.1); }
   },
+  /** Deux, trois, quatre éliminations de suite pour le même joueur : autant de notes qui montent. */
+  multi(n = 2) { [E5, G5, B5, E6].slice(0, Math.min(4, Math.max(2, n))).forEach((f, k) => bell(f, k * 0.075, 0.06, 0.55)); },
+  /** Un pentakill : un grand coup sourd, cinq notes qui montent, puis un accord qui s'ouvre et retombe en pluie claire. Ample, jamais fort. */
+  penta() {
+    tone(98, { dur: 0.9, to: 41, vol: 0.3 });
+    noise({ dur: 0.55, vol: 0.1, type: 'lowpass', freq: 1800, to: 150 });
+    [E5, G5, B5, E6, G6].forEach((f, k) => bell(f, 0.1 + k * 0.085, 0.1, 1.1));
+    [E5 / 2, B5 / 2, E5, G5, B5].forEach((f) => tone(f, { t: 0.56, dur: 2.5, vol: 0.05, attack: 0.09 }));
+    tone(82.4, { t: 0.56, dur: 2.2, vol: 0.17, attack: 0.03 });
+    [B6, G6, E6, B5].forEach((f, k) => bell(f, 1.05 + k * 0.14, 0.05, 1.3));
+    noise({ t: 0.5, dur: 1.9, vol: 0.03, type: 'highpass', freq: 6400 });
+  },
   /** Un ultime part, pendant un ralenti : un souffle qui s'ouvre, une note grave. */
   ult() { noise({ dur: 0.3, vol: 0.05, freq: 500, to: 3000, q: 0.8 }); bell(E5 / 2, 0.02, 0.06, 0.6); },
   /** Début d'un ralenti : tout descend. */

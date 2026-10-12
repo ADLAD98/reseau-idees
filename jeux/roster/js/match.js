@@ -6,6 +6,7 @@ import { createFans } from './fans.js';
 import { createFx } from './fx.js';
 import { KITS, RESOURCES, SPELLS, SPELL_DEFAULT, SPELL_PICKS } from './kits.js';
 import { CAMPS, KILL_GAP, NEXUS, NEXUS_TOWERS, PIT, SHOW_LEAD, STRUCT, TRAILS, planMoves, sample } from './moves.js';
+import { cheer } from './music.js';
 import { ROLES, signed } from './rules.js';
 import { sfx, soundOn } from './sound.js';
 import { closeVolume, toggleVolume } from './volume.js';
@@ -76,6 +77,9 @@ export function runMatch({ data, cat, fx }) {
   }
   const short = (s) => M.teams[s].short;
   const foeTeam = cat.teamById.get(M.opp);
+  /* La Karmine joue-t-elle ? Son équipe en face, ou trois de ses joueurs au moins (d'aujourd'hui, ou en édition KC) dans la mienne : sa
+     tribune s'entend alors, très loin derrière la musique, et s'anime quand elle marque (music.js). kcSide : son camp, −1 sinon. */
+  const kcSide = M.opp === 'KC' ? 1 - you : P.filter((p) => p.side === you && p.card && (p.card.team === 'KC' || p.card.variant === 'kc')).length >= 3 ? you : -1;
 
   /* ---------- l'écran ---------- */
   const strip = (i) => {
@@ -113,6 +117,7 @@ export function runMatch({ data, cat, fx }) {
   const root = document.createElement('div');
   root.className = 'mv';
   root.dataset.stage = 'versus';
+  if (kcSide >= 0) root.dataset.crowd = 'kc';
   root.innerHTML = '<canvas class="mv-fx"></canvas><div class="mv-flash"></div>'
     + '<section class="vs">' + vsTeam(0) + '<div class="vs-mid"><i></i><b>VS</b><i></i></div>' + vsTeam(1)
     + '<div class="vs-foot"><button class="btn primary big" type="button" data-act="start">' + (fx ? 'Lancer la partie' : 'Voir le résultat') + '</button></div></section>'
@@ -466,6 +471,7 @@ export function runMatch({ data, cat, fx }) {
     pop(tokens[victim]);
     sfx.kill();
     if (fx) { const c = clientOf(tokens[victim]); particles.burst(c[0], c[1], { count: slow ? 26 : 10, colors: SIDE_COLORS[side], speed: [50, slow ? 260 : 180], life: [0.35, slow ? 1.1 : 0.7], size: [1.5, 4], gravity: 80 }); }
+    if (side === kcSide) cheer(slow ? 1 : 0.7);
     score[side]++;
     kda[killer].k++; kda[victim].d++;
     for (const a of kill[2]) { kda[a].a++; drawKda(a); }
@@ -481,10 +487,14 @@ export function runMatch({ data, cat, fx }) {
     ping(plan.anchors[n], fought ? -1 : ev.s);
     if (!fought) { say(ev); cue(ev); }
     await advance(a.tau + SHOW_LEAD);
+    const streak = new Map();
     for (let j = 0; j < ev.kills.length; j++) {
       if (stopped(mine)) return;
       strike(ev.kills[j], false);
+      const c = (streak.get(ev.kills[j][0]) || 0) + 1;
+      streak.set(ev.kills[j][0], c);
       await advance(a.kills[j] + KILL_GAP);
+      if (c === 5 && !stopped(mine)) await penta(ev.kills[j][0]);
     }
     if (stopped(mine)) return;
     if (fought) { say(ev); cue(ev); }
@@ -500,6 +510,8 @@ export function runMatch({ data, cat, fx }) {
   /** Ce qu'un événement change : bâtiments, objectif, tableau de bord. */
   function settle(ev) {
     if (ev.st) structures(ev.st, false);
+    /* un objectif, une tour pour la Karmine : sa tribune se fait entendre */
+    if (ev.s >= 0 && ev.s === kcSide && EVENT_ICON[ev.k]) cheer(ev.k === 'nexus' ? 2.4 : ev.k === 'baron' || ev.k === 'elder' ? 1.7 : 1);
     pulsePit(ev);
     if (ev.k === 'nexus') explode(ev);
     hud(ev);
@@ -515,6 +527,21 @@ export function runMatch({ data, cat, fx }) {
     flash.style.setProperty('--beam', SIDE_COLORS[ev.s][0]);
     pop(flash);
     particles.burst(c[0], c[1], { count: 150, colors: SIDE_COLORS[loser].concat(GOLD), speed: [120, 760], life: [0.7, 1.9] });
+  }
+  /** Un pentakill : la carte s'assombrit, le mot tombe en lettres d'or devant le champion qui vient de les faire tomber tous les cinq. */
+  async function penta(K) {
+    const p = P[K], box = document.createElement('div');
+    box.className = 'mv-penta s' + p.side;
+    box.innerHTML = '<i class="mv-penta-rays"></i><span class="mv-penta-art" style="background-image:url(' + DDRAGON + '/img/champion/loading/' + p.champ + '_0.jpg)"></span>'
+      + '<div class="mv-penta-text"><span class="mv-penta-pips"><i></i><i></i><i></i><i></i><i></i></span><b>Pentakill</b><em>' + esc(p.name) + '<u>' + esc(p.champName) + '</u></em></div>';
+    mapEl.appendChild(box);
+    sfx.penta();
+    if (p.side === kcSide) cheer(3);
+    if (fx) { const r = mapEl.getBoundingClientRect(); particles.burst(r.left + r.width / 2, r.top + r.height * 0.56, { count: 90, colors: GOLD, speed: [120, 620], life: [0.7, 1.8], size: [1.5, 4.5], gravity: 160 }); }
+    /* (le temps d'un pentakill ne se presse pas, même en vitesse rapide ; un toucher sur la carte le passe) */
+    await nap(2700, null, 1);
+    box.classList.add('out');
+    setTimeout(() => box.remove(), 450);
   }
   /* ---------- les temps forts, au ralenti ---------- */
   /* De quoi mettre un combat en scène : déplacer un pion, régler sa barre de vie, lancer un projectile, faire éclater un anneau. */
@@ -631,12 +658,15 @@ export function runMatch({ data, cat, fx }) {
       strike(kill, true, here.get(K), vp);
       const c = (streak.get(K) || 0) + 1;
       streak.set(K, c);
+      if (c >= 2 && c <= 4) sfx.multi(c);
       /* dans la bande du bas, là où rien ne cache l'action : qui élimine qui */
       foot.innerHTML = '<p class="mv-kill s' + sideOf(K) + '"><img src="' + iconUrl(cat, P[K].champ) + '" alt=""><b>' + esc(P[K].name) + '</b>' + icon('i-play')
         + '<span>' + esc(P[V].name) + '</span><img class="v" src="' + iconUrl(cat, P[V].champ) + '" alt="">'
         /* un coup en série, ou le nom de l'ultime qu'il vient de lancer */
         + (c > 1 ? '<em>' + STREAK[Math.min(5, c)] + '</em>' : ulted.has(K) && P[K].ult ? '<em class="r">' + esc(P[K].ult) + '</em>' : '') + '</p>';
       await nap(quick ? 480 : 820, null, 2);
+      /* cinq éliminations pour le même joueur : la partie s'arrête sur son pentakill */
+      if (c === 5 && !stopped(mine)) await penta(K);
       count++;
     }
     if (stopped(mine)) { root.classList.remove('slow'); return; }
@@ -662,6 +692,7 @@ export function runMatch({ data, cat, fx }) {
     skipped = false; paused = false; skipSlow = false;
     lost = [[0, 0, 0, 0], [0, 0, 0, 0]];
     built.forEach((node) => node.classList.remove('down'));
+    root.querySelectorAll('.mv-penta').forEach((node) => node.remove());
     score[0] = 0; score[1] = 0;
     setClock(0);
     tau = 0;
