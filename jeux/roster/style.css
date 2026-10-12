@@ -439,6 +439,60 @@ body.fx .card.v-legend .card-front .card-frame::after{animation:spin 6s linear i
 .card.missing.v-legend .card-facets{opacity:.3}
 .card.missing .card-cups svg{filter:none}
 
+/* « MY CEO » : Kameto, en édition limitée à 200 exemplaires numérotés — la plus belle carte du jeu. Bleu roi et or. Son portrait remplit
+   la carte ; « CEO » s'écrit en très grand derrière lui, « My CEO » en lettres d'or au-dessus de son nom ; des étoiles d'or scintillent,
+   un trait de lumière traverse la carte, l'or du cadre tourne, et le numéro de l'exemplaire est gravé sur une plaque, à la pointe du blason. */
+.tiers .v-ceo i{background:linear-gradient(135deg,#fff6d6,#f0cd72 45%,#1d6bff);box-shadow:0 0 9px #f0cd72}
+.chip.v-ceo{border-color:#f0cd72;color:#fff3d0;background:rgba(29,107,255,.16)}
+b.v-ceo,.op-clues .v-ceo{color:#ffe19a;font-weight:600}
+@container (min-width:150px){
+  body.fx .card.e-ceo:not(.tilting) .card-front{animation:light 6.5s ease-in-out infinite}
+}
+.card.e-ceo{transition:filter 0s calc(var(--flip) / 2)}
+.card.e-ceo:not(.is-back):not(.missing){filter:drop-shadow(0 0 2.2cqw rgba(255,206,104,.6)) drop-shadow(0 0 5cqw rgba(36,110,255,.42))}
+.card.e-ceo .card-front{--tc:#f0cd72;--hi:#fff6d6;--lo:#8a651c}
+.card.e-ceo .card-bg{background:
+  radial-gradient(70% 44% at 50% 24%,rgba(128,196,255,.96) 0,rgba(36,104,246,.8) 32%,rgba(10,44,170,.42) 62%,rgba(3,12,54,0) 84%),
+  linear-gradient(118deg,rgba(255,255,255,0) 30%,rgba(140,200,255,.2) 43%,rgba(255,255,255,0) 56%),
+  linear-gradient(180deg,#0a2a92 0%,#04103e 52%,#01040e 100%)}
+.card.e-ceo .card-bg::after{display:none}
+.card.e-ceo .card-wm{display:none}
+/* « CEO » en très grand, derrière lui : de l'or en creux, qui s'allume là où passe la lumière */
+.card-ceo{position:absolute;top:5.5%;left:0;right:0;text-align:center;pointer-events:none;font:italic 900 41cqw/.9 "Arial Black",Arial,Helvetica,sans-serif;letter-spacing:-.03em;
+  color:transparent;-webkit-text-stroke:.55cqw rgba(240,205,114,.5);
+  -webkit-mask-image:radial-gradient(120% 90% at var(--hx) var(--hy),#000 0,rgba(0,0,0,.6) 34%,rgba(0,0,0,.26) 70%);mask-image:radial-gradient(120% 90% at var(--hx) var(--hy),#000 0,rgba(0,0,0,.6) 34%,rgba(0,0,0,.26) 70%)}
+.card.e-ceo .card-photo{top:2.6%;left:-13%;width:126%;height:86%;filter:drop-shadow(0 0 2.2cqw rgba(120,190,255,.7)) drop-shadow(0 1.4cqw 2cqw rgba(0,0,0,.5));
+  -webkit-mask-image:linear-gradient(to bottom,#000 62%,transparent 93%);mask-image:linear-gradient(to bottom,#000 62%,transparent 93%)}
+.card.e-ceo .card-shade{background:
+  linear-gradient(to top,#01040e 0,rgba(1,4,14,.97) 28%,rgba(1,4,14,.82) 41%,rgba(1,4,14,.32) 54%,transparent 63%),
+  linear-gradient(100deg,rgba(1,4,14,.66) 0,rgba(1,4,14,.16) 22%,transparent 36%)}
+/* « My CEO », en lettres d'or où glisse un reflet */
+.card-myceo{margin-bottom:.6cqw;font:italic 900 15.5cqw/.95 "Arial Black",Arial,Helvetica,sans-serif;letter-spacing:-.02em;text-transform:uppercase;white-space:nowrap;
+  background:linear-gradient(100deg,#fff6d6 0%,#f0cd72 22%,#a67c2a 44%,#ffe9a8 62%,#f0cd72 80%,#fff6d6 100%) var(--hx) 0/230% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 .5cqw 1.2cqw rgba(0,0,0,.8)) drop-shadow(0 0 2.4cqw rgba(255,206,104,.45))}
+.card.e-ceo .card-name{color:#fff;font-size:min(8.6cqw,calc(82cqw / (var(--n) * .7)));letter-spacing:.22em;text-indent:.22em;text-shadow:0 0 2.4cqw rgba(90,170,255,.9),0 .5cqw 2cqw #000}
+.card.e-ceo .card-stats span{color:#a9c3e6}
+/* des étoiles d'or : un semis derrière lui, un autre par-dessus, qui scintillent à contretemps */
+.card.e-ceo .card-spark,.card.e-ceo .card-glint{--st:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 0l1.7 10.3L24 12l-10.3 1.7L12 24l-1.7-10.3L0 12l10.3-1.7z' fill='%23ffe19a'/%3E%3C/svg%3E")}
+.card.e-ceo .card-spark{-webkit-mask-image:none;mask-image:none;mix-blend-mode:screen;
+  background:var(--st) 11% 12%/8cqw 8cqw no-repeat,var(--st) 88% 26%/5.6cqw 5.6cqw no-repeat,var(--st) 78% 6%/3.6cqw 3.6cqw no-repeat,var(--st) 24% 38%/3.2cqw 3.2cqw no-repeat,
+    radial-gradient(circle,#fff3c4 0,#fff3c4 .3cqw,rgba(255,255,255,0) .66cqw) 0 0/8.9cqw 10.7cqw,
+    radial-gradient(circle,#ffe19a 0,#ffe19a .38cqw,rgba(255,255,255,0) .8cqw) 5cqw 3cqw/16.3cqw 18.9cqw}
+body.fx .card.e-ceo .card-spark{animation:twinkle 1.9s ease-in-out infinite alternate}
+/* un halo qui suit la lumière, et un trait d'or qui traverse la carte */
+body.fx .card.e-ceo .card-holo,.card.e-ceo .card-holo{opacity:.92;mix-blend-mode:screen;animation:none;
+  background:
+    linear-gradient(112deg,rgba(255,255,255,0) 41%,rgba(255,220,140,.4) 47.5%,rgba(255,250,230,.86) 50%,rgba(255,220,140,.4) 52.5%,rgba(255,255,255,0) 59%) 130% 0/270% 100% no-repeat,
+    radial-gradient(circle at var(--hx) var(--hy),rgba(255,240,200,.5) 0,rgba(140,200,255,.16) 26%,rgba(255,255,255,0) 54%)}
+body.fx .card.e-ceo .card-holo{animation:kcsweep 3.6s cubic-bezier(.45,0,.2,1) infinite}
+body.fx .card.e-ceo .card-front .card-frame::after,.card.e-ceo .card-front .card-frame::after{background:conic-gradient(from var(--spin),#fff6d6,#f0cd72,#9a7226,#f6dd95,#5aa8ff,#f0cd72,#a67c2a,#fff6d6)}
+body.fx .card.e-ceo .card-front .card-frame::after{animation:spin 5s linear infinite}
+.card.e-ceo .card-mark{padding:1.2cqw 2.6cqw 1.1cqw;font-weight:800;color:#1a1204;background:linear-gradient(105deg,#fff6d6,#f0cd72 32%,#a67c2a 60%,#ffe9a8 100%) var(--hx) 0/220% 100%;box-shadow:0 0 2.6cqw rgba(255,206,104,.8)}
+/* la plaque du numéro, à la pointe du blason (elle prend la place de la clé du cadre) */
+.card-serial{position:absolute;left:50%;bottom:4.4cqw;transform:translateX(-50%);padding:.9cqw 2.6cqw .8cqw;white-space:nowrap;font:800 3.5cqw/1 var(--text);letter-spacing:.16em;text-indent:.16em;color:#1a1204;
+  background:linear-gradient(105deg,#fff6d6,#f0cd72 32%,#a67c2a 60%,#ffe9a8 100%) var(--hx) 0/220% 100%;box-shadow:0 0 0 .4cqw #01040e,0 0 2.4cqw rgba(255,206,104,.7)}
+.card.missing .card-ceo,.card.missing .card-myceo{opacity:.5}
+
 /* ---------- connexion ---------- */
 .auth{flex:1;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,430px);gap:60px;align-items:center;width:100%;max-width:1080px;margin:0 auto;padding:44px 24px}
 .auth-brand .mark{width:66px;height:66px;color:var(--gold);filter:drop-shadow(0 0 18px rgba(200,170,110,.45))}
@@ -469,6 +523,19 @@ body.fx .card.v-legend .card-front .card-frame::after{animation:spin 6s linear i
 .wait{display:flex;flex-direction:column;gap:12px;width:100%;max-width:400px}
 .wait-time{display:flex;align-items:baseline;gap:14px;color:var(--mut)}
 .wait-time b{font:400 50px/1 var(--title);letter-spacing:.04em;color:var(--gold-hi);font-variant-numeric:tabular-nums}
+/* les missions du jour : trois lignes et leur bonus, chacune avec sa barre d'avancement et sa récompense */
+.missions{margin-bottom:8px}
+.ms-sub{margin:-6px 0 14px;color:var(--mut);font-size:14.5px}
+.ms-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 14px}
+.ms{display:flex;align-items:center;gap:14px;padding:12px 14px;border:1px solid var(--line);background:linear-gradient(90deg,rgba(11,24,44,.8),rgba(6,14,27,.4))}
+.ms-t{flex:1;min-width:0;display:grid;gap:8px}
+.ms-t b{font:600 15.5px/1.25 var(--text);color:var(--ink)}
+.ms em{flex:none;font-style:normal;color:var(--mut);font-size:14px}
+.ms .btn{flex:none;height:38px;padding:0 14px;font-size:12.5px;white-space:nowrap}
+.ms.done{border-color:var(--line2)}
+.ms.bonus{border-color:var(--line2);background:linear-gradient(90deg,rgba(40,30,8,.5),rgba(6,14,27,.4))}
+.ms.claimed{opacity:.6}
+.ms-ok{flex:none;color:var(--ok);font:600 13px/1 var(--text);white-space:nowrap}
 /* le menu des boosters, au-dessus du pack choisi ; le booster à crédits a son propre sachet, bleu hextech */
 .pack-menu{width:100%;max-width:440px;margin-bottom:4px}
 .home-pack.credits .pack{filter:hue-rotate(150deg) saturate(1.15)}
@@ -654,6 +721,9 @@ body.fx .card.v-legend .card-front .card-frame::after{animation:spin 6s linear i
   .sheet-box{grid-template-columns:1fr;gap:24px;max-width:none;min-height:100%;padding:24px 18px 34px;align-content:start;border:0}
   .sheet-box::before{display:none}
   .sheet-card .card{--w:min(66vw,270px)}
+  .ms-list{grid-template-columns:1fr}
+  .ms{gap:10px;padding:10px 12px}
+  .ms-t b{font-size:14.5px}
   .team-row{grid-template-columns:minmax(0,1fr) 84px}
   .team-row .btn{grid-column:1/-1}
   .sheet-title h2{font-size:30px}

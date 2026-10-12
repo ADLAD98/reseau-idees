@@ -80,11 +80,15 @@ const BACK = '<div class="card-face card-back"><svg class="back-art" viewBox="0 
 const SILHOUETTE = '<svg class="card-ph" viewBox="0 0 100 100" aria-hidden="true"><use href="#silhouette"/></svg>';
 
 /** opts : back (ajoute le dos, pour pouvoir la retourner), eager (image chargée tout de suite), cls (classes en plus),
-    qty (nombre d'exemplaires possédés : à partir de deux, la carte est posée sur une pile et le nombre s'affiche en bas à droite). */
+    qty (nombre d'exemplaires possédés : à partir de deux, la carte est posée sur une pile et le nombre s'affiche en bas à droite),
+    serial (numéro de l'exemplaire, pour une carte en édition limitée).
+    Cartes hors série : edition donne son habillage (« ceo » : Kameto, MY CEO), limited le nombre d'exemplaires, label ce qui s'écrit à la place du poste. */
 export function cardHTML(card, cat, opts = {}) {
   const qty = opts.qty > 1 ? Math.floor(opts.qty) : 0;
-  /* l'holographique, l'édition KC et la légendaire ont déjà leur propre lumière */
-  const pr = card.variant === 'holo' || card.variant === 'kc' || card.variant === 'legend' ? 0 : prestigeOf(card);
+  /* l'habillage d'une carte hors série (jamais sur une de ses versions) */
+  const ed = !card.variant && card.edition ? card.edition : '';
+  /* l'holographique, l'édition KC, la légendaire et les cartes hors série ont déjà leur propre lumière */
+  const pr = card.variant === 'holo' || card.variant === 'kc' || card.variant === 'legend' || ed ? 0 : prestigeOf(card);
   const legend = card.variant === 'legend' && cat.legends ? cat.legends[card.base] : null;
   const team = cat.teamById.get(card.team);
   const photo = photoUrl(card), v = card.variant || '';
@@ -95,26 +99,29 @@ export function cardHTML(card, cat, opts = {}) {
   const flag = card.country
     ? '<img class="card-flag" src="' + flagUrl(card.country) + '" alt="' + esc(cat.countries[card.country]) + '" title="' + esc(cat.countries[card.country]) + '" loading="lazy" draggable="false">'
     : '';
-  return '<article class="card t' + card.tier + (card.kind === 'c' ? ' is-coach' : '') + (v ? ' v-' + v : '') + (pr ? ' is-prestige' + (pr > 1 ? ' is-icon' : '') : '')
+  return '<article class="card t' + card.tier + (card.kind === 'c' ? ' is-coach' : '') + (v ? ' v-' + v : '') + (ed ? ' e-' + ed : '') + (pr ? ' is-prestige' + (pr > 1 ? ' is-icon' : '') : '')
     + (qty ? ' stack' + (qty > 2 ? ' s3' : '') : '') + (opts.cls ? ' ' + opts.cls : '') + '" data-id="' + esc(card.id) + '">'
     + '<div class="card-in"><div class="card-face card-front">'
     + '<div class="card-bg"></div>'
     + (pr > 1 ? '<div class="card-rays"></div>' : '')
     /* derrière le joueur, l'illustration de son champion fétiche (les full art n'en ont pas : le portrait remplit la carte) */
-    + (card.art && (!v || v === 'holo') ? '<img class="card-art" src="' + DDRAGON + '/img/champion/loading/' + esc(card.art) + '.jpg" alt="" ' + load + '>' : '')
+    + (card.art && !ed && (!v || v === 'holo') ? '<img class="card-art" src="' + DDRAGON + '/img/champion/loading/' + esc(card.art) + '.jpg" alt="" ' + load + '>' : '')
     /* édition KC : le « mur bleu » ; holographique et édition KC : une feuille de métal irisée derrière le joueur, et ses paillettes */
     + (v === 'kc' ? '<div class="card-wall"></div>' : '')
     + (v === 'holo' || v === 'kc' ? '<div class="card-foil"></div><div class="card-spark"></div>' : '')
     /* édition légendaire : les facettes d'un diamant, et ses éclats */
     + (v === 'legend' ? '<div class="card-facets"></div><div class="card-spark"></div>' : '')
+    /* MY CEO : « CEO » en très grand derrière lui, et une pluie d'étoiles d'or */
+    + (ed === 'ceo' ? '<div class="card-ceo">CEO</div><div class="card-spark"></div>' : '')
     + '<span class="card-wm">' + esc(v === 'kc' ? 'KC' : team ? team.short : '') + '</span>'
     + picture
     + '<div class="card-shade"></div>'
-    + '<div class="card-side"><span class="card-ovr">' + card.ovr + '</span><span class="card-role">' + ROLE_LABEL[card.role] + '</span><i></i>'
+    + '<div class="card-side"><span class="card-ovr">' + card.ovr + '</span><span class="card-role">' + esc(card.label || ROLE_LABEL[card.role]) + '</span><i></i>'
     + flag + '<span class="card-league">' + esc(card.league) + '</span></div>'
     + '<div class="card-plate">'
     /* un trophée par titre mondial, avec son année */
     + (legend ? '<div class="card-cups" title="Champion du monde ' + legend.worlds.join(', ') + '">' + legend.worlds.map((y) => '<span><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-cup"/></svg><b>' + y + '</b></span>').join('') + '</div>' : '')
+    + (ed === 'ceo' ? '<div class="card-myceo">My CEO</div>' : '')
     + '<div class="card-name" style="--n:' + len + '">' + esc(card.name) + '</div>'
     /* sur une carte KC, le joueur est sous le maillot de la Karmine : c'est elle qui est écrite sous son nom */
     + '<div class="card-team">' + esc(v === 'kc' && cat.karmine && cat.karmine[card.base] ? (cat.karmine[card.base][2] === 'KCB' ? 'Karmine Corp Blue' : 'Karmine Corp') : team ? team.name : card.team) + '</div>'
@@ -123,7 +130,9 @@ export function cardHTML(card, cat, opts = {}) {
     + (pr ? '<div class="card-edge"></div>' : '')
     + (v ? '<span class="card-mark">' + VARIANTS[v].mark + '</span>' : '')
     + (v === 'kc' ? '<div class="card-glint"></div><span class="card-era">' + esc(karmineEra(cat, card)) + '</span>' : '')
-    + (v === 'legend' ? '<div class="card-glint"></div>' : '')
+    + (v === 'legend' || ed === 'ceo' ? '<div class="card-glint"></div>' : '')
+    /* édition limitée : son poinçon, et la plaque de son numéro à la pointe du blason */
+    + (card.limited && !v ? '<span class="card-mark">Édition limitée</span><span class="card-serial">' + (opts.serial ? 'N° ' + String(opts.serial).padStart(3, '0') + ' / ' + card.limited : card.limited + ' exemplaires') + '</span>' : '')
     + '</div>' + (opts.back ? BACK : '') + '</div><i class="card-gem"></i>' + (qty ? '<span class="card-qty">×' + qty + '</span>' : '') + '</article>';
 }
 

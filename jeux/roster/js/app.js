@@ -35,9 +35,11 @@ const S = {
   free: null,             // pack gratuit : { readyAt, cooldownMs, size }
   shop: null,             // booster à crédits et barème de la vente rapide (null : le serveur ne les propose pas)
   pack: 'free',           // booster choisi sur l'écran Packs : 'free' ou 'credits'
+  missions: null,         // les missions du jour (false : le serveur ne les connaît pas)
   skew: 0,                // heure du serveur − heure de cet appareil
   cat: null,              // catalogue des cartes
   owned: new Map(),       // identifiant de carte → { qty, at }
+  prints: new Map(),      // carte en édition limitée → numéros de mes exemplaires
   /* group : '' (toutes les cartes à la suite) ou 'roster' (une page par équipe) ; rsort : ordre des rosters */
   filters: { q: '', league: '', team: '', role: '', tier: '', variant: '', own: '', sort: 'ovr', group: '', rsort: 'league' },
   fx: true,               // animations
@@ -121,8 +123,13 @@ async function loadCollection() {
   const data = await call('GET', '/api/collection');
   applyState(data);
   S.owned = new Map(data.cards.map((row) => [row[0], { qty: row[1], at: row[2] }]));
+  /* mes exemplaires numérotés (éditions limitées) */
+  S.prints = new Map();
+  for (const [id, serial] of data.prints || []) { const list = S.prints.get(id); if (list) list.push(serial); else S.prints.set(id, [serial]); }
   return data;
 }
+/** Le numéro de mon exemplaire d'une carte en édition limitée (le plus petit si j'en ai plusieurs). */
+const serialOf = (id) => (S.prints.get(id) || [])[0] || 0;
 async function loadGame() {
   const data = await loadCollection();
   await loadCatalogue(data.catalogVersion);
@@ -329,7 +336,7 @@ window.addEventListener('hashchange', route);
 function tile(card, extra) {
   const own = S.owned.get(card.id);
   return '<button class="tile" type="button" data-card="' + esc(card.id) + '" aria-label="' + esc(card.name) + ', note ' + card.ovr + '">'
-    + cardHTML(card, S.cat, { cls: own ? '' : 'missing', qty: own ? own.qty : 0 }) + (extra || '') + '</button>';
+    + cardHTML(card, S.cat, { cls: own ? '' : 'missing', qty: own ? own.qty : 0, serial: own ? serialOf(card.id) : 0 }) + (extra || '') + '</button>';
 }
 document.addEventListener('click', (e) => {
   const t = e.target.closest('[data-card]');
@@ -372,6 +379,8 @@ function packActionHTML() {
   return '<button class="btn primary big" type="button" id="openPack">' + (left > 0 ? 'Ouvrir un pack en réserve' : 'Ouvrir le pack') + '</button>' + reserve;
 }
 function viewPacks(main) {
+  /* les missions avancent en jouant : on les redemande à chaque passage sur cet écran */
+  loadMissions();
   const recent = [...S.owned.entries()].sort((a, b) => b[1].at - a[1].at).slice(0, 6).map(([id]) => S.cat.cardById.get(id)).filter(Boolean);
   const kind = packKind(), credits = kind === 'credits';
   /* le menu des boosters : le pack gratuit, ou celui qui se paie en crédits */
@@ -383,10 +392,43 @@ function viewPacks(main) {
     + '<p class="lead">' + (credits ? 'Un booster en plus du pack gratuit, payé avec tes crédits. Ses chances sont un peu plus faibles que celles du pack gratuit (le détail est dans ton profil).'
       : 'Joueurs et coachs pros de la saison ' + S.cat.season + '. La dernière carte du pack est une carte bonus : rang Titulaire au minimum. Les plus belles cartes existent aussi en version holographique et en full art' + (S.cat.cards.some((c) => c.variant === 'kc') ? ', et les joueurs passés par la Karmine en édition KC' : '') + '.') + '</p>'
     + '<div id="packAction" data-sig="' + packSig() + '">' + packActionHTML() + '</div>' + progressHTML() + '</div></section>'
+    + '<section class="missions" id="missions"' + (S.missions ? '' : ' hidden') + '>' + (S.missions ? missionsHTML() : '') + '</section>'
     + '<section><h2 class="h2">Dernières cartes obtenues</h2>'
     + (recent.length ? '<div class="row-cards">' + recent.map((c) => tile(c)).join('') + '</div>' : '<p class="empty">Ta collection est vide. Ouvre ton premier pack !</p>')
     + '</section>';
 }
+/* ---------- les missions du jour ---------- */
+function missionsHTML() {
+  const m = S.missions, left = Math.max(0, m.resetAt - now()), h = Math.floor(left / 3_600_000), min = Math.floor((left % 3_600_000) / 60000);
+  const row = (x) => '<div class="ms' + (x.claimed ? ' claimed' : x.done ? ' done' : '') + '"><div class="ms-t"><b>' + esc(x.label) + '</b>'
+    + '<span class="bar"><i style="width:' + Math.round((100 * x.progress) / x.goal) + '%"></i></span></div><em class="num">' + x.progress + ' / ' + x.goal + '</em>'
+    + (x.claimed ? '<span class="ms-ok">+' + x.reward + ' touchés</span>' : '<button class="btn' + (x.done ? ' primary' : '') + '" type="button" data-claim="' + x.slot + '"' + (x.done ? '' : ' disabled') + '>+' + x.reward + ' crédits</button>') + '</div>';
+  return '<h2 class="h2">Missions du jour</h2><p class="ms-sub">De nouvelles missions dans ' + (h ? h + ' h ' : '') + min + ' min.</p><div class="ms-list">' + m.missions.map(row).join('')
+    + '<div class="ms bonus' + (m.bonus.claimed ? ' claimed' : m.bonus.done ? ' done' : '') + '"><div class="ms-t"><b>Les trois missions du jour</b><span class="bar"><i style="width:' + Math.round((100 * m.missions.filter((x) => x.done).length) / m.missions.length) + '%"></i></span></div>'
+    + '<em class="num">' + m.missions.filter((x) => x.done).length + ' / ' + m.missions.length + '</em>'
+    + (m.bonus.claimed ? '<span class="ms-ok">+' + m.bonus.reward + ' touchés</span>' : '<button class="btn' + (m.bonus.done ? ' primary' : '') + '" type="button" data-claim="bonus"' + (m.bonus.done ? '' : ' disabled') + '>+' + m.bonus.reward + ' crédits</button>') + '</div></div>';
+}
+/** Redemande les missions au serveur et les affiche si l'écran Packs est ouvert (un serveur plus ancien ne les connaît pas). */
+async function loadMissions() {
+  if (S.missions === false || !S.shop) return;
+  try { S.missions = await call('GET', '/api/missions'); } catch (e) { if (e instanceof ApiError && e.status === 404) S.missions = false; return; }
+  const box = document.getElementById('missions');
+  if (box && S.missions) { box.innerHTML = missionsHTML(); box.hidden = false; }
+}
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('#missions [data-claim]');
+  if (!b || b.disabled) return;
+  b.disabled = true;
+  const res = await guard(() => call('POST', '/api/missions/claim', { slot: b.dataset.claim === 'bonus' ? 'bonus' : Number(b.dataset.claim) }));
+  if (!res) { b.disabled = false; return; }
+  applyState(res);
+  S.missions = res;
+  sfx.click();
+  toast('+' + res.reward + ' crédits');
+  const box = document.getElementById('missions');
+  if (box) box.innerHTML = missionsHTML();
+});
+
 /* compte à rebours : mis à jour chaque seconde, sans redessiner l'écran */
 setInterval(() => {
   const box = document.getElementById('packAction');
@@ -428,6 +470,7 @@ document.addEventListener('click', async (e) => {
     for (const p of result.data.pack.cards) {
       const had = S.owned.get(p.id);
       S.owned.set(p.id, { qty: p.qty, at: had ? had.at : now() });
+      if (p.serial) S.prints.set(p.id, [...(S.prints.get(p.id) || []), p.serial].sort((a, b) => a - b));
     }
     S.opening = false;
     if (result.goTo === 'collection') { S.filters.sort = 'recent'; S.filters.own = 'owned'; location.hash = '#/collection'; }
@@ -478,7 +521,8 @@ function rosterGroups(list) {
   const groups = [];
   for (const [id, cards] of shown) {
     const team = cat.teamById.get(id) || { id, name: id, short: id, league: cards[0].league };
-    const all = cat.base.filter((c) => c.team === id), special = cat.cards.filter((c) => c.variant && c.team === id);
+    /* une édition limitée ne compte pas dans l'effectif à compléter : elle se range avec les versions spéciales */
+    const all = cat.base.filter((c) => c.team === id && !c.limited), special = cat.cards.filter((c) => (c.variant || c.limited) && c.team === id);
     /* note du roster : le meilleur joueur de chaque poste */
     const best = ['TOP', 'JGL', 'MID', 'BOT', 'SUP'].map((r) => Math.max(0, ...all.filter((c) => c.role === r).map((c) => c.ovr))).filter(Boolean);
     groups.push({
@@ -606,14 +650,18 @@ function showSheet(id) {
   const sheet = document.createElement('div');
   sheet.className = 'sheet';
   sheet.innerHTML = '<div class="sheet-box panel" role="dialog" aria-modal="true" aria-label="' + esc(card.name) + '" style="--tc:var(--t' + card.tier + ')">'
-    + '<div class="sheet-card">' + cardHTML(card, cat, { eager: true, cls: own ? '' : 'missing', qty: own ? own.qty : 0 })
+    + '<div class="sheet-card">' + cardHTML(card, cat, { eager: true, cls: own ? '' : 'missing', qty: own ? own.qty : 0, serial: own ? serialOf(card.id) : 0 })
     + '<span>' + (own ? (own.qty > 1 ? own.qty + ' exemplaires' : '1 exemplaire') + ' · depuis le ' + frDate(own.at) : 'Carte manquante') + '</span></div>'
     + '<div class="sheet-info"><div class="sheet-title"><div><h2>' + esc(card.name) + '</h2>'
-    + '<p>' + (card.country ? '<img src="' + flagUrl(card.country) + '" alt="">' + esc(cat.countries[card.country]) + ' · ' : '') + esc(ROLE_NAME[card.role]) + ' · ' + esc(team ? team.name : card.team) + '</p></div>'
+    + '<p>' + (card.country ? '<img src="' + flagUrl(card.country) + '" alt="">' + esc(cat.countries[card.country]) + ' · ' : '') + esc(card.title || ROLE_NAME[card.role]) + ' · ' + esc(team ? team.name : card.team) + '</p></div>'
     + '<span class="spacer"></span><button class="close" type="button" aria-label="Fermer">' + icon('i-close') + '</button></div>'
-    + '<div class="chips"><span class="chip">' + esc(tier.name) + ' · ' + card.ovr + '</span>' + (card.variant ? '<span class="chip v-' + card.variant + '">' + VARIANTS[card.variant].name + '</span>' : '') + '<span class="chip" style="--tc:var(--mut)">' + esc(card.league) + (league ? ' · ' + esc(league.region) : '') + '</span>' + titles + '</div>'
+    + '<div class="chips"><span class="chip">' + esc(tier.name) + ' · ' + card.ovr + '</span>' + (card.variant ? '<span class="chip v-' + card.variant + '">' + VARIANTS[card.variant].name + '</span>' : '')
+    + (card.limited ? '<span class="chip v-ceo">Édition limitée · ' + card.limited + ' exemplaires</span>' + (own && serialOf(card.id) ? '<span class="chip v-ceo">N° ' + (S.prints.get(card.id) || []).join(', ') + '</span>' : '') : '') + '<span class="chip" style="--tc:var(--mut)">' + esc(card.league) + (league ? ' · ' + esc(league.region) : '') + '</span>' + titles + '</div>'
     + '<div><h3 class="h2">Statistiques de la carte</h3><div class="bars">' + statsOf(card).map((s) => '<div title="' + esc(s[3]) + '"><span>' + s[2] + '</span><span class="bar"><i style="width:' + card.stats[s[0]] + '%"></i></span><b>' + card.stats[s[0]] + '</b></div>').join('') + '</div></div>'
-    + (facts ? '<div><h3 class="h2">Saison ' + cat.season + (card.kind === 'c' ? ' de son équipe' : ' en chiffres') + '</h3><div class="facts">' + facts + '</div></div>' : '<p class="note">Aucune partie officielle jouée cette saison : la note est celle d\'un remplaçant.</p>')
+    + (facts ? '<div><h3 class="h2">Saison ' + cat.season + (card.kind === 'c' ? ' de son équipe' : ' en chiffres') + '</h3><div class="facts">' + facts + '</div></div>'
+      : card.limited ? '<p class="note">« MY CEO » : une édition limitée à ' + card.limited + ' exemplaires numérotés, pas un de plus. Elle prend parfois la place de la carte bonus d\'un pack, tant qu\'il en reste, et se joue au poste de coach.</p>'
+        : card.ovr < 10 ? '<p class="note">Une carte hors série, pour rire : elle sort des packs comme les autres, mais mieux vaut un banc vide que ce coach-là.</p>'
+          : '<p class="note">Aucune partie officielle jouée cette saison : la note est celle d\'un remplaçant.</p>')
     + (card.champs && card.champs.length ? '<div><h3 class="h2">Champions fétiches</h3><div class="champs">' + card.champs.map((c) => '<div class="champ"><img src="' + iconUrl(cat, c[0]) + '" alt="" loading="lazy"><div><b>' + esc(champName(cat, c[0])) + '</b><span>' + c[1] + ' parties · ' + pct(c[2], c[1]) + ' %</span></div></div>').join('') + '</div></div>' : '')
     + (card.variant === 'legend' ? '<p class="note">Édition légendaire de ' + esc(card.name) + ' : la carte la plus rare du jeu. Contrairement aux autres versions, elle a sa propre note et ses propres statistiques, et porte tous ses titres mondiaux. Elle prend parfois la place de la carte bonus d\'un pack.</p>'
       : card.variant ? '<p class="note">' + (card.variant === 'kc' ? 'Édition Karmine Corp de la carte de ' + esc(card.name) + ' (' + esc(karmineEra(cat, card)) + '), réservée à celles et ceux qui portent ou ont porté ses couleurs'
@@ -758,11 +806,17 @@ async function viewProfile(main) {
   box.innerHTML = data.packs.map(table).join('')
     + (data.variants || []).map((v) => {
       const from = S.cat.tiers.filter((t) => t.id >= v.minTier).map((t) => t.name);
+      /* (les éditions limitées sont annoncées plus bas, avec ce qu'il en reste) */
       /* l'édition légendaire ne remplace pas une carte tirée : elle prend parfois la place de la carte bonus */
       if (v.id === 'legend') return '<p class="hint"><b class="v-legend">' + esc(v.name) + '</b> — la carte bonus est une carte légendaire dans ' + data.packs.map((p) => 'un ' + (p.price ? 'booster à crédits' : 'pack gratuit') + ' sur ' + Math.round(1 / (p.legend || v.pack))).join(', ') + ' (' + v.cards + (v.cards > 1 ? ' cartes' : ' carte') + ').</p>';
       /* l'édition KC ne dépend pas du rang : elle concerne les joueurs et les coachs passés par la Karmine */
       if (v.id === 'kc') return '<p class="hint"><b class="v-kc">' + esc(v.name) + '</b> — ' + show(v.chance) + ' des cartes des joueurs et des coachs passés par la Karmine Corp (' + v.cards + ' cartes) sortent dans cette édition.</p>';
       return '<p class="hint"><b class="v-' + esc(v.id) + '">' + esc(v.name) + '</b> — ' + show(v.chance) + ' des cartes ' + esc(from.slice(0, -1).join(', ') + (from.length > 1 ? ' et ' : '') + from[from.length - 1]) + ' sortent dans cette version.</p>';
+    }).join('')
+    + (data.limited || []).map((l) => {
+      const card = S.cat.cardById.get(l.card);
+      return card ? '<p class="hint"><b class="v-ceo">' + esc(card.name) + (card.edition === 'ceo' ? ' « MY CEO »' : '') + '</b> — édition limitée à ' + l.cap + ' exemplaires numérotés : ' + (l.minted >= l.cap ? 'tous sont sortis.' : l.minted + ' déjà sortis. Elle prend la place de la carte bonus dans '
+        + data.packs.map((p) => 'un ' + (p.price ? 'booster à crédits' : 'pack gratuit') + ' sur ' + Math.round(1 / p.limited)).join(', ') + ', tant qu\'il en reste.') + '</p>' : '';
     }).join('')
     + '<p class="hint">Les cartes sont tirées au sort par le serveur. Un coach sort moins souvent qu\'un joueur.</p>';
 }

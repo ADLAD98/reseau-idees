@@ -12,7 +12,8 @@ const coin = () => G.icon('i-coin');
 const nameOf = (card) => card.name + (card.variant ? ' (' + VARIANTS[card.variant].name.toLowerCase() + ')' : '');
 /* prix proposé par défaut, quand personne ne vend encore cette carte : selon le rang, plus cher pour une version spéciale */
 const BASE_PRICE = [0, 30, 80, 250, 900, 3000], VARIANT_PRICE = { holo: 2.5, full: 5, kc: 6, legend: 40 };
-const advised = (card) => Math.round(BASE_PRICE[card.tier] * (card.variant ? VARIANT_PRICE[card.variant] : 1));
+/* (une édition limitée n'a pas de prix d'usage : on propose gros) */
+const advised = (card) => (card.limited ? 50000 : Math.round(BASE_PRICE[card.tier] * (card.variant ? VARIANT_PRICE[card.variant] : 1)));
 
 export async function viewMarket(main, ctx) {
   G = ctx;

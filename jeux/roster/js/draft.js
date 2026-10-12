@@ -259,7 +259,8 @@ export function runDraft({ match, cat, fx, act, resync, toast, help, head, live,
       if (auto && fx && !live) { syncAll(); await wait(620 + Math.random() * 480); }
       apply(a);
       shown++;
-      if (a.type === 'ban') sfx.ban(); else sfx.pick();
+      /* en draft automatique, les choix s'enchaînent : un simple « toc » à la place des coups */
+      if (auto) sfx.tick(); else if (a.type === 'ban') sfx.ban(); else sfx.pick();
       syncAll();
       pop(a.type === 'ban' ? banEl(a.side, bans[a.side].length - 1) : slotEl(a.side, ROLES.indexOf(a.role)));
       if (fx) await wait(auto ? 400 : 280);
@@ -273,7 +274,7 @@ export function runDraft({ match, cat, fx, act, resync, toast, help, head, live,
     if (t && t.side === you) {
       if (t.type !== lastType || (t.type === 'pick' && (!role || picks[you][ROLES.indexOf(role)]))) role = t.type === 'pick' ? ROLES.find((r, i) => !picks[you][i]) : '';
       lastType = t.type;
-      if (fx) sfx.turn();
+      if (fx && !auto) sfx.turn();
     }
     syncAll();
     $('.dr-grid').scrollTop = 0;

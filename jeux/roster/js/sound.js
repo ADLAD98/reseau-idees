@@ -22,9 +22,9 @@ function audio() {
     out = ctx.createGain();
     out.gain.value = 0.5;
     out.connect(ctx.destination);
-    /* un écho court et discret, pour donner de l'air aux notes */
+    /* un écho court et discret, pour donner de l'air aux notes (très peu de retour : des sons qui s'enchaînent ne s'empilent pas) */
     const delay = ctx.createDelay(0.5), back = ctx.createGain(), wet = ctx.createGain();
-    delay.delayTime.value = 0.13; back.gain.value = 0.3; wet.gain.value = 0.2;
+    delay.delayTime.value = 0.13; back.gain.value = 0.2; wet.gain.value = 0.14;
     out.connect(delay); delay.connect(back); back.connect(delay); delay.connect(wet); wet.connect(ctx.destination);
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
     const data = noiseBuf.getChannelData(0);
@@ -122,7 +122,10 @@ export const sfx = {
   whoosh() { noise({ dur: 0.32, vol: 0.1, freq: 500, to: 2600, q: 0.7 }); },
   /** Toutes les cartes sont retournées. */
   done() { bell(E5, 0, 0.08, 0.9); bell(B5, 0.09, 0.07, 0.9); bell(E6, 0.18, 0.07, 1.2); },
-  click() { tone(880, { dur: 0.05, vol: 0.05 }); },
+  /** Un bouton, un champion désigné : un petit « toc » de bois, grave et bref (pas un bip). */
+  click() { tone(420, { dur: 0.045, to: 300, vol: 0.03, type: 'triangle' }); noise({ dur: 0.018, vol: 0.012, type: 'highpass', freq: 2600 }); },
+  /** Un choix qui se fait tout seul (draft automatique) : presque rien, pour ne pas lasser quand ils s'enchaînent. */
+  tick() { tone(300, { dur: 0.06, to: 210, vol: 0.022, type: 'triangle' }); },
 
   /* ---------- le sachet ---------- */
   /** Le papier crisse quand on saisit le sachet. */
@@ -148,12 +151,12 @@ export const sfx = {
   slide() { noise({ dur: 0.2, vol: 0.05, freq: 1300, to: 3000, q: 0.7 }); },
 
   /* ---------- le combat ---------- */
-  /** C'est au joueur de choisir. */
-  turn() { bell(B5, 0, 0.06, 0.5); bell(E6, 0.09, 0.05, 0.7); },
-  /** Un champion est banni : un coup sourd. */
-  ban() { tone(150, { dur: 0.3, to: 58, vol: 0.3 }); noise({ dur: 0.18, vol: 0.12, type: 'lowpass', freq: 1400, to: 200 }); },
-  /** Un champion est verrouillé : le coup, puis une note qui reste. */
-  pick() { tone(110, { dur: 0.45, to: 55, vol: 0.34 }); bell(E5, 0.01, 0.12, 0.9); bell(B5, 0.06, 0.07, 0.8); noise({ dur: 0.22, vol: 0.05, type: 'highpass', freq: 5000 }); },
+  /** C'est au joueur de choisir : deux notes douces, une octave plus bas qu'avant. */
+  turn() { bell(B5 / 2, 0, 0.032, 0.4); bell(E6 / 2, 0.1, 0.028, 0.5); },
+  /** Un champion est banni : un coup feutré. */
+  ban() { tone(140, { dur: 0.2, to: 72, vol: 0.12 }); noise({ dur: 0.1, vol: 0.04, type: 'lowpass', freq: 1000, to: 240 }); },
+  /** Un champion est verrouillé : le coup, puis une note brève. */
+  pick() { tone(112, { dur: 0.26, to: 68, vol: 0.13 }); bell(E5, 0.01, 0.055, 0.5); bell(B5, 0.07, 0.028, 0.45); },
   /** Présentation des deux équipes. */
   versus() {
     tone(65.4, { dur: 1.4, vol: 0.28, attack: 0.03 });

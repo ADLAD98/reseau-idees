@@ -18,9 +18,12 @@ export { packHTML } from './pack.js';
 const PRISM = ['#ffe7a8', '#9fe8ff', '#ffffff'];
 const RAINBOW = ['#ff9cc6', '#ffd88a', '#a8ffdc', '#9ccfff', '#d3b4ff', '#ffffff'];
 const KC_BLUE = ['#39b8ff', '#ffffff', '#0b47ff', '#9be7ff'];
-const dustOf = (card) => (card.variant === 'kc' ? KC_BLUE : card.variant === 'holo' ? RAINBOW : card.tier === 5 ? PRISM : [TIER_COLOR[card.tier], '#ffffff', '#f0e6d2']);
-/* l'éclat d'une carte, de 1 à 5 : son rang, relevé d'un cran pour une holographique et de deux pour une full art */
-const shineOf = (card) => Math.min(5, card.tier + variantRank(card));
+const DIAMOND = ['#ffffff', '#bfe7ff', '#9cc8ff', '#ffe9c4'];
+const CEO_GOLD = ['#ffd978', '#fff6d6', '#39b8ff', '#f0cd72'];
+const dustOf = (card) => (card.edition === 'ceo' && !card.variant ? CEO_GOLD : card.variant === 'legend' ? DIAMOND : card.variant === 'kc' ? KC_BLUE : card.variant === 'holo' ? RAINBOW
+  : card.tier === 5 ? PRISM : [TIER_COLOR[card.tier], '#ffffff', '#f0e6d2']);
+/* l'éclat d'une carte, de 1 à 5 : son rang, relevé d'un cran pour une holographique et de deux pour une full art ; le plus fort pour une édition limitée */
+const shineOf = (card) => (card.limited ? 5 : Math.min(5, card.tier + variantRank(card)));
 /* pour examiner l'animation image par image, les essais peuvent tout ralentir : window.__lent = 4 */
 const slow = () => (typeof window !== 'undefined' && window.__lent) || 1;
 const wait = (ms) => new Promise((r) => setTimeout(r, ms * slow()));
@@ -180,7 +183,10 @@ export async function runOpening({ request, getCat, fx, size, from }) {
   const setStage = (name) => { op.dataset.stage = name; };
   const setInfo = (html, pulse) => { info.innerHTML = html; info.classList.toggle('pulse', !!pulse); };
   /* la lumière de la scène prend la couleur de la carte */
-  const setBeam = (card) => { op.style.setProperty('--beam', card.variant === 'kc' ? '#39b8ff' : card.tier >= 3 ? TIER_COLOR[card.tier] : '#c8aa6e'); op.dataset.tier = card.tier; op.dataset.variant = card.variant || ''; };
+  const setBeam = (card) => {
+    op.style.setProperty('--beam', card.limited && !card.variant ? '#ffd978' : card.variant === 'legend' ? '#dff3ff' : card.variant === 'kc' ? '#39b8ff' : card.tier >= 3 ? TIER_COLOR[card.tier] : '#c8aa6e');
+    op.dataset.tier = card.tier; op.dataset.variant = card.variant || '';
+  };
   let untilt = null;
   const cardEl = (i) => boxes[i].querySelector('.card');
   const clientOf = (pose) => [M.x + pose.x, M.y + pose.y];
@@ -220,7 +226,8 @@ export async function runOpening({ request, getCat, fx, size, from }) {
     throw e;
   }
   cat = getCat();
-  pulls = data.pack.cards.map((p) => ({ qty: p.qty, isNew: p.isNew, card: cat.cardById.get(p.id) })).filter((p) => p.card);
+  pulls = data.pack.cards.map((p) => ({ qty: p.qty, isNew: p.isNew, serial: p.serial || 0, card: cat.cardById.get(p.id) })).filter((p) => p.card);
+  const serials = new Map(pulls.filter((p) => p.serial).map((p) => [p.card.id, p.serial]));
   if (!pulls.length) { close(); throw new Error('sachet vide : cartes inconnues du catalogue'); }
   imgs = pulls.map((p) => preload(photoUrl(p.card)));
   const best = pulls.reduce((a, p) => (shineOf(p.card) > shineOf(a) ? p.card : a), pulls[0].card);
@@ -230,7 +237,7 @@ export async function runOpening({ request, getCat, fx, size, from }) {
     b.className = 'op-item op-cardbox t' + p.card.tier + (p.card.variant ? ' v-' + p.card.variant : '');
     b.dataset.i = i;
     b.style.zIndex = 10 - i;
-    b.innerHTML = cardHTML(p.card, cat, { back: true, eager: true, cls: 'is-back' }) + '<i class="op-sheen"></i>'
+    b.innerHTML = cardHTML(p.card, cat, { back: true, eager: true, cls: 'is-back', serial: p.serial }) + '<i class="op-sheen"></i>'
       + '<span class="op-tag' + (p.isNew ? ' new' : '') + '">' + (p.isNew ? 'Nouvelle' : '×' + p.qty) + '</span>';
     stage.insertBefore(b, front);
     where.set(b, ['inside', i]);
@@ -437,7 +444,8 @@ export async function runOpening({ request, getCat, fx, size, from }) {
         { duration: (tier >= 4 ? 1500 : 1000) * slow(), easing: 'cubic-bezier(.2,.6,.3,1)' });
       const c = clientOf(POSE.stack(0));
       particles.burst(c[0], c[1], { count: tier === 5 ? 46 : tier === 4 ? 32 : 14, colors: dustOf(card), shapes: ['dot'], speed: [40, tier >= 4 ? 300 : 190], life: [0.9, 2.2], size: [1, 2.6], gravity: -18, drag: 0.955 });
-      label.textContent = cat.tierById.get(card.tier).name + (card.variant ? ' · ' + VARIANTS[card.variant].name : '');
+      label.textContent = card.limited && !card.variant ? 'Édition limitée' + (serials.get(card.id) ? ' · n° ' + serials.get(card.id) + ' / ' + card.limited : '')
+        : cat.tierById.get(card.tier).name + (card.variant ? ' · ' + VARIANTS[card.variant].name : '');
       label.style.setProperty('--n', label.textContent.length);
       label.classList.add('on');
       op.classList.add('named');
@@ -461,8 +469,8 @@ export async function runOpening({ request, getCat, fx, size, from }) {
     sfx.rise(1.75);
     const parts = [
       card.country ? '<span><img src="' + flagUrl(card.country) + '" alt="">' + esc(cat.countries[card.country]) + '</span>' : '',
-      '<span>' + ROLE_LABEL[card.role] + '</span>', '<span>' + esc(card.league) + '</span>',
-      card.variant ? '<span class="v-' + card.variant + '">' + VARIANTS[card.variant].name + '</span>' : '',
+      '<span>' + esc(card.label || ROLE_LABEL[card.role]) + '</span>', '<span>' + esc(card.league) + '</span>',
+      card.variant ? '<span class="v-' + card.variant + '">' + VARIANTS[card.variant].name + '</span>' : card.limited ? '<span class="v-ceo">Édition limitée</span>' : '',
     ].filter(Boolean);
     clues.innerHTML = '';
     /* longueur de la ligne d'indices une fois complète : le texte, plus la place du drapeau et des séparateurs */
