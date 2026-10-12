@@ -1,8 +1,8 @@
 /* Roster — le jeu. Six écrans : Packs, Jouer (matchs, Mondial), Collection, Marché, Joueurs (amis, échanges, défis, classement), Profil.
    Le serveur décide de tout (cartes tirées, délais, collection, matchs, ventes, échanges) ; cette page affiche et met en scène. */
 import { ApiError, call, clearSession, deriveKey, loadSession, saveSession } from './api.js';
-import { VARIANTS, cardHTML, champName, esc, flagUrl, iconUrl, karmineEra, logoHTML, prepare, statsOf, tiltCard, variantRank } from './cards.js';
-import { GAME_NAME, ROLE_NAME, ROLE_ORDER, STORE } from './config.js';
+import { VARIANTS, cardHTML, champName, esc, flagUrl, iconUrl, karmineEra, logoHTML, photoUrl, prepare, statsOf, tiltCard, variantRank } from './cards.js';
+import { GAME_NAME, ROLE_LABEL, ROLE_NAME, ROLE_ORDER, STORE } from './config.js';
 import { createDuels } from './duel.js';
 import { sellCard, showOnMarket, viewMarket } from './market.js';
 import { packHTML, runOpening } from './opening.js';
@@ -276,6 +276,8 @@ function showAuth(message) {
       const data = await call('POST', mode === 'register' ? '/api/register' : '/api/login', { name, key });
       S.session = { token: data.token, name: data.player.name };
       saveSession(S.session);
+      /* (un autre compte sur le même écran : rien de l'équipe ni des missions du précédent ne doit rester) */
+      S.play = null; S.missions = null; hubAsked = false;
       await loadGame();
       location.hash = '#/packs';
       shell();
@@ -313,7 +315,8 @@ function shell() {
     /* le son : ce bouton ouvre le réglage du volume (musique de fond, effets) ; il est barré quand la musique est coupée */
     + '<button class="tune' + (musicOn() ? '' : ' off') + '" type="button" id="tune" aria-haspopup="dialog" title="Réglage du son" aria-label="Régler le son : musique de fond et effets">' + icon('i-note') + '</button>'
     + '<a class="purse" href="#/' + (S.live ? 'marche' : 'jouer') + '" title="Tes crédits : gagnés en jouant, dépensés au marché">' + icon('i-coin') + '<b id="credits">' + S.player.coins + '</b></a>'
-    + '<a class="who" href="#/profil">' + icon('i-user') + '<b>' + esc(S.player.name) + '</b></a></header>'
+    /* le joueur : son initiale dans un losange, puis son pseudo */
+    + '<a class="who" href="#/profil"><i class="who-av"><span>' + esc(S.player.name.charAt(0).toUpperCase()) + '</span></i><b>' + esc(S.player.name) + '</b></a></header>'
     + '<main class="main" id="main"></main>'
     + '<nav class="tabs">' + tabs().map((t) => '<a href="#/' + t[0] + '" data-tab="' + t[0] + '">' + icon(t[2]) + t[1] + pip(t[0]) + '</a>').join('') + '</nav>';
   drawPulse();
@@ -409,13 +412,69 @@ const timeLeft = () => (packKind() === 'credits' ? S.shop.credits.readyAt : S.fr
 const packReady = () => (packKind() === 'credits' ? timeLeft() <= 0 && S.player.coins >= S.shop.credits.price : timeLeft() <= 0 || S.free.spare > 0);
 /* résumé de la situation : quand il change, on redessine le bouton ; sinon seul le compte à rebours bouge */
 const packSig = () => packKind() + '/' + (timeLeft() <= 0 ? 'pret' : 'attente') + '/' + (packKind() === 'credits' ? (S.player.coins >= S.shop.credits.price ? 'ok' : 'court') : S.free.spare || 0);
+/* ---------- le tableau de bord de l'accueil : la collection, mon équipe, ma saison ---------- */
+/** La collection : un anneau (la part des cartes possédées), puis une barre par rang et par version spéciale. */
 function progressHTML() {
-  const total = S.cat.cards.length, have = S.owned.size;
-  const tally = (all) => all.filter((c) => S.owned.has(c.id)).length + '/' + all.length;
-  const tiers = [...S.cat.tiers].reverse().map((t) => '<span style="--tc:var(--t' + t.id + ')"><i></i>' + esc(t.name) + ' ' + tally(S.cat.base.filter((c) => c.tier === t.id)) + '</span>').join('')
-    + Object.entries(VARIANTS).filter(([id]) => S.cat.cards.some((c) => c.variant === id)).map(([id, v]) => '<span class="v-' + id + '"><i></i>' + v.name + (id === 'holo' ? 's' : '') + ' ' + tally(S.cat.cards.filter((c) => c.variant === id)) + '</span>').join('');
-  return '<div class="meter"><div class="meter-head"><span class="label">Collection</span><span><b>' + have + '</b> / ' + total + ' cartes</span></div>'
-    + '<div class="bar"><i style="width:' + pct(have, total) + '%"></i></div><div class="tiers">' + tiers + '</div></div>';
+  const total = S.cat.cards.length, have = S.owned.size, R = 54, C = 2 * Math.PI * R;
+  const row = (attrs, name, all) => {
+    const n = all.filter((c) => S.owned.has(c.id)).length;
+    return '<span' + attrs + '><i></i><em>' + name + '</em><u class="bar"><i style="width:' + pct(n, all.length) + '%"></i></u><b>' + n + '/' + all.length + '</b></span>';
+  };
+  const tiers = [...S.cat.tiers].reverse().map((t) => row(' style="--tc:var(--t' + t.id + ')"', esc(t.name), S.cat.base.filter((c) => c.tier === t.id))).join('')
+    + Object.entries(VARIANTS).filter(([id]) => S.cat.cards.some((c) => c.variant === id)).map(([id, v]) => row(' class="v-' + id + '"', v.name + (id === 'holo' ? 's' : ''), S.cat.cards.filter((c) => c.variant === id))).join('');
+  /* (les graduations de l'anneau : un trait tous les dixièmes) */
+  const ticks = Array.from({ length: 10 }, (x, k) => { const a = (k / 10) * 2 * Math.PI; return 'M' + (60 + 46 * Math.cos(a)).toFixed(1) + ' ' + (60 + 46 * Math.sin(a)).toFixed(1) + 'L' + (60 + 49 * Math.cos(a)).toFixed(1) + ' ' + (60 + 49 * Math.sin(a)).toFixed(1); }).join('');
+  return '<div class="meter"><div class="hub-ring"><svg viewBox="0 0 120 120" aria-hidden="true"><circle class="rg-track" cx="60" cy="60" r="' + R + '"/><path class="rg-ticks" d="' + ticks + '"/>'
+    + '<circle class="rg-fill" cx="60" cy="60" r="' + R + '" stroke-dasharray="' + C.toFixed(1) + '" stroke-dashoffset="' + (C * (1 - have / Math.max(1, total))).toFixed(1) + '"/></svg>'
+    + '<div class="rg-in"><b>' + pct(have, total) + '<small>%</small></b><span>' + have + ' / ' + total + '</span></div></div>'
+    + '<div class="tiers">' + tiers + '</div></div>';
+}
+/** Mon équipe : sa note, mes dernières parties, les six visages alignés. (Elle vient de l'écran Jouer : S.play.) */
+function teamHubHTML() {
+  const P = S.play;
+  if (!P) return '<div class="hub-wait"><div class="spin"></div></div>';
+  /* (le coach : dans l'équipe telle que le serveur la décrit, sinon dans la composition enregistrée) */
+  const L = P.lineup, coachId = (L.coach && L.coach.id) || (P.deck && P.deck.coach) || null;
+  const filled = L.players.filter((p) => p.id).length + (coachId ? 1 : 0);
+  const face = (id, role) => {
+    const c = id ? S.cat.cardById.get(id) : null;
+    return '<span class="hub-face' + (c ? '' : ' empty') + '" title="' + (c ? esc(c.name) + ' · ' + c.ovr : 'Poste libre') + '">'
+      + (c && c.photo ? '<img src="' + photoUrl(c, 96) + '" alt="" loading="lazy" decoding="async" draggable="false">' : '<svg viewBox="0 0 100 100" aria-hidden="true"><use href="#silhouette"/></svg>')
+      + '<i>' + ROLE_LABEL[role] + '</i></span>';
+  };
+  const last = (P.history || []).slice(0, 5);
+  return '<div class="hub-rating"><b>' + L.rating + '</b><span>Note<br>d\'équipe</span>'
+    + (last.length ? '<em class="hub-form" title="Tes dernières parties, de la plus récente à la plus ancienne">' + last.map((m) => '<i class="' + (m.won ? 'w' : 'l') + '">' + (m.won ? 'V' : 'D') + '</i>').join('') + '</em>' : '') + '</div>'
+    + '<div class="hub-line">' + L.players.map((p) => face(p.id, p.role)).join('') + face(coachId, 'COACH') + '</div>'
+    + '<a class="btn" href="#/jouer">' + (filled < 6 ? 'Composer mon équipe' : 'Jouer un match') + '</a>';
+}
+/** Ma saison : six chiffres. */
+function seasonHubHTML() {
+  const p = S.player, games = p.wins + p.losses;
+  const cell = (value, label, cls) => '<div' + (cls ? ' class="' + cls + '"' : '') + '><b>' + value + '</b><span>' + label + '</span></div>';
+  return '<div class="hub-stats">' + cell(p.wins, p.wins > 1 ? 'victoires' : 'victoire') + cell(p.losses, p.losses > 1 ? 'défaites' : 'défaite')
+    + cell(games ? Math.round((100 * p.wins) / games) + ' %' : '—', 'de réussite') + cell(num(p.coins), 'crédits', 'gold')
+    + cell(p.packsOpened, p.packsOpened > 1 ? 'packs ouverts' : 'pack ouvert')
+    + (S.live ? cell(p.titles || 0, (p.titles || 0) > 1 ? 'Mondiaux' : 'Mondial', 'gold') : cell(p.cardsTotal, 'exemplaires')) + '</div>';
+}
+function hubHTML() {
+  return '<section class="hub">'
+    + '<article class="hub-card hub-col panel"><header><span class="label">Collection</span><a href="#/collection">Tout voir</a></header>' + progressHTML() + '</article>'
+    + '<article class="hub-card panel"><header><span class="label">Mon équipe</span><a href="#/jouer">Composer</a></header><div class="hub-team" id="hubTeam" style="display:contents">' + teamHubHTML() + '</div></article>'
+    + '<article class="hub-card panel"><header><span class="label">Ma saison</span><a href="#/profil">Profil</a></header>' + seasonHubHTML() + '</article></section>';
+}
+/** L'équipe n'est connue qu'après un passage par l'écran Jouer : sinon on la demande au serveur, une seule fois par visite. */
+let hubAsked = false;
+async function loadHubTeam() {
+  if (S.play || hubAsked) return;
+  hubAsked = true;
+  let data = null;
+  try { data = await call('GET', '/api/play'); } catch (e) { return; }
+  if (S.play || !data) return;
+  applyState(data);
+  S.play = data;
+  const box = document.getElementById('hubTeam');
+  if (box) box.innerHTML = teamHubHTML();
 }
 function packActionHTML() {
   if (packKind() === 'credits') {
@@ -439,6 +498,7 @@ function packActionHTML() {
 function viewPacks(main) {
   /* les missions avancent en jouant : on les redemande à chaque passage sur cet écran */
   loadMissions();
+  loadHubTeam();
   const recent = [...S.owned.entries()].sort((a, b) => b[1].at - a[1].at).slice(0, 6).map(([id]) => S.cat.cardById.get(id)).filter(Boolean);
   const kind = packKind(), credits = kind === 'credits';
   /* le menu des boosters : le pack gratuit, ou celui qui se paie en crédits */
@@ -448,8 +508,10 @@ function viewPacks(main) {
     + '<div class="home-side">' + menu + '<div class="eyebrow">' + (credits ? 'Booster à crédits · un toutes les ' + Math.round(S.shop.credits.cooldownMs / 60000) + ' minutes' : 'Pack gratuit · toutes les ' + Math.round(S.free.cooldownMs / 60000) + ' minutes') + '</div>'
     + '<h1 class="h1">' + S.free.size + ' cartes ' + (credits ? 'de plus' : 'à découvrir') + '</h1>'
     + '<p class="lead">' + (credits ? 'Un booster en plus du pack gratuit, payé avec tes crédits. Ses chances sont un peu plus faibles que celles du pack gratuit (le détail est dans ton profil).'
-      : 'Joueurs et coachs pros de la saison ' + S.cat.season + '. La dernière carte du pack est une carte bonus : rang Titulaire au minimum. Les plus belles cartes existent aussi en version holographique et en full art' + (S.cat.cards.some((c) => c.variant === 'kc') ? ', et les joueurs passés par la Karmine en édition KC' : '') + '.') + '</p>'
-    + '<div id="packAction" data-sig="' + packSig() + '">' + packActionHTML() + '</div>' + progressHTML() + '</div></section>'
+      /* (sur un téléphone, seulement l'essentiel : le bouton doit tenir sur le premier écran) */
+      : 'Joueurs et coachs pros de la saison ' + S.cat.season + '. La dernière carte du pack est une carte bonus<span class="hide-s"> : rang Titulaire au minimum. Les plus belles cartes existent aussi en version holographique et en full art' + (S.cat.cards.some((c) => c.variant === 'kc') ? ', et les joueurs passés par la Karmine en édition KC' : '') + '</span>.') + '</p>'
+    + '<div id="packAction" data-sig="' + packSig() + '">' + packActionHTML() + '</div></div></section>'
+    + hubHTML()
     + '<section class="missions" id="missions"' + (S.missions ? '' : ' hidden') + '>' + (S.missions ? missionsHTML() : '') + '</section>'
     + '<section><h2 class="h2">Dernières cartes obtenues</h2>'
     + (recent.length ? '<div class="row-cards">' + recent.map((c) => tile(c)).join('') + '</div>' : '<p class="empty">Ta collection est vide. Ouvre ton premier pack !</p>')
