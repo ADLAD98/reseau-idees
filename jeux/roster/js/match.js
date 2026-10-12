@@ -3,6 +3,7 @@
 import { cardHTML, esc, iconUrl } from './cards.js';
 import { DDRAGON, ROLE_LABEL, STORE } from './config.js';
 import { createFx } from './fx.js';
+import { KITS, RESOURCES } from './kits.js';
 import { CAMPS, KILL_GAP, NEXUS, NEXUS_TOWERS, PIT, SHOW_LEAD, STRUCT, TRAILS, planMoves, sample } from './moves.js';
 import { ROLES, signed } from './rules.js';
 import { setSound, sfx, soundOn } from './sound.js';
@@ -61,7 +62,12 @@ export function runMatch({ data, cat, fx }) {
   for (const side of [0, 1]) {
     M.teams[side].players.forEach((p, r) => {
       const champ = M.picks[side][r];
-      P.push({ side, role: ROLES[r], name: p.name || 'Remplaçant', card: (p.id && cat.cardById.get(p.id)) || null, champ, champName: cat.champions[champ] ? cat.champions[champ].n : champ });
+      /* ce que Riot dit de son champion : sa ressource (m mana, e énergie, n aucune, les autres montent quand on se bat) et son ultime */
+      const kit = KITS[champ] || null, info = cat.champions[champ] || {};
+      P.push({ side, role: ROLES[r], name: p.name || 'Remplaçant', card: (p.id && cat.cardById.get(p.id)) || null, champ, champName: info.n || champ,
+        res: kit ? kit[0] : 'm', ult: kit ? kit[1] : '', ultCd: kit ? kit[2] : null, ultEarly: !!(kit && kit[3]),
+        /* un champion de duel (combattant, assassin) : au milieu, il ira tenir une voie de côté en fin de partie */
+        split: info.t === 'Fighter' || info.t === 'Assassin' });
     });
   }
   const short = (s) => M.teams[s].short;
@@ -85,11 +91,14 @@ export function runMatch({ data, cat, fx }) {
   const sideHTML = (s) => '<aside class="mv-side s' + s + '">' + [0, 1, 2, 3, 4].map((r) => {
     const i = s * 5 + r, p = P[i];
     /* la pastille ronde sur le portrait : verte quand l'ultime (R) est disponible, comme dans le jeu */
-    return '<div class="mv-p" data-p="' + i + '"><span class="mv-pw"><span class="mv-pi"><img src="' + iconUrl(cat, p.champ) + '" alt="" draggable="false"></span><i class="mv-r" data-r="' + i + '" title="Ultime (R)"></i>'
+    return '<div class="mv-p" data-p="' + i + '"><span class="mv-pw"><span class="mv-pi"><img src="' + iconUrl(cat, p.champ) + '" alt="" draggable="false"></span><i class="mv-r" data-r="' + i + '" title="Ultime (R)' + (p.ult ? ' : ' + esc(p.ult) : '') + '"></i>'
       /* le niveau du champion, comme sur le tableau des scores du jeu */
       + '<b class="mv-lv" data-lv="' + i + '" title="Niveau">1</b></span>'
       + '<span class="mv-pn"><b>' + esc(p.name) + '</b><i>' + ROLE_LABEL[p.role] + ' · ' + esc(p.champName) + '</i></span>'
-      + '<span class="mv-pk"><b data-kda="' + i + '">0/0/0</b><i data-cs="' + i + '" title="Sbires tués">0 CS</i></span></div>';
+      + '<span class="mv-pk"><b data-kda="' + i + '">0/0/0</b><i data-cs="' + i + '" title="Sbires tués">0 CS</i></span>'
+      /* sa vie, et sa ressource quand son champion en a une (mana, énergie, rage…) */
+      + '<span class="mv-bars"><i class="mv-hp" title="Vie"><b data-hp="' + i + '"></b></i>'
+      + (p.res === 'n' ? '' : '<i class="mv-mp r-' + p.res + '" title="' + esc(RESOURCES[p.res] || 'Ressource') + '"><b data-mp="' + i + '"></b></i>') + '</span></div>';
   }).join('') + '</aside>';
 
   const root = document.createElement('div');
@@ -120,16 +129,19 @@ export function runMatch({ data, cat, fx }) {
   const csEls = P.map((p, i) => root.querySelector('[data-cs="' + i + '"]')), ultEls = P.map((p, i) => root.querySelector('[data-r="' + i + '"]'));
   const lvEls = P.map((p, i) => root.querySelector('[data-lv="' + i + '"]'));
   const pitEls = { drake: root.querySelector('[data-pit="drake"]'), baron: root.querySelector('[data-pit="baron"]') };
+  const pitUse = { drake: pitEls.drake.querySelector('use'), baron: pitEls.baron.querySelector('use') };
   const timerEls = { drake: root.querySelector('[data-timer="drake"]'), baron: root.querySelector('[data-timer="baron"]') };
   const tokens = P.map((p) => {
     const d = document.createElement('div');
     d.className = 'tk s' + p.side;
-    /* le portrait, et ce qui ne se voit que pendant un ralenti : la barre de vie */
-    d.innerHTML = '<span class="tk-i"><img src="' + iconUrl(cat, p.champ) + '" alt="" draggable="false"></span><i class="tk-hp"><b></b></i>';
+    /* le portrait et, au-dessus, la barre de vie et celle de la ressource */
+    d.innerHTML = '<span class="tk-i"><img src="' + iconUrl(cat, p.champ) + '" alt="" draggable="false"></span>'
+      + '<span class="tk-bars"><i class="tk-hp"><b></b></i>' + (p.res === 'n' ? '' : '<i class="tk-mp r-' + p.res + '"><b></b></i>') + '</span>';
     mapIn.appendChild(d);
     return d;
   });
-  const hpEls = tokens.map((d) => d.querySelector('.tk-hp b'));
+  const hpEls = tokens.map((d) => d.querySelector('.tk-hp b')), mpEls = tokens.map((d) => d.querySelector('.tk-mp b'));
+  const hpRows = P.map((p, i) => root.querySelector('[data-hp="' + i + '"]')), mpRows = P.map((p, i) => root.querySelector('[data-mp="' + i + '"]'));
   const scroll = document.body.style.overflow;
   document.body.style.overflow = 'hidden';
   document.body.appendChild(root);
@@ -142,12 +154,29 @@ export function runMatch({ data, cat, fx }) {
   let clockT = 0, lost = [[0, 0, 0, 0], [0, 0, 0, 0]];
   const pos = P.map(() => [500, 500]), kda = P.map(() => ({ k: 0, d: 0, a: 0 })), score = [0, 0];
   /* Les déplacements de toute la partie sont calculés d'avance (moves.js). tau : l'instant affiché, en millisecondes à vitesse ×1. */
-  const plan = planMoves(sim);
+  const plan = planMoves(sim, P.map((p) => ({ res: p.res === 'm' ? 'mana' : p.res === 'e' ? 'energy' : p.res === 'n' ? 'none' : 'build', cd: p.ultCd, early: p.ultEarly, split: p.split })));
   let tau = 0, lastDraw = 0;
   const cursor = P.map(() => 0), shown = P.map(() => null), look = P.map(() => '?');
 
-  /* ---------- ce que le serveur ne compte pas, et qu'une vraie partie affiche : le farm de chacun, le retour du dragon et du Nashor ---------- */
+  /* ---------- ce que le serveur ne compte pas, et qu'une vraie partie affiche : farm, niveau, vie et ressource de chacun, retour des monstres épiques ---------- */
   const csLook = P.map(() => -1), ultLook = P.map(() => null), lvLook = P.map(() => 0), timerLook = { drake: '?', baron: '?' };
+  const hpLook = P.map(() => -1), mpLook = P.map(() => -1);
+  /** Règle la barre de vie du joueur i, sur son pion et sur son portrait (part : de 0 à 1) ; de même sa ressource, s'il en a une. */
+  function setHp(i, part) {
+    const v = Math.round(clamp(part, 0, 1) * 100);
+    if (v === hpLook[i]) return;
+    hpLook[i] = v;
+    hpEls[i].style.width = v + '%'; hpRows[i].style.width = v + '%';
+    const low = v > 0 && v < 30;
+    hpEls[i].classList.toggle('low', low); hpRows[i].classList.toggle('low', low);
+  }
+  function setMp(i, part) {
+    if (!mpEls[i]) return;
+    const v = Math.round(clamp(part, 0, 1) * 100);
+    if (v === mpLook[i]) return;
+    mpLook[i] = v;
+    mpEls[i].style.width = v + '%'; mpRows[i].style.width = v + '%';
+  }
   const frac = (x) => x - Math.floor(x), jitter = (i) => frac(Math.sin((sim.duration + 7) * (i + 1) * 12.9898) * 43758.5453);
   /* sbires par minute : ceux du joueur cette saison quand on les connaît, sinon l'ordinaire de son poste */
   const CS_RATE = { TOP: 7.8, JGL: 5.6, MID: 8.4, BOT: 9.1, SUP: 1.2 };
@@ -164,19 +193,38 @@ export function runMatch({ data, cat, fx }) {
       for (const t of campsBy[i]) { if (t <= x) camps++; else break; }
       return camps * 4 + Math.floor((Math.max(0, alive - 840) / 60) * 1.5);
     }
-    /* les sbires arrivent sur les voies vers 1:30 */
-    return Math.floor((csRate[i] * Math.max(0, alive - 88)) / 60);
+    /* les sbires partent à 0:30 et arrivent sur les voies vers 0:55 */
+    return Math.floor((csRate[i] * Math.max(0, alive - 55)) / 60);
   }
-  /* Le dragon et le Nashor : absents de la carte entre a et b (secondes de jeu). Les délais d'une vraie partie : premier dragon à 5:00,
-     de retour cinq minutes après sa mort (un peu plus pour le dragon ancestral) ; Nashor à 20:00, de retour six minutes après.
-     Le serveur ne reprend jamais un objectif avant ces délais. */
-  const away = { drake: [[0, 300]], baron: [[0, 1200]] };
-  for (const e of events) {
-    if (e.k === 'elder') away.drake.push([e.t, e.t + 340]);
-    else if (e.k === 'dragon') away.drake.push([e.t, e.t + (e.dr[0] >= 4 || e.dr[1] >= 4 ? 350 : 300)]);
-    else if (e.k === 'baron') away.baron.push([e.t, e.t + 360]);
+  /* Les monstres épiques, avec les vrais délais du jeu (saison 2026). La fosse du haut accueille tour à tour les larves du Néant (8:00 ; parties à 14:45
+     si personne ne les a prises), le Héraut de la Faille (15:00 ; parti à 19:45) puis le Baron Nashor (20:00, de retour 6:00 après sa mort) ; celle du
+     bas, le dragon (5:00, de retour 5:00 après sa mort) puis, quand une équipe a pris l'âme, le Dragon ancestral (6:00 après, et 6:00 après chaque mort).
+     Pour chaque fosse, la suite de ses occupants : [qui, arrivée, départ], en secondes de jeu. Un serveur d'avant ces réglages peut avoir pris un
+     objectif un peu plus tôt : son arrivée est alors avancée d'autant, pour qu'on ne le voie pas tomber avant d'être apparu. */
+  const PIT_SYM = { grubs: 'i-grubs', herald: 'i-herald', baron: 'i-baron', drake: 'i-drake', elder: 'i-drake' };
+  const stays = { baron: [], drake: [] };
+  {
+    const taken = (k) => events.filter((e) => e.k === k).map((e) => e.t);
+    const early = (from, t) => (t === undefined ? from : Math.min(from, t - 12));
+    const grubs = taken('grubs')[0], herald = taken('herald')[0];
+    stays.baron.push(['grubs', early(480, grubs), grubs === undefined ? 885 : grubs], ['herald', early(900, herald), herald === undefined ? 1185 : herald]);
+    let from = 1200, who = 'drake';
+    for (const t of taken('baron')) { stays.baron.push(['baron', early(from, t), t]); from = t + 360; }
+    stays.baron.push(['baron', from, Infinity]);
+    from = 300;
+    for (const e of events) {
+      if (e.k !== 'dragon' && e.k !== 'elder') continue;
+      stays.drake.push([e.k === 'elder' ? 'elder' : 'drake', early(from, e.t), e.t]);
+      who = e.k === 'elder' || e.dr[0] >= 4 || e.dr[1] >= 4 ? 'elder' : 'drake';
+      from = e.t + (who === 'elder' ? 360 : 300);
+    }
+    stays.drake.push([who, from, Infinity]);
   }
-  const awayLeft = (list, g) => { for (const [a, b] of list) if (g >= a && g < b) return b - g; return 0; };
+  /** L'occupant d'une fosse quand l'horloge marque g : [qui, secondes avant son arrivée (0 : il est là)]. */
+  const pitAt = (name, g) => {
+    for (const [who, from, to] of stays[name]) if (g < to) return [who, Math.max(0, from - g)];
+    return [stays[name][stays[name].length - 1][0], 0];
+  };
   /** Met à jour le farm, les pastilles d'ultime et les comptes à rebours, quand ils changent. */
   function drawLive() {
     const g = clockT;
@@ -186,9 +234,16 @@ export function runMatch({ data, cat, fx }) {
       if (lv !== lvLook[i]) { if (lvLook[i] && lv > lvLook[i]) pop(lvEls[i]); lvLook[i] = lv; lvEls[i].textContent = lv; }
       if (ult !== ultLook[i]) { ultLook[i] = ult; ultEls[i].classList.toggle('on', ult); }
     }
+    /* pendant un temps fort, c'est l'action qui règle les barres de vie */
+    if (!root.classList.contains('slow')) for (let i = 0; i < 10; i++) { setHp(i, plan.hpAt(i, tau)); setMp(i, plan.resAt(i, tau)); }
     for (const name of ['drake', 'baron']) {
-      const left = awayLeft(away[name], g), text = left > 0 ? clockText(Math.ceil(left)) : '';
-      if (text !== timerLook[name]) { timerLook[name] = text; timerEls[name].textContent = text; pitEls[name].dataset.off = text ? '1' : ''; }
+      const [who, left] = pitAt(name, g), text = left > 0 ? clockText(Math.ceil(left)) : '', sig = who + text;
+      if (sig === timerLook[name]) continue;
+      timerLook[name] = sig;
+      timerEls[name].textContent = text;
+      pitEls[name].dataset.off = text ? '1' : '';
+      pitEls[name].dataset.who = who;
+      pitUse[name].setAttribute('href', '#' + PIT_SYM[who]);
     }
   }
   const campEls = plan.camps.map((c) => root.querySelector('[data-camp="' + c.id + '"]')), campLook = plan.camps.map(() => '?');
@@ -247,8 +302,11 @@ export function runMatch({ data, cat, fx }) {
       /* pendant un ralenti, c'est la mise en scène qui dit qui est debout */
       if (slow) continue;
       const dead = s.k === 'x', back = s.k === 'g', away = back || (dead && tau - plan.tracks[i][s.j].t > 900);
-      const sig = (dead ? 'x' : '') + (away ? 'a' : '') + (back ? 'g' : '') + (s.k === 'r' ? 'r' : '');
+      const sig = (dead ? 'x' : '') + (away ? 'a' : '') + (back ? 'g' : '') + (s.k === 'r' ? 'r' : s.k === 't' ? 't' : '');
       if (sig !== look[i]) {
+        /* une Téléportation : l'incantation là où il se trouve, puis un éclat là où il apparaît */
+        if (look[i] === 't' && sig === '') pop(tokens[i]);
+        tokens[i].classList.toggle('tp', s.k === 't');
         look[i] = sig;
         tokens[i].classList.toggle('dead', dead);
         tokens[i].classList.toggle('away', away);
@@ -400,7 +458,6 @@ export function runMatch({ data, cat, fx }) {
   /* De quoi mettre un combat en scène : déplacer un pion, régler sa barre de vie, lancer un projectile, faire éclater un anneau. */
   const sideOf = (i) => (i < 5 ? 0 : 1);
   const put = (i, p) => { tokens[i].style.left = (p[0] / 10).toFixed(2) + '%'; tokens[i].style.top = (p[1] / 10).toFixed(2) + '%'; };
-  const hp = (i, part) => { hpEls[i].style.width = Math.round(100 * part) + '%'; };
   const again = (node, cls) => { node.classList.remove(cls); void node.offsetWidth; node.classList.add(cls); };
   function fxNode(cls, p, life) {
     const node = document.createElement('i');
@@ -446,7 +503,11 @@ export function runMatch({ data, cat, fx }) {
     sfx.slowmo();
     const cast = [...new Set([...plan.casts[n], ...ev.kills.flatMap((k) => [k[0], k[1]])])];
     const here = new Map(cast.map((i) => [i, pos[i].slice()])), fallen = new Set();
-    for (const i of cast) { tokens[i].classList.add('fight'); hp(i, 1); }
+    /* la vie de chacun : celle qu'il a en arrivant, puis ce que l'action lui laisse (rien, pour ceux qui y tombent) */
+    const lifeOf = new Map(cast.map((i) => [i, plan.hpAt(i, when.tau)])), lifeEnd = new Map(cast.map((i) => [i, plan.hpAt(i, when.hud)]));
+    const doomed = new Set(ev.kills.map((k) => k[1])), share = 1 / Math.max(1, ev.kills.length);
+    const wear = () => { for (const i of cast) { if (doomed.has(i)) continue; const v = lifeOf.get(i) + (lifeEnd.get(i) - plan.hpAt(i, when.tau)) * share; lifeOf.set(i, v); setHp(i, v); } };
+    for (const i of cast) { tokens[i].classList.add('fight'); setHp(i, lifeOf.get(i)); }
     const focus = (p) => {
       const cx = clamp(p[0], 260, 740), cy = clamp(p[1], 260, 740);
       mapIn.style.transform = 'translate(' + (50 - cx / 5).toFixed(2) + '%,' + (50 - cy / 5).toFixed(2) + '%) scale(2)';
@@ -457,6 +518,8 @@ export function runMatch({ data, cat, fx }) {
       const q = [p[0] + dx * k, p[1] + dy * k];
       here.set(i, q); put(i, q);
     };
+    /* ceux qui lancent leur ultime dans cette action */
+    const ulted = new Set(cast.filter((i) => plan.ults[i].used.some(([t]) => t >= when.tau - 400 && t <= when.end)));
     focus(a);
     await nap(620, null, 2);
     if (!stopped(mine) && cast.length > 1) {
@@ -469,7 +532,6 @@ export function runMatch({ data, cat, fx }) {
       }
       await nap(260, null, 2);
       /* les ultimes partent, presque ensemble : un anneau éclate autour de chacun de ceux qui lancent le leur */
-      const ulted = cast.filter((i) => plan.ults[i].used.some(([t]) => t >= when.tau - 400 && t <= when.end));
       for (const i of ulted) {
         if (stopped(mine) || skipSlow) break;
         ring(here.get(i), sideOf(i), true);
@@ -477,7 +539,7 @@ export function runMatch({ data, cat, fx }) {
         sfx.ult();
         await nap(120, null, 2);
       }
-      if (ulted.length) await nap(260, null, 2);
+      if (ulted.size) await nap(260, null, 2);
     }
     const streak = new Map();
     let count = 0;
@@ -488,27 +550,30 @@ export function runMatch({ data, cat, fx }) {
       focus([(vp[0] + here.get(K)[0]) / 4 + a[0] / 2, (vp[1] + here.get(K)[1]) / 4 + a[1] / 2]);
       /* ceux qui l'aident touchent d'abord la victime : sa vie fond */
       const hits = kill[2].filter((h) => here.has(h) && !fallen.has(h)).slice(0, 3);
-      let life = 1;
+      let life = lifeOf.get(V);
       for (const h of hits) {
         orb(here.get(h), vp, sideOf(h), quick ? 140 : 220);
         await nap(quick ? 100 : 190, null, 2);
-        life = Math.max(0.28, life - 0.25);
-        hp(V, life); again(tokens[V], 'hurt');
+        life = Math.max(life * 0.3, life - 0.26);
+        setHp(V, life); again(tokens[V], 'hurt');
       }
-      if (!hits.length) { hp(V, 0.5); again(tokens[V], 'hurt'); await nap(170, null, 2); }
+      if (!hits.length) { setHp(V, life * 0.5); again(tokens[V], 'hurt'); await nap(170, null, 2); }
       /* le tueur fond sur sa cible et l'achève (s'il vient de tomber lui-même, c'est son dernier sort qui s'en charge) */
       if (fallen.has(K)) orb(here.get(K), vp, sideOf(K), quick ? 140 : 220); else step(K, vp, 76, 60);
       await nap(quick ? 150 : 250, null, 2);
       if (stopped(mine)) break;
-      hp(V, 0);
+      setHp(V, 0);
       fallen.add(V);
+      wear();
       ring(vp, sideOf(K), false);
       strike(kill, true, here.get(K), vp);
       const c = (streak.get(K) || 0) + 1;
       streak.set(K, c);
       /* dans la bande du bas, là où rien ne cache l'action : qui élimine qui */
       foot.innerHTML = '<p class="mv-kill s' + sideOf(K) + '"><img src="' + iconUrl(cat, P[K].champ) + '" alt=""><b>' + esc(P[K].name) + '</b>' + icon('i-play')
-        + '<span>' + esc(P[V].name) + '</span><img class="v" src="' + iconUrl(cat, P[V].champ) + '" alt="">' + (c > 1 ? '<em>' + STREAK[Math.min(5, c)] + '</em>' : '') + '</p>';
+        + '<span>' + esc(P[V].name) + '</span><img class="v" src="' + iconUrl(cat, P[V].champ) + '" alt="">'
+        /* un coup en série, ou le nom de l'ultime qu'il vient de lancer */
+        + (c > 1 ? '<em>' + STREAK[Math.min(5, c)] + '</em>' : ulted.has(K) && P[K].ult ? '<em class="r">' + esc(P[K].ult) + '</em>' : '') + '</p>';
       await nap(quick ? 480 : 820, null, 2);
       count++;
     }
@@ -538,7 +603,7 @@ export function runMatch({ data, cat, fx }) {
     score[0] = 0; score[1] = 0;
     setClock(0);
     tau = 0;
-    cursor.fill(0); look.fill('?'); campLook.fill('?'); csLook.fill(-1); ultLook.fill(null); lvLook.fill(0);
+    cursor.fill(0); look.fill('?'); campLook.fill('?'); csLook.fill(-1); ultLook.fill(null); lvLook.fill(0); hpLook.fill(-1); mpLook.fill(-1);
     P.forEach((p, i) => { kda[i] = { k: 0, d: 0, a: 0 }; setDead(i, false); drawKda(i); tokens[i].classList.remove('fight', 'ulting', 'hurt'); });
     banner.classList.remove('done');
     draw(true);
