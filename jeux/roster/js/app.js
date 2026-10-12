@@ -925,16 +925,36 @@ async function viewProfile(main) {
     + '<table class="odds"><thead><tr><th>Rang</th><th>Cartes 1 à ' + (pack.size - 1) + '</th><th>Carte bonus</th></tr></thead><tbody>'
     + [...S.cat.tiers].reverse().map((t) => '<tr style="--tc:var(--t' + t.id + ')"><td>' + esc(t.name) + '</td><td>' + show(pack.odds[t.id - 1]) + '</td><td>' + show(pack.lastOdds[t.id - 1]) + '</td></tr>').join('')
     + '</tbody></table>';
-  box.innerHTML = data.packs.map(table).join('')
+  /* Ce qu'on a de chances de trouver dans un pack, en pourcentage (quand le serveur le dit) : au moins une carte de chaque rang, de chaque
+     version spéciale. C'est ce qui compte pour le joueur ; le détail carte par carte reste dessous, replié. */
+  const part = (x) => (!x ? '—' : frNum(x >= 0.1 ? Math.round(x * 100) : x >= 0.01 ? Math.round(x * 1000) / 10 : x >= 0.001 ? Math.round(x * 10000) / 100 : Math.round(x * 100000) / 1000) + ' %');
+  const cell = (x) => '<td>' + part(x) + (x && x < 0.2 ? '<i>1 sur ' + num(Math.round(1 / x)) + '</i>' : '') + '</td>';
+  const perPack = data.packs.every((p) => p.chances && p.chances.tiers);
+  const line = (label, tc, pick, cls) => (data.packs.some((p) => pick(p.chances) > 0)
+    ? '<tr' + (cls ? ' class="' + cls + '"' : '') + ' style="--tc:' + tc + '"><td>' + label + '</td>' + data.packs.map((p) => cell(pick(p.chances))).join('') + '</tr>' : '');
+  const tierName = (t) => esc(S.cat.tierById.get(t).name);
+  const summary = perPack
+    ? '<table class="odds per-pack"><thead><tr><th>Dans un pack, au moins…</th>' + data.packs.map((p) => '<th>' + (p.price ? 'Booster à crédits' : 'Pack gratuit') + '</th>').join('') + '</tr></thead><tbody>'
+      + [5, 4, 3].map((t) => line('un ' + tierName(t), 'var(--t' + t + ')', (c) => c.tiers[t - 1])).join('')
+      + [3, 4, 5].map((t) => line('un ' + tierName(t) + ' holographique', 'var(--t' + t + ')', (c) => c.holo[t - 1], 'sub')).join('')
+      + [4, 5].map((t) => line('un ' + tierName(t) + ' full art', 'var(--t' + t + ')', (c) => c.full[t - 1], 'sub')).join('')
+      + line('un full art KC', '#4cc3ff', (c) => c.kc, 'sub') + line('une légendaire', '#f0e6d2', (c) => c.legend, 'sub')
+      + '</tbody></table>'
+      + '<p class="hint">Chaque pack est un tirage au hasard, indépendant des précédents : « 1 pack sur 150 » est une moyenne, pas un compteur — on peut en trouver deux de suite, ou aucun pendant longtemps. Plus une carte est forte, plus sa version spéciale est rare.</p>'
+    : '';
+  const byTier = (v) => (Array.isArray(v.byTier) ? S.cat.tiers.filter((t) => v.byTier[t.id - 1] > 0).map((t) => show(v.byTier[t.id - 1]) + ' des ' + esc(t.name)).join(', ') : '');
+  box.innerHTML = summary + (perPack ? '<details class="more odds-more"><summary>Le détail, carte par carte</summary>' : '') + data.packs.map(table).join('')
     + (data.variants || []).map((v) => {
       const from = S.cat.tiers.filter((t) => t.id >= v.minTier).map((t) => t.name);
       /* (les éditions limitées sont annoncées plus bas, avec ce qu'il en reste) */
       /* l'édition légendaire ne remplace pas une carte tirée : elle prend parfois la place de la carte bonus */
       if (v.id === 'legend') return '<p class="hint"><b class="v-legend">' + esc(v.name) + '</b> — la carte bonus est une carte légendaire dans ' + data.packs.map((p) => 'un ' + (p.price ? 'booster à crédits' : 'pack gratuit') + ' sur ' + Math.round(1 / (p.legend || v.pack))).join(', ') + ' (' + v.cards + (v.cards > 1 ? ' cartes' : ' carte') + ').</p>';
       /* l'édition KC ne dépend pas du rang : elle concerne les joueurs et les coachs passés par la Karmine */
-      if (v.id === 'kc') return '<p class="hint"><b class="v-kc">' + esc(v.name) + '</b> — ' + show(v.chance) + ' des cartes des joueurs et des coachs passés par la Karmine Corp (' + v.cards + ' cartes) sortent dans cette édition.</p>';
+      if (v.id === 'kc') return '<p class="hint"><b class="v-kc">' + esc(v.name) + '</b> — ' + (byTier(v) || show(v.chance)) + ' passés par la Karmine Corp (' + v.cards + ' cartes) sortent dans cette édition.</p>';
+      if (byTier(v)) return '<p class="hint"><b class="v-' + esc(v.id) + '">' + esc(v.name) + '</b> — ' + byTier(v) + ' sortent dans cette version.</p>';
       return '<p class="hint"><b class="v-' + esc(v.id) + '">' + esc(v.name) + '</b> — ' + show(v.chance) + ' des cartes ' + esc(from.slice(0, -1).join(', ') + (from.length > 1 ? ' et ' : '') + from[from.length - 1]) + ' sortent dans cette version.</p>';
     }).join('')
+    + (perPack ? '</details>' : '')
     + (data.limited || []).map((l) => {
       const card = S.cat.cardById.get(l.card);
       return card ? '<p class="hint"><b class="v-ceo">' + esc(card.name) + (card.edition === 'ceo' ? ' « MY CEO »' : '') + '</b> — édition limitée à ' + l.cap + ' exemplaires numérotés : ' + (l.minted >= l.cap ? 'tous sont sortis.' : l.minted + ' déjà sortis. Elle prend la place de la carte bonus dans '
