@@ -6,10 +6,11 @@ import { GAME_NAME, ROLE_NAME, ROLE_ORDER, STORE } from './config.js';
 import { createDuels } from './duel.js';
 import { sellCard, showOnMarket, viewMarket } from './market.js';
 import { packHTML, runOpening } from './opening.js';
-import { musicOn, setMusic, startMusic } from './music.js';
+import { musicOn, startMusic } from './music.js';
 import { viewPlay } from './play.js';
 import { viewSocial } from './social.js';
-import { setSound, sfx, soundOn } from './sound.js';
+import { sfx } from './sound.js';
+import { toggleVolume } from './volume.js';
 import { inspectCard } from './inspect.js';
 import { confirmSheet, num } from './ui.js';
 import { viewWorlds } from './worlds.js';
@@ -292,8 +293,8 @@ function shell() {
   app.innerHTML = '<header class="top' + (S.live ? ' wide' : '') + '"><a class="brand" href="#/packs"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#mark"/></svg>' + esc(GAME_NAME) + '<small>saison ' + S.cat.season + '</small></a>'
     + '<nav class="nav">' + tabs().map((t) => '<a href="#/' + t[0] + '" data-tab="' + t[0] + '">' + t[1] + pip(t[0]) + '</a>').join('') + '</nav>'
     + '<span class="spacer"></span><a class="online" id="online" href="#/joueurs" hidden><i></i><b>1</b><span>en ligne</span></a>'
-    /* la musique de fond : un bouton pour la couper ou la remettre */
-    + '<button class="tune' + (musicOn() ? '' : ' off') + '" type="button" id="tune" aria-pressed="' + musicOn() + '" title="Musique de fond" aria-label="Couper ou remettre la musique de fond">' + icon('i-note') + '</button>'
+    /* le son : ce bouton ouvre le réglage du volume (musique de fond, effets) ; il est barré quand la musique est coupée */
+    + '<button class="tune' + (musicOn() ? '' : ' off') + '" type="button" id="tune" aria-haspopup="dialog" title="Réglage du son" aria-label="Régler le son : musique de fond et effets">' + icon('i-note') + '</button>'
     + '<a class="purse" href="#/' + (S.live ? 'marche' : 'jouer') + '" title="Tes crédits : gagnés en jouant, dépensés au marché">' + icon('i-coin') + '<b id="credits">' + S.player.coins + '</b></a>'
     + '<a class="who" href="#/profil">' + icon('i-user') + '<b>' + esc(S.player.name) + '</b></a></header>'
     + '<main class="main" id="main"></main>'
@@ -337,12 +338,10 @@ function route() {
 window.addEventListener('hashchange', route);
 /* la musique de fond part au premier geste du joueur (un navigateur ne laisse rien jouer avant) ; son bouton la coupe ou la remet */
 for (const kind of ['pointerdown', 'keydown']) document.addEventListener(kind, () => startMusic(), { passive: true });
+const syncTune = () => { const b = document.getElementById('tune'); if (b) b.classList.toggle('off', !musicOn()); };
 document.addEventListener('click', (e) => {
   const b = e.target.closest('#tune');
-  if (!b) return;
-  setMusic(!musicOn());
-  b.classList.toggle('off', !musicOn());
-  b.setAttribute('aria-pressed', String(musicOn()));
+  if (b) toggleVolume(b, syncTune);
 });
 
 /* ---------- carte cliquable ---------- */
@@ -836,7 +835,7 @@ async function viewProfile(main) {
       + '<input class="inp team-tag" name="tag" maxlength="4" placeholder="' + esc(p.team.short) + '" value="' + (p.team.custom ? esc(p.team.short) : '') + '" autocomplete="off" aria-label="Sigle"><button class="btn" type="submit">Renommer</button></div>'
       + '<p class="hint">Le nom (3 à 24 caractères) et le sigle (2 à 4 lettres) sous lesquels ton équipe joue ses matchs, ses défis et le Mondial. Vide : elle porte ton pseudo.</p><p class="form-error" role="alert"></p></form>' : '')
     + '<div class="switch"><span>Animations</span><button type="button" id="fxSwitch" aria-pressed="' + S.fx + '" aria-label="Animations"></button></div>'
-    + '<div class="switch"><span>Sons</span><button type="button" id="soundSwitch" aria-pressed="' + soundOn() + '" aria-label="Sons"></button></div>'
+    + '<div class="switch setting"><span>Son<small>musique de fond et effets</small></span><button class="btn" type="button" id="volBtn" aria-haspopup="dialog">Régler le volume</button></div>'
     + '<div class="actions"><button class="btn" type="button" id="logout">Se déconnecter</button><button class="btn danger" type="button" id="askDelete">Supprimer mon compte</button></div>'
     + '<form id="deleteForm" hidden style="display:grid;gap:10px"><p class="hint">Ton compte et toutes tes cartes seront effacés pour de bon. Tape ton mot de passe pour confirmer.</p>'
     + '<input class="inp" name="password" type="password" autocomplete="current-password" placeholder="Mot de passe" required><p class="form-error" role="alert"></p>'
@@ -855,11 +854,7 @@ async function viewProfile(main) {
     document.body.classList.toggle('fx', S.fx);
     try { localStorage.setItem(STORE + 'fx', S.fx ? '1' : '0'); } catch (err) { /* réglage non gardé */ }
   });
-  $('#soundSwitch').addEventListener('click', (e) => {
-    setSound(!soundOn());
-    e.currentTarget.setAttribute('aria-pressed', String(soundOn()));
-    sfx.click();
-  });
+  $('#volBtn').addEventListener('click', (e) => { sfx.click(); toggleVolume(e.currentTarget, syncTune); });
   $('#logout').addEventListener('click', async () => {
     try { await call('POST', '/api/logout'); } catch (err) { /* la connexion sera de toute façon oubliée ici */ }
     clearSession();

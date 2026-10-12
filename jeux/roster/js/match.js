@@ -7,7 +7,8 @@ import { createFx } from './fx.js';
 import { KITS, RESOURCES, SPELLS, SPELL_DEFAULT, SPELL_PICKS } from './kits.js';
 import { CAMPS, KILL_GAP, NEXUS, NEXUS_TOWERS, PIT, SHOW_LEAD, STRUCT, TRAILS, planMoves, sample } from './moves.js';
 import { ROLES, signed } from './rules.js';
-import { setSound, sfx, soundOn } from './sound.js';
+import { sfx, soundOn } from './sound.js';
+import { closeVolume, toggleVolume } from './volume.js';
 
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 const clockText = (sec) => Math.floor(sec / 60) + ':' + String(Math.floor(sec % 60)).padStart(2, '0');
@@ -125,7 +126,7 @@ export function runMatch({ data, cat, fx }) {
     + '<div class="mv-cast"><div class="mv-talk" aria-live="polite"><article class="mv-now"></article><div class="mv-past"></div></div><aside class="mv-social"></aside></div>'
     + '<footer class="mv-ctrl"><button class="op-icon" type="button" data-act="pause" aria-label="Pause ou reprise"></button>'
     + '<div class="mv-speed" role="group" aria-label="Vitesse">' + [1, 2, 4].map((v) => '<button type="button" data-speed="' + v + '">×' + v + '</button>').join('') + '</div>'
-    + '<span class="spacer"></span><button class="op-icon" type="button" data-act="sound" aria-label="Couper ou remettre le son"></button>'
+    + '<span class="spacer"></span><button class="op-icon" type="button" data-act="sound" aria-haspopup="dialog" aria-label="Régler le son"></button>'
     + '<button class="btn" type="button" data-act="skip">Passer</button></footer></section>'
     + '<section class="mv-end"></section>';
   const $ = (sel) => root.querySelector(sel);
@@ -783,7 +784,7 @@ export function runMatch({ data, cat, fx }) {
     const a = e.target.closest('[data-act]');
     if (a) {
       const what = a.dataset.act;
-      if (what === 'sound') { setSound(!soundOn()); drawCtrl(); sfx.click(); }
+      if (what === 'sound') toggleVolume(a, drawCtrl);
       else if (what === 'pause') { paused = !paused; drawCtrl(); }
       else if (what === 'skip') { skipped = true; if (!playing) { finalState(); showEnd(); } }
       else if (what === 'start') { if (fx) { playGame(); } else { finalState(); showEnd(); } }
@@ -800,6 +801,7 @@ export function runMatch({ data, cat, fx }) {
   }
   function close() {
     closed = true;
+    closeVolume();
     document.removeEventListener('keydown', onKey);
     particles.destroy();
     root.remove();

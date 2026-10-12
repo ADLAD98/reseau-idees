@@ -14,7 +14,9 @@ import { VARIANTS, cardHTML, esc, flagUrl, photoUrl, tiltCard, variantRank } fro
 import { createFx } from './fx.js';
 import { inspectCard } from './inspect.js';
 import { TEAR_Y, packBackHTML, packSplitHTML, shapeBack, shapeBody, tearPoints } from './pack.js';
-import { setSound, sfx, soundOn } from './sound.js';
+import { musicScale } from './music.js';
+import { sfx, soundOn } from './sound.js';
+import { closeVolume, toggleVolume } from './volume.js';
 
 export { packHTML } from './pack.js';
 
@@ -70,7 +72,7 @@ export async function runOpening({ request, getCat, fx, size, from, look, quick 
   op.dataset.stage = 'enter';
   op.innerHTML = '<canvas class="op-fx"></canvas>'
     + '<header class="op-head"><h2>Ouverture du pack</h2><span class="spacer"></span>'
-    + '<button class="op-icon" type="button" data-act="sound" aria-label="Couper ou remettre le son"></button>'
+    + '<button class="op-icon" type="button" data-act="sound" aria-haspopup="dialog" aria-label="Régler le son"></button>'
     + '<button class="btn" type="button" data-act="skip">Passer</button></header>'
     + '<div class="op-stage"><div class="op-tray" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>'
     + '<div class="op-item op-back">' + packBackHTML(look) + '</div>'
@@ -220,6 +222,7 @@ export async function runOpening({ request, getCat, fx, size, from, look, quick 
 
   function close() {
     closed = true;
+    closeVolume();
     gen++;
     clearInterval(omenTimer);
     if (endApo) endApo();
@@ -537,9 +540,11 @@ export async function runOpening({ request, getCat, fx, size, from, look, quick 
     op.appendChild(tile);
     const frame = tile.firstChild;
     const tell = (func, args) => { try { frame.contentWindow.postMessage(JSON.stringify({ event: 'command', func, args: args || [], id: 'song', channel: 'widget' }), YT); } catch (e) { /* lecteur pas encore prêt */ } };
-    const wake = () => { try { frame.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 'song', channel: 'widget' }), YT); } catch (e) { /* idem */ } tell('setVolume', [def.volume]); tell('unMute'); tell('playVideo'); };
+    /* son volume suit le réglage de la musique du joueur */
+    const vol = () => Math.round(Math.min(100, Math.max(3, def.volume * musicScale())));
+    const wake = () => { try { frame.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 'song', channel: 'widget' }), YT); } catch (e) { /* idem */ } tell('setVolume', [vol()]); tell('unMute'); tell('playVideo'); };
     frame.addEventListener('load', () => { wake(); [500, 1200, 2400].forEach((ms) => setTimeout(() => { if (song && song.tile === tile) wake(); }, ms)); });
-    song = { tile, tell, volume: def.volume, timer: setTimeout(() => stopSong(), (def.end - def.start + 4) * 1000) };
+    song = { tile, tell, vol, volume: vol(), timer: setTimeout(() => stopSong(), (def.end - def.start + 4) * 1000) };
   }
   /** Coupe la musique : en fondu, ou tout de suite. */
   function stopSong(now) {
@@ -792,7 +797,14 @@ export async function runOpening({ request, getCat, fx, size, from, look, quick 
   /* ---------- gestes ---------- */
   function onClick(e) {
     const act = e.target.closest('[data-act]');
-    if (act && act.dataset.act === 'sound') { setSound(!soundOn()); drawSound(); sfx.click(); if (!soundOn()) stopSong(true); return; }
+    if (act && act.dataset.act === 'sound') {
+      toggleVolume(soundBtn, () => {
+        drawSound();
+        if (!soundOn()) stopSong(true);
+        else if (song) { song.volume = song.vol(); song.tell('setVolume', [song.volume]); }
+      });
+      return;
+    }
     if (act && act.dataset.act === 'skip') { skip(); return; }
     const go = e.target.closest('[data-go]');
     if (go) { if (leave && op.dataset.stage === 'done') { goTo = go.dataset.go; leave(); } return; }

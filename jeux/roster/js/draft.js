@@ -5,7 +5,8 @@ import { ApiError } from './api.js';
 import { esc, iconUrl, photoUrl } from './cards.js';
 import { ROLE_LABEL, STORE } from './config.js';
 import { CLASS_NAME, DAMAGE_NAME, ORDER, PHASES, ROLES, compState, pickValue, played, signed } from './rules.js';
-import { setSound, sfx, soundOn } from './sound.js';
+import { sfx, soundOn } from './sound.js';
+import { closeVolume, toggleVolume } from './volume.js';
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const icon = (id) => '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#' + id + '"/></svg>';
@@ -78,7 +79,7 @@ export function runDraft({ match, cat, fx, act, resync, toast, help, head, live,
     + (head ? '<span class="dr-series">' + esc(head) + '</span>' : '')
     + '<div class="dr-phase"><span class="dr-step"></span><span class="dr-titlerow"><b class="dr-title" aria-live="polite"></b><span class="dr-timer" hidden></span></span></div>'
     + '<button class="op-icon" type="button" data-act="help" aria-label="Comment gagner la draft">?</button>'
-    + '<button class="op-icon" type="button" data-act="sound" aria-label="Couper ou remettre le son"></button></header>'
+    + '<button class="op-icon" type="button" data-act="sound" aria-haspopup="dialog" aria-label="Régler le son"></button></header>'
     + '<div class="dr-track" aria-hidden="true">' + ORDER.map((o, k) => '<i class="s' + o.side + ' ' + o.type + (PHASES.some((p) => p[0] === k && k) ? ' gap' : '') + '"></i>').join('') + '</div>'
     + '<div class="dr-body">' + teamHTML(0)
     + '<section class="dr-pool"><div class="dr-tools"><div class="dr-roles"></div><input class="inp dr-q" type="search" placeholder="Chercher…" autocomplete="off" aria-label="Chercher un champion"></div>'
@@ -397,7 +398,7 @@ export function runDraft({ match, cat, fx, act, resync, toast, help, head, live,
     const a = e.target.closest('[data-act]');
     if (a) {
       const what = a.dataset.act;
-      if (what === 'sound') { setSound(!soundOn()); drawSound(); sfx.click(); }
+      if (what === 'sound') toggleVolume(soundBtn, drawSound);
       else if (what === 'help') { $('.dr-help').hidden = !$('.dr-help').hidden; }
       else if (what === 'leave') {
         if (confirmLeave) { confirmLeave().then((yes) => { if (yes && alive) { close(); settle({ left: true }); } }); return; }
@@ -435,6 +436,7 @@ export function runDraft({ match, cat, fx, act, resync, toast, help, head, live,
   const scroll = document.body.style.overflow;
   function close() {
     alive = false;
+    closeVolume();
     clearInterval(pollTimer);
     clearInterval(clockTimer);
     clearTimeout(autoTimer);

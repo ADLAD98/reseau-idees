@@ -75,6 +75,24 @@ h1,h2,h3,p{margin:0}
 .tune svg{width:19px;height:19px}
 .tune.off{color:var(--faint)}
 .tune.off::after{content:"";position:absolute;left:7px;right:7px;top:50%;height:1.5px;background:currentColor;transform:rotate(-38deg)}
+.tune.open{color:var(--gold-hi)}
+/* le réglage du son : un petit panneau, deux curseurs (musique, effets) */
+.vol{position:fixed;z-index:200;display:grid;gap:16px;padding:16px 16px 18px;border:1px solid var(--gold-lo);background:linear-gradient(#0b1626,#060d18);box-shadow:0 14px 40px rgba(0,0,0,.7);animation:fade .15s}
+.vol-row{display:grid;grid-template-columns:30px 1fr auto;align-items:center;gap:4px 10px}
+.vol-row>button{display:grid;place-items:center;width:30px;height:30px;padding:0;border:1px solid var(--line2);background:#050d18;color:var(--gold);cursor:pointer}
+.vol-row>button:hover{color:var(--gold-hi);border-color:var(--gold-lo)}
+.vol-row>button svg{width:17px;height:17px}
+.vol-row>span{font:600 12.5px/1 var(--text);letter-spacing:.12em;text-transform:uppercase;color:var(--ink)}
+.vol-row>output{min-width:44px;text-align:right;font:600 13px/1 var(--text);color:var(--gold-hi);font-variant-numeric:tabular-nums}
+.vol-row>input{grid-column:1/-1;width:100%;height:26px;margin:0;background:none;cursor:pointer;-webkit-appearance:none;appearance:none;touch-action:pan-y}
+.vol-row>input::-webkit-slider-runnable-track{height:4px;background:linear-gradient(90deg,var(--gold) var(--v,50%),#26303f var(--v,50%))}
+.vol-row>input::-moz-range-track{height:4px;background:linear-gradient(90deg,var(--gold) var(--v,50%),#26303f var(--v,50%))}
+.vol-row>input::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;margin-top:-6px;border:1px solid var(--gold-hi);background:#0b1626;transform:rotate(45deg);box-shadow:0 0 10px rgba(200,170,110,.45)}
+.vol-row>input::-moz-range-thumb{width:14px;height:14px;border:1px solid var(--gold-hi);border-radius:0;background:#0b1626;transform:rotate(45deg);box-shadow:0 0 10px rgba(200,170,110,.45)}
+.vol-row>input:focus-visible{outline:1px solid var(--blue);outline-offset:3px}
+.vol-row.off>span,.vol-row.off>output{color:var(--faint)}
+.vol-row.off>button{color:var(--faint)}
+.vol-row.off>input{opacity:.45}
 .who{display:flex;align-items:center;gap:9px;color:var(--mut);text-decoration:none;font:600 15px/1 var(--text)}
 .who svg{color:var(--gold)}
 .who:hover{color:var(--gold-hi)}
@@ -754,6 +772,11 @@ body.fx .card.e-ceo .card-front .card-frame::after{animation:spin 5s linear infi
 .switch button::after{content:"";position:absolute;top:4px;left:4px;width:16px;height:16px;background:var(--faint);transition:transform .15s,background .15s}
 .switch button[aria-pressed="true"]{border-color:var(--blue)}
 .switch button[aria-pressed="true"]::after{transform:translateX(22px);background:var(--blue);box-shadow:0 0 10px var(--blue)}
+/* un réglage qui s'ouvre d'un bouton (le son) */
+.setting>span{display:flex;flex-direction:column;gap:5px}
+.setting small{font-size:12.5px;color:var(--faint)}
+.switch.setting .btn{position:static;width:auto;height:36px;padding:0 16px;font-size:13px}
+.switch.setting .btn::after{content:none}
 .actions{display:flex;flex-wrap:wrap;gap:12px}
 
 /* ---------- messages ---------- */

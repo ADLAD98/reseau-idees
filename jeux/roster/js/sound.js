@@ -2,14 +2,35 @@
    Le son se coupe d'un bouton ; le choix est gardé dans ce navigateur. */
 import { STORE } from './config.js';
 
-let ctx = null, out = null, noiseBuf = null, on = true;
-try { on = localStorage.getItem(STORE + 'son') !== '0'; } catch (e) { on = true; }
+/* le curseur du joueur va de 0 à 1 (volume.js) ; le volume réel suit son carré, l'oreille entendant en proportion (0,7 : le réglage d'origine) */
+const DEFAULT = 0.7;
+let ctx = null, out = null, noiseBuf = null, on = true, level = DEFAULT;
+try {
+  on = localStorage.getItem(STORE + 'son') !== '0';
+  const saved = localStorage.getItem(STORE + 'volume-sons');
+  if (saved !== null && Number(saved) >= 0 && Number(saved) <= 100) level = Number(saved) / 100;
+} catch (e) { on = true; }
+if (level <= 0) on = false;
+const loud = () => (on ? level * level : 0);
+function save() {
+  try { localStorage.setItem(STORE + 'son', on ? '1' : '0'); localStorage.setItem(STORE + 'volume-sons', String(Math.round(level * 100))); } catch (e) { /* réglage non gardé */ }
+}
 
 export const soundOn = () => on;
+/** Le réglage du joueur, de 0 à 1 (gardé même quand le son est coupé). */
+export const soundLevel = () => level;
 export function setSound(value) {
   on = !!value;
-  try { localStorage.setItem(STORE + 'son', on ? '1' : '0'); } catch (e) { /* réglage non gardé */ }
-  if (out) out.gain.value = on ? 0.5 : 0;
+  if (on && level <= 0) level = DEFAULT;
+  save();
+  if (out) out.gain.value = loud();
+}
+/** Règle le volume des effets, de 0 à 1 : à zéro ils sont coupés. */
+export function setSoundLevel(value) {
+  level = Math.min(1, Math.max(0, Number(value) || 0));
+  on = level > 0;
+  save();
+  if (out) out.gain.value = loud();
 }
 
 /* Le navigateur n'autorise le son qu'après un geste du joueur : tout est créé au premier son demandé. */
@@ -20,7 +41,7 @@ function audio() {
     if (!AC) return null;
     ctx = new AC();
     out = ctx.createGain();
-    out.gain.value = 0.5;
+    out.gain.value = loud();
     out.connect(ctx.destination);
     /* un écho court et discret, pour donner de l'air aux notes (très peu de retour : des sons qui s'enchaînent ne s'empilent pas) */
     const delay = ctx.createDelay(0.5), back = ctx.createGain(), wet = ctx.createGain();
