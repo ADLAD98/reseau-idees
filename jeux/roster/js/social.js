@@ -85,8 +85,11 @@ function friendsHTML() {
     + '<span class="soc-acts"><button class="btn primary" type="button" data-answer="' + r.id + '" data-yes="1">Accepter</button><button class="btn" type="button" data-answer="' + r.id + '">Refuser</button></span></div>';
   const sent = (r) => '<div class="soc-row"><i class="soc-av"><span>' + initial(r.name) + '</span></i><span class="soc-who"><b>' + esc(r.name) + '</b><i>demande envoyée ' + since(now - r.at) + '</i></span>'
     + '<span class="soc-acts"><button class="btn" type="button" data-remove="' + r.id + '">Annuler</button></span></div>';
-  const duel = (d) => '<div class="hist-row ' + (d.won ? 'win' : 'lose') + '"><b>' + (d.won ? 'Victoire' : 'Défaite') + '</b><span class="hist-foe">contre ' + esc(d.foe) + (d.bot ? ' (son équipe, dirigée par l\'ordinateur)' : '') + '</span>'
-    + '<span class="hist-score">' + (d.format > 1 ? 'BO' + d.format + ' · ' : '') + d.wins[0] + ' – ' + d.wins[1] + (d.forfeit ? ' · forfait' : '') + '</span><span class="hist-coins">+' + d.coins + '</span><span></span></div>';
+  /* (mode : une partie rapide ou classée figure ici aussi, sous son nom ; lp : les points de ligue qu'elle a déplacés) */
+  const duel = (d) => '<div class="hist-row ' + (d.won ? 'win' : 'lose') + '"><b>' + (d.won ? 'Victoire' : 'Défaite') + '</b><span class="hist-foe">' + (d.mode === 'quick' ? 'Partie rapide · ' : d.mode === 'ranked' ? 'Classé · ' : '')
+    + 'contre ' + esc(d.foe) + (d.bot ? ' (son équipe, dirigée par l\'ordinateur)' : '') + '</span>'
+    + '<span class="hist-score">' + (d.format > 1 ? 'BO' + d.format + ' · ' : '') + d.wins[0] + ' – ' + d.wins[1] + (d.forfeit ? ' · forfait' : '')
+    + (typeof d.lp === 'number' ? ' · ' + (d.lp < 0 ? '−' : '+') + Math.abs(d.lp) + ' points de ligue' : '') + '</span><span class="hist-coins">+' + d.coins + '</span><span></span></div>';
   return '<form class="soc-add" id="addFriend" novalidate><div class="soc-add-in"><input class="inp" name="name" placeholder="Pseudo d\'un joueur" maxlength="16" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Pseudo du joueur à ajouter">'
     + '<div class="soc-suggest" id="suggest" hidden></div></div><button class="btn primary" type="submit">Ajouter en ami</button></form>'
     + (F.requests.length ? '<section><h2 class="h2">Demandes reçues</h2><div class="soc-list">' + F.requests.map(ask).join('') + '</div></section>' : '')

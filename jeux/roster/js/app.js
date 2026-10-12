@@ -6,6 +6,7 @@ import { GAME_NAME, ROLE_LABEL, ROLE_NAME, ROLE_ORDER, STORE } from './config.js
 import { dailyLook, drawDaily, loadDaily } from './daily.js';
 import { createDuels } from './duel.js';
 import { sellCard, showOnMarket, viewMarket } from './market.js';
+import { queueText } from './online.js';
 import { packHTML, runOpening } from './opening.js';
 import { musicOn, startMusic } from './music.js';
 import { viewPlay } from './play.js';
@@ -181,7 +182,10 @@ function drawPulse() {
   chip.hidden = false;
   chip.querySelector('b').textContent = p.online;
   chip.title = p.online > 1 ? p.online + ' joueurs en ligne' : 'Tu es seul en ligne pour l\'instant';
-  const pips = { joueurs: p.inbox.friends + p.inbox.trades + p.inbox.duels.length, marche: p.inbox.sales };
+  /* (sur l'onglet Jouer : les joueurs qui cherchent une partie classée en ce moment) */
+  const pips = { joueurs: p.inbox.friends + p.inbox.trades + p.inbox.duels.length, marche: p.inbox.sales, jouer: p.ranked ? p.ranked.waiting : 0 };
+  const waitLine = document.getElementById('rankedWait');
+  if (waitLine && p.ranked) waitLine.textContent = queueText(p.ranked.waiting);
   document.querySelectorAll('[data-pip]').forEach((el) => { const n = pips[el.dataset.pip] || 0; el.textContent = n ? String(n) : ''; el.hidden = !n; });
   /* un défi en cours que le joueur a quitté : un bandeau pour y revenir */
   let bar = document.getElementById('duelBar');

@@ -5,6 +5,7 @@ import { cardHTML, esc, flagUrl, logoHTML } from './cards.js';
 import { ROLE_LABEL, ROLE_NAME } from './config.js';
 import { runDraft } from './draft.js';
 import { runMatch } from './match.js';
+import { bindOnline, onlineHTML } from './online.js';
 import { winChance } from './rules.js';
 import { worldsBanner } from './worlds.js';
 
@@ -76,12 +77,15 @@ function draw(main) {
     + '<li><b>Coach</b> — +' + R.coach + ' à chaque joueur de son club. Sa propre note compte pour 8 % de la note d\'équipe.</li>'
     + '<li>Un joueur ne gagne jamais plus de ' + R.max + ' points. Un poste laissé vide est tenu par un remplaçant noté ' + R.sub + '.</li>'
     + '</ul></details></section>'
+    /* les parties en ligne : rapide, classée (rien si le serveur ne les propose pas) */
+    + onlineHTML(G)
     + '<section><h2 class="h2">Adversaires</h2><div class="foe-bar"><div class="pills" id="leagues">'
     + [['', 'Toutes']].concat(cat.leagues.map((l) => [l.id, l.name])).map((l) => '<button type="button" data-league="' + l[0] + '"' + ((S.playLeague || '') === l[0] ? ' class="on"' : '') + '>' + esc(l[1]) + '</button>').join('')
     + '</div><span class="count">La première victoire contre une équipe rapporte un pack.</span></div><div class="foes" id="foes"></div></section>'
     + '<section><h2 class="h2">Dernières parties</h2>' + (P.history.length ? '<div class="hist">' + P.history.map(histHTML).join('') + '</div>'
       : '<p class="empty">Aucune partie jouée. Choisis un adversaire ci-dessus.</p>') + '</section>';
   drawFoes();
+  bindOnline(main);
 
   main.querySelectorAll('[data-slot]').forEach((b) => b.addEventListener('click', () => pickSlot(b.dataset.slot)));
   $('#auto').addEventListener('click', async (e) => {

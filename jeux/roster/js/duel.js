@@ -21,13 +21,21 @@ export function createDuels(ctx) {
 
   /* ce que la draft attend du serveur : le match, la partie si elle vient d'être jouée ; over : le défi s'est arrêté (l'adversaire a quitté) */
   const forfeited = (d) => !!(d && d.status !== 'live' && d.result && d.result.forfeit);
+  /* en partie classée : les points de ligue gagnés ou perdus, et le rang où cela mène */
+  const lpHTML = (r) => (typeof r.lp === 'number' ? '<div class="prize lp' + (r.lp < 0 ? ' down' : '') + '"><span>Points de ligue</span><b>' + (r.lp > 0 ? '+' : r.lp < 0 ? '−' : '') + Math.abs(r.lp) + '</b>'
+    + (r.rank ? '<i>' + esc(r.rank.label) + (r.rank.next ? ' · ' + r.rank.points + ' / ' + r.rank.next + ' points' : '') + '</i>' : '') + '</div>' : '');
   const shape = (d) => Object.assign({ match: d.match, deadline: d.deadline, away: d.away, forfeitAt: d.forfeitAt, duel: d, over: forfeited(d) }, d.last ? { sim: d.last.sim, report: d.last.report } : {});
   const headOf = (d) => {
     const sv = d.series;
+    /* (une partie rapide se joue contre l'équipe d'un joueur, dirigée par l'ordinateur ; une partie classée, contre le joueur lui-même) */
+    if (d.mode === 'quick') return 'Partie rapide · contre l\'équipe de ' + d.foe.name;
+    if (d.mode === 'ranked') return 'Partie classée · contre ' + d.foe.name;
     return (d.format > 1 ? 'BO' + d.format + (d.fearless ? ' fearless' : '') + ' · manche ' + sv.game + ' · ' + sv.wins[0] + ' – ' + sv.wins[1] : 'Défi en une partie') + ' · contre ' + d.foe.name;
   };
   /* quitter un défi en direct, c'est l'abandonner : on le fait confirmer */
-  const confirmQuit = (d) => confirmSheet('Abandonner le défi ?', 'Si tu quittes maintenant, tu perds par forfait : ' + d.foe.name + ' remporte le défi et sa récompense.', 'Abandonner', { danger: true });
+  const confirmQuit = (d) => (d.mode === 'ranked'
+    ? confirmSheet('Abandonner la partie classée ?', 'Si tu quittes maintenant, tu perds par forfait : ' + d.foe.name + ' l\'emporte, et tu perds les points de ligue d\'une défaite.', 'Abandonner', { danger: true })
+    : confirmSheet('Abandonner le défi ?', 'Si tu quittes maintenant, tu perds par forfait : ' + d.foe.name + ' remporte le défi et sa récompense.', 'Abandonner', { danger: true }));
   /** Le défi s'est terminé par un abandon : on l'annonce. */
   function forfeitSheet(d) {
     const r = d.result;
@@ -35,6 +43,7 @@ export function createDuels(ctx) {
       const s = openSheet(sheetTitle(r.won ? 'Victoire par forfait' : 'Défaite par forfait', (d.format > 1 ? 'BO' + d.format + ' · ' + d.series.wins[0] + ' – ' + d.series.wins[1] + ' · ' : '') + 'contre ' + esc(d.foe.name))
         + '<p class="lead">' + (r.won ? esc(d.foe.name) + ' a quitté le défi : la victoire te revient.' : 'Tu as quitté le défi : la victoire revient à ' + esc(d.foe.name) + '.') + '</p>'
         + (r.won ? '<div class="prize"><span>Récompense du défi</span><b>+' + num(r.coins) + ' crédits</b>' + (r.reduced ? '<i>Plus de trois défis aujourd\'hui contre ce joueur : gain réduit.</i>' : '') + '</div>' : '')
+        + lpHTML(r)
         + '<div class="actions"><button class="btn primary big" type="button" data-ok>Continuer</button></div>', { cls: 'small duel-wait', label: 'Défi terminé', onClose: resolve });
       s.box.querySelector('[data-ok]').addEventListener('click', () => s.close());
       if (r.won) sfx.turn();
@@ -70,6 +79,41 @@ export function createDuels(ctx) {
     if (S.busy) return;
     const res = await guard(() => call('POST', '/api/duel/bot', { to: friend.id, format, fearless: !!fearless }));
     if (res) runSeries(res.duel);
+  }
+
+  /** Partie rapide : le serveur choisit l'équipe d'un autre joueur, d'un niveau voisin du mien ; l'ordinateur la dirige. */
+  async function quick() {
+    if (S.busy) return;
+    const res = await guard(() => call('POST', '/api/quick'));
+    if (res) runSeries(res.duel);
+  }
+
+  /** Partie classée : on entre dans la file ; dès que le serveur a trouvé un adversaire de rang voisin, la partie commence. */
+  async function ranked() {
+    if (S.busy || asking) return;
+    let res = await guard(() => call('POST', '/api/ranked/queue'));
+    if (!res) return;
+    if (res.duel) { resume(res.duel); return; }
+    let over = false;
+    const since = Date.now(), R = S.player.ranked;
+    const s = openSheet(sheetTitle('Recherche d\'une partie', 'Classé' + (R ? ' · ' + esc(R.rank.label) : ''))
+      + '<p class="lead">En attente d\'un adversaire… <b class="num" id="rqTime">0:00</b></p><div class="spin"></div><p class="note" id="rqLine"></p>'
+      + '<div class="actions"><button class="btn" type="button" data-cancel>Quitter la file</button></div>',
+      { cls: 'small duel-wait', label: 'File du classé', keep: true, onClose: () => { over = true; asking = null; clearInterval(clock); } });
+    asking = s;
+    const time = s.box.querySelector('#rqTime'), line = s.box.querySelector('#rqLine');
+    const clock = setInterval(() => { time.textContent = countdown(Date.now() - since); }, 500);
+    s.box.querySelector('[data-cancel]').addEventListener('click', async () => {
+      s.close();
+      try { await call('POST', '/api/ranked/leave'); } catch (e) { /* la file m'oubliera d'elle-même en quelques secondes */ }
+    });
+    while (!over) {
+      line.textContent = (res.waiting ? (res.waiting > 1 ? res.waiting + ' autres joueurs sont' : 'Un autre joueur est') + ' dans la file.' : 'Personne d\'autre dans la file pour l\'instant.') + ' Plus l\'attente dure, plus la recherche s\'élargit aux rangs voisins.';
+      await wait(POLL);
+      if (over) return;
+      try { res = await call('POST', '/api/ranked/queue'); } catch (e) { if (e instanceof ApiError && e.status === 401) { s.close(); ctx.expired(); return; } continue; }
+      if (res.duel) { s.close(); sfx.turn(); resume(res.duel); return; }
+    }
   }
 
   /** Une invitation vient d'arriver : on la propose au joueur (une seule fois, et jamais au milieu d'une partie). */
@@ -117,10 +161,12 @@ export function createDuels(ctx) {
     const sv = d.series, label = d.format > 1 ? 'BO' + d.format : 'Défi';
     if (sv.phase === 'done') {
       const r = d.result || { won: sv.wins[0] > sv.wins[1], coins: 0 };
+      /* une partie rapide ou classée : une seule manche, sa récompense, et en classé les points de ligue */
+      const online = d.mode === 'quick' ? 'Partie rapide' : d.mode === 'ranked' ? 'Partie classée' : '';
       return {
-        won: r.won, title: r.won ? 'Victoire' : 'Défaite', sub: label + ' ' + (r.won ? 'remporté' : 'perdu') + ' ' + sv.wins[0] + ' – ' + sv.wins[1],
-        html: '<div class="prize"><span>' + (r.won ? 'Récompense du défi' : 'Lot de consolation') + '</span><b>+' + num(r.coins) + ' crédits</b>'
-          + (r.reduced ? '<i>Plus de trois défis aujourd\'hui contre ce joueur : gain réduit.</i>' : d.bot ? '<i>Équipe dirigée par l\'ordinateur : moitié moins qu\'en direct.</i>' : '') + '</div>',
+        won: r.won, title: r.won ? 'Victoire' : 'Défaite', sub: online ? online + (r.won ? ' gagnée' : ' perdue') + ' contre ' + (d.mode === 'quick' ? 'l\'équipe de ' : '') + d.foe.name : label + ' ' + (r.won ? 'remporté' : 'perdu') + ' ' + sv.wins[0] + ' – ' + sv.wins[1],
+        html: '<div class="prize"><span>' + (r.won ? (online ? 'Récompense' : 'Récompense du défi') : 'Lot de consolation') + '</span><b>+' + num(r.coins) + ' crédits</b>'
+          + (r.reduced ? '<i>Plus de trois défis aujourd\'hui contre ce joueur : gain réduit.</i>' : d.bot && !online ? '<i>Équipe dirigée par l\'ordinateur : moitié moins qu\'en direct.</i>' : '') + '</div>' + lpHTML(r),
       };
     }
     return {
@@ -206,7 +252,9 @@ export function createDuels(ctx) {
     else if (quit && d && d.bot) toast('Série abandonnée.');
     await ctx.refreshMe();
     ctx.refresh();
+    /* (la file du classé et les pastilles ont pu changer pendant la série) */
+    if (ctx.pulse) ctx.pulse();
   }
 
-  return { invite, bot, incoming, resume };
+  return { invite, bot, incoming, resume, quick, ranked };
 }
