@@ -33,6 +33,36 @@ function save() {
   try { localStorage.setItem(STORE + 'musique', on ? '1' : '0'); localStorage.setItem(STORE + 'volume', String(Math.round(level * 100))); } catch (e) { /* réglage non gardé */ }
 }
 
+/* ---------- le volume d'un lecteur ---------- */
+/* Sur iPhone et iPad, le volume d'un lecteur audio ne se règle pas : il vaut toujours 1, et ce qu'un site y écrit est ignoré (seuls les
+   boutons de l'appareil comptent). Sans précaution, la musique y joue à plein volume, sans pouvoir être baissée ni coupée. Là, chaque
+   lecteur passe par un nœud de gain de l'API Web Audio, qui, lui, se règle ; vol() et setVol() cachent la différence au reste du fichier. */
+const FIXED = (() => { try { const probe = new Audio(); probe.volume = 0.5; return probe.volume !== 0.5; } catch (e) { return false; } })();
+let actx = null;
+const gains = new WeakMap(), told = new WeakMap();
+/* branche un lecteur sur son nœud de gain, une fois pour toutes */
+function wire(el) {
+  if (!FIXED || gains.has(el)) return;
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!actx) actx = new AC();
+    const gain = actx.createGain();
+    gain.gain.value = 0;
+    actx.createMediaElementSource(el).connect(gain);
+    gain.connect(actx.destination);
+    gains.set(el, gain);
+  } catch (e) { /* pas de Web Audio : il restera « coupé ou non » (setVol) */ }
+}
+/* ce circuit dort tant qu'aucun geste ne l'a réveillé, et se rendort quand le téléphone passe à autre chose */
+function wake() { if (actx && actx.state !== 'running') actx.resume().catch(() => { /* au prochain geste */ }); }
+const vol = (el) => (FIXED ? told.get(el) ?? 0 : el.volume);
+function setVol(el, value) {
+  if (!FIXED) { el.volume = value; return; }
+  told.set(el, value);
+  const gain = gains.get(el);
+  if (gain) gain.gain.value = value; else el.muted = value < 0.0005;
+}
+
 export const musicOn = () => on;
 /** Le réglage du joueur, de 0 à 1 (gardé même quand la musique est coupée). */
 export const musicLevel = () => level;
@@ -51,13 +81,13 @@ const wanted = () => (!on || hush ? 0 : base() * SCENES[scene].gain * (scene ===
 function ramp(to, then) {
   clearInterval(fade);
   fade = setInterval(() => {
-    const gap = to - audio.volume;
+    const gap = to - vol(audio);
     if (Math.abs(gap) < 0.003) {
-      audio.volume = to;
+      setVol(audio, to);
       clearInterval(fade);
       if (to === 0 && !on) audio.pause();
       if (then) then();
-    } else audio.volume = Math.min(1, Math.max(0, audio.volume + Math.sign(gap) * Math.max(0.002, Math.abs(gap) * 0.2)));
+    } else setVol(audio, Math.min(1, Math.max(0, vol(audio) + Math.sign(gap) * Math.max(0.002, Math.abs(gap) * 0.2))));
   }, 60);
 }
 /* met en place le morceau du moment, à l'endroit où on l'avait laissé */
@@ -100,18 +130,19 @@ function crowdMood() {
   if (want && !crowd) {
     crowd = new Audio(CROWD);
     crowd.loop = true;
-    crowd.volume = 0;
+    wire(crowd);
+    setVol(crowd, 0);
   }
   if (!crowd) return;
   if (want && crowd.paused && !document.hidden) crowd.play().catch(() => { /* au prochain geste */ });
-  if (!crowdTick && (want || crowd.volume > 0)) {
+  if (!crowdTick && (want || vol(crowd) > 0)) {
     crowdTick = setInterval(() => {
       const live = on && !hush && !!document.querySelector('.mv[data-crowd][data-stage="game"]');
-      const to = live ? Math.min(1, base() * CROWD_GAIN * (1 + swell)) : 0, gap = to - crowd.volume;
+      const to = live ? Math.min(1, base() * CROWD_GAIN * (1 + swell)) : 0, gap = to - vol(crowd);
       /* la clameur retombe d'elle-même */
       swell *= 0.965;
-      crowd.volume = Math.abs(gap) < 0.002 ? to : Math.min(1, Math.max(0, crowd.volume + gap * 0.12));
-      if (!document.querySelector('.mv[data-crowd]') && crowd.volume === 0) { crowd.pause(); clearInterval(crowdTick); crowdTick = 0; swell = 0; }
+      setVol(crowd, Math.abs(gap) < 0.002 ? to : Math.min(1, Math.max(0, vol(crowd) + gap * 0.12)));
+      if (!document.querySelector('.mv[data-crowd]') && vol(crowd) === 0) { crowd.pause(); clearInterval(crowdTick); crowdTick = 0; swell = 0; }
     }, 80);
   }
 }
@@ -121,6 +152,7 @@ export function cheer(power = 1) { swell = Math.min(2.2, swell + 0.7 * power); }
 /** À appeler à chaque geste du joueur : lance la musique si elle n'est pas coupée (un navigateur ne laisse rien jouer avant le premier geste),
     et relance ce qu'il aurait empêché de démarrer. */
 export function startMusic() {
+  wake();
   if (started) {
     if (on && audio && audio.paused && !document.hidden && !switching) play();
     if (crowd && crowd.paused && on && document.querySelector('.mv[data-crowd]')) crowd.play().catch(() => { /* tant pis */ });
@@ -131,7 +163,9 @@ export function startMusic() {
   if (!audio) {
     audio = new Audio();
     audio.preload = 'none';
-    audio.volume = 0;
+    wire(audio);
+    wake();
+    setVol(audio, 0);
     spot.home.index = Math.floor(Math.random() * SCENES.home.tracks.length);
     /* un morceau fini : le suivant du même moment (ou le même, s'il est seul) */
     audio.addEventListener('ended', () => { const s = spot[scene]; s.index = (s.index + 1) % SCENES[scene].tracks.length; s.time = 0; load(); play(); });
@@ -167,6 +201,6 @@ export function setMusicLevel(value) {
   if (!started) { startMusic(); return; }
   if (switching) return;
   clearInterval(fade);
-  audio.volume = goal;
+  setVol(audio, goal);
   if (audio.paused) play();
 }

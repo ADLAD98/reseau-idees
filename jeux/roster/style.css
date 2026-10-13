@@ -110,6 +110,22 @@ body.fx .main.page-in>*:nth-child(n+5){animation-delay:.2s}
 .vol-row.off>span,.vol-row.off>output{color:var(--faint)}
 .vol-row.off>button{color:var(--faint)}
 .vol-row.off>input{opacity:.45}
+/* au doigt (téléphone, tablette) : des cibles plus larges — le bouton ♪, les pictogrammes, et surtout la poignée des curseurs, qu'un
+   iPhone demande d'attraper pour la faire glisser */
+@media (pointer:coarse){
+  .tune::before{content:"";position:absolute;inset:-6px -3px}
+  .vol{gap:20px;padding:18px 18px 20px}
+  .vol-row{grid-template-columns:40px 1fr auto;gap:6px 12px}
+  .vol-row>button{width:40px;height:40px}
+  .vol-row>button svg{width:20px;height:20px}
+  .vol-row>span{font-size:13.5px}
+  .vol-row>output{font-size:14.5px}
+  .vol-row>input{height:42px}
+  .vol-row>input::-webkit-slider-runnable-track{height:6px}
+  .vol-row>input::-moz-range-track{height:6px}
+  .vol-row>input::-webkit-slider-thumb{width:26px;height:26px;margin-top:-10px}
+  .vol-row>input::-moz-range-thumb{width:24px;height:24px}
+}
 .who{display:flex;align-items:center;gap:9px;color:var(--mut);text-decoration:none;font:600 15px/1 var(--text)}
 .who svg{color:var(--gold)}
 .who:hover{color:var(--gold-hi)}
