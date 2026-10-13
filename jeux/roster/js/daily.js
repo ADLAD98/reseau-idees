@@ -58,7 +58,7 @@ function topHTML() {
       + (D.pack.count ? prizeHTML(D) : '<p class="dg-done">Booster du jour ouvert.<br>À demain pour le prochain champion.</p>') + '</div>';
   }
   return '<div class="dg-ask"><div class="dg-intro"><p>Un champion mystère, le même pour tous les joueurs. Propose un nom : chaque essai te dit ce qu\'il a en commun avec lui. Trouve-le, et tu gagnes un <b>booster du jour</b>.</p>' + next + '</div>'
-    + '<form class="dg-form" id="dgForm" novalidate autocomplete="off"><div class="dg-in"><input class="inp" id="dgQ" type="search" placeholder="Nom d\'un champion…" maxlength="24" autocapitalize="off" spellcheck="false" aria-label="Nom du champion à proposer" aria-controls="dgList">'
+    + '<form class="dg-form" id="dgForm" novalidate autocomplete="off"><div class="dg-in"><input class="inp" id="dgQ" type="search" placeholder="' + (innerWidth <= 480 ? 'Un champion…' : 'Nom d\'un champion…') + '" maxlength="24" autocapitalize="off" spellcheck="false" aria-label="Nom du champion à proposer" aria-controls="dgList">'
     + '<div class="dg-list" id="dgList" role="listbox" hidden></div></div><button class="btn primary" type="submit">Proposer</button></form></div>'
     /* un booster gagné un autre jour, pas encore ouvert */
     + (D.pack.count ? '<div class="dg-wait">' + prizeHTML(D) + '</div>' : '');
