@@ -13,6 +13,7 @@ import { musicOn, startMusic } from './music.js';
 import { viewPlay } from './play.js';
 import { viewSocial } from './social.js';
 import { sfx } from './sound.js';
+import { freshReload, watchVersion } from './version.js';
 import { toggleVolume } from './volume.js';
 import { inspectCard } from './inspect.js';
 import { confirmSheet, num } from './ui.js';
@@ -1103,5 +1104,26 @@ async function viewProfile(main) {
     }).join('')
     + '<p class="hint">Les cartes sont tirées au sort par le serveur. Un coach sort moins souvent qu\'un joueur.</p>';
 }
+
+/* ---------- une nouvelle version du jeu a été publiée pendant que la page était ouverte ---------- */
+/* On le dit (un bandeau, avec son bouton), et on l'installe de soi-même au premier moment calme : en changeant d'onglet ou en revenant
+   sur la page, jamais au milieu d'une ouverture de pack, d'une draft, d'une partie ou d'une fenêtre ouverte. */
+let update = false;
+function applyUpdate() {
+  if (!update || S.busy || document.querySelector('.op, .mv, .dr, .insp, .sheet')) return;
+  update = false;
+  freshReload();
+}
+watchVersion(() => {
+  update = true;
+  const bar = document.createElement('div');
+  bar.className = 'upd';
+  bar.setAttribute('role', 'status');
+  bar.innerHTML = '<span>Nouvelle version du jeu</span><button class="btn primary slim" type="button">Mettre à jour</button>';
+  bar.querySelector('button').addEventListener('click', (e) => { e.currentTarget.disabled = true; update = false; freshReload(); });
+  document.body.appendChild(bar);
+});
+window.addEventListener('hashchange', applyUpdate);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) applyUpdate(); });
 
 boot();
