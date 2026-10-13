@@ -14,6 +14,8 @@ const BEST = { groups: 'phase de poules', quarter: 'quarts de finale', semi: 'de
 let G = null;
 const onView = () => /^#\/?jouer\/mondial/.test(location.hash) && !!document.getElementById('main');
 const bo = (n) => (n === 1 ? 'une manche' : 'BO' + n);
+/* une durée, en clair : « 4 h 36 », « 25 min » */
+const span = (ms) => { const m = Math.max(1, Math.round(ms / 60000)); return m >= 60 ? Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0') : m + ' min'; };
 
 export async function viewWorlds(main, ctx) {
   G = ctx;
@@ -41,7 +43,11 @@ function draw(main) {
 }
 function introHTML(D, after) {
   const R = D.rules, S = G.S, short = D.fee > S.player.coins;
-  const prize = (key, label) => '<div><span>' + label + '</span><b>+' + num(R.bonus[key][0]) + ' crédits</b><em>+ ' + plural(R.bonus[key][1], 'pack', 'packs') + '</em></div>';
+  /* les packs d'un tour ne se gagnent qu'une fois par jour (D.packs, quand le serveur applique cette règle) : ceux d'aujourd'hui sont
+     déjà pris, ou pas ; les crédits se gagnent à chaque parcours */
+  const P = D.packs || null, gone = (key) => !!(P && P.got.includes(key));
+  const prize = (key, label) => '<div><span>' + label + '</span><b>+' + num(R.bonus[key][0]) + ' crédits</b>'
+    + (gone(key) ? '<em class="dim">' + plural(R.bonus[key][1], 'pack déjà gagné', 'packs déjà gagnés') + ' aujourd\'hui</em>' : '<em>+ ' + plural(R.bonus[key][1], 'pack', 'packs') + '</em>') + '</div>';
   const past = Object.entries(D.record.past || {}).filter(([k]) => BEST[k]).map(([k, n]) => n + ' × ' + BEST[k]).join(' · ');
   return '<section class="panel wd-intro">' + (after ? '' : '<h3>Le tournoi</h3><ul>'
     + '<li><b>Seize équipes</b> — la tienne et les quinze meilleures des six ligues majeures : ' + Object.entries(R.slots).map(([l, n]) => n + ' de ' + l).join(', ') + '.</li>'
@@ -49,7 +55,8 @@ function introHTML(D, after) {
     + '<li><b>Phase finale</b> — quarts de finale en trois manches (BO3), demi-finales et finale en cinq (BO5).</li>'
     + '<li><b>Ton équipe</b> — celle que tu alignes dans l\'onglet Jouer ; tu peux la retoucher entre deux rencontres.</li>'
     + '<li>Chaque manche gagnée rapporte ses crédits, comme un match ordinaire. S\'y ajoutent les primes ci-dessous.</li></ul>'
-    + '<div class="prizes wd-prizes">' + prize('quarter', 'Sortir des poules') + prize('semi', 'Demi-finale') + prize('final', 'Finale') + prize('champion', 'Champion') + '</div>')
+    + '<div class="prizes wd-prizes">' + prize('quarter', 'Sortir des poules') + prize('semi', 'Demi-finale') + prize('final', 'Finale') + prize('champion', 'Champion') + '</div>'
+    + (P ? '<p class="hint wd-daily">Les packs d\'un tour se gagnent <b>une fois par jour</b> : ils reviennent à minuit, heure française (dans ' + span(P.resetAt - P.now) + '). Les crédits, eux, se gagnent à chaque parcours.</p>' : ''))
     + (past ? '<p class="hint">Tes parcours passés : ' + esc(past) + '.</p>' : '')
     + '<div class="actions"><button class="btn primary big" type="button" data-wd="start"' + (short ? ' disabled' : '') + '>' + (after ? 'Nouveau Mondial' : 'S\'inscrire') + '</button>'
     + '<p class="note">' + (D.fee ? 'Inscription : ' + num(D.fee) + ' crédits' + (short ? ' — il t\'en manque ' + num(D.fee - S.player.coins) + '.' : ' (tu en as ' + num(S.player.coins) + ').') : 'Ta première participation est offerte. Les suivantes coûteront ' + num(R.fee) + ' crédits.') + '</p></div></section>';
@@ -127,7 +134,9 @@ async function onClick(e) {
 function rewardsFor(res) {
   const run = res.run, p = res.played, sv = run.series, last = run.path[run.path.length - 1];
   const bonus = p.bonus ? '<div class="prize bonus"><span>' + esc(REACHED[p.bonus.stage] || 'Prime') + '</span><b>+' + num(p.bonus.coins) + ' crédits</b>'
-    + (p.bonus.packs ? '<i>+ ' + plural(p.bonus.packs, 'pack', 'packs') + ' : ' + (p.bonus.packs > 1 ? 'ils t\'attendent' : 'il t\'attend') + ' dans l\'onglet Packs.</i>' : '') + '</div>' : '';
+    + (p.bonus.packs ? '<i>+ ' + plural(p.bonus.packs, 'pack', 'packs') + ' : ' + (p.bonus.packs > 1 ? 'ils t\'attendent' : 'il t\'attend') + ' dans l\'onglet Packs.</i>'
+      /* les packs de ce tour ont déjà été gagnés aujourd'hui : il reste les crédits */
+      : p.bonus.capped ? '<i>' + (p.bonus.capped > 1 ? 'Les packs de ce tour sont déjà gagnés aujourd\'hui : ils reviennent' : 'Le pack de ce tour est déjà gagné aujourd\'hui : il revient') + ' à minuit.</i>' : '') + '</div>' : '';
   const game = '<div class="prize"><span>' + (p.won ? 'Manche gagnée' : 'Manche perdue') + '</span><b>+' + num(p.coins) + ' crédits</b>'
     + (p.over ? '' : '<i>' + bo(sv.format) + ' : ' + sv.wins[0] + ' – ' + sv.wins[1] + '. La série continue.</i>') + '</div>';
   if (!p.over) return { won: p.won, title: p.won ? 'Manche gagnée' : 'Manche perdue', sub: bo(sv.format) + ' · ' + sv.wins[0] + ' – ' + sv.wins[1], html: game, next: 'Manche suivante' };
