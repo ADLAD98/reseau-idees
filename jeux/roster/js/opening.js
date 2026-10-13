@@ -25,7 +25,8 @@ const YT = 'https://www.youtube-nocookie.com';
 const PRISM = ['#ffe7a8', '#9fe8ff', '#ffffff'];
 const RAINBOW = ['#ff9cc6', '#ffd88a', '#a8ffdc', '#9ccfff', '#d3b4ff', '#ffffff'];
 const KC_BLUE = ['#39b8ff', '#ffffff', '#0b47ff', '#9be7ff'];
-const DIAMOND = ['#ffffff', '#bfe7ff', '#9cc8ff', '#ffe9c4'];
+/* (l'édition légendaire : or, or pâle et rouge sang, comme la carte) */
+const DIAMOND = ['#fff8e2', '#ffd98a', '#e0344e', '#f0cf7c'];
 const CEO_GOLD = ['#ffd978', '#fff6d6', '#39b8ff', '#f0cd72'];
 const SIGN_GOLD = ['#fff6cf', '#f3dc9a', '#ffffff', '#c79a3e'];
 const dustOf = (card) => (card.edition === 'ceo' && !card.variant ? CEO_GOLD : card.variant === 'sign' ? SIGN_GOLD : card.variant === 'legend' ? DIAMOND : card.variant === 'kc' ? KC_BLUE : card.variant === 'holo' ? RAINBOW
@@ -195,7 +196,7 @@ export async function runOpening({ request, getCat, fx, size, from, look, quick 
   const setInfo = (html, pulse) => { info.innerHTML = html; info.classList.toggle('pulse', !!pulse); };
   /* la lumière de la scène prend la couleur de la carte */
   const setBeam = (card) => {
-    op.style.setProperty('--beam', card.limited && !card.variant ? '#ffd978' : card.variant === 'sign' ? '#f3dc9a' : card.variant === 'legend' ? '#dff3ff' : card.variant === 'kc' ? '#39b8ff' : card.tier >= 3 ? TIER_COLOR[card.tier] : '#c8aa6e');
+    op.style.setProperty('--beam', card.limited && !card.variant ? '#ffd978' : card.variant === 'sign' ? '#f3dc9a' : card.variant === 'legend' ? '#ffcf7a' : card.variant === 'kc' ? '#39b8ff' : card.tier >= 3 ? TIER_COLOR[card.tier] : '#c8aa6e');
     op.dataset.tier = card.tier; op.dataset.variant = card.variant || '';
   };
   let untilt = null, omenTimer = 0, endApo = null, song = null;

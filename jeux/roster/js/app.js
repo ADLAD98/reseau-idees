@@ -1,9 +1,9 @@
 /* Roster — le jeu. Six écrans : Packs, Jouer (matchs, Mondial), Collection, Marché, Joueurs (amis, échanges, défis, classement), Profil.
    Le serveur décide de tout (cartes tirées, délais, collection, matchs, ventes, échanges) ; cette page affiche et met en scène. */
 import { ApiError, call, clearSession, deriveKey, loadSession, saveSession } from './api.js';
-import { VARIANTS, cardHTML, champName, esc, flagUrl, iconUrl, karmineEra, logoHTML, photoUrl, prepare, statsOf, tiltCard, variantRank } from './cards.js';
+import { VARIANTS, autographOf, cardHTML, champName, esc, flagUrl, iconUrl, karmineEra, logoHTML, photoUrl, prepare, statsOf, tiltCard, variantRank } from './cards.js';
 import { clubSectionHTML, loadClub } from './club.js';
-import { GAME_NAME, ROLE_LABEL, ROLE_NAME, ROLE_ORDER, STORE } from './config.js';
+import { GAME_NAME, LEGEND_ART_NOTE, ROLE_LABEL, ROLE_NAME, ROLE_ORDER, STORE } from './config.js';
 import { dailyLook, drawDaily, loadDaily } from './daily.js';
 import { createDuels } from './duel.js';
 import { sellCard, showOnMarket, viewMarket } from './market.js';
@@ -910,8 +910,8 @@ function showSheet(id) {
         : card.ovr < 10 ? '<p class="note">Une carte hors série, pour rire : elle sort des packs comme les autres, mais mieux vaut un banc vide que ce coach-là.</p>'
           : '<p class="note">Aucune partie officielle jouée cette saison : la note est celle d\'un remplaçant.</p>')
     + (card.champs && card.champs.length ? '<div><h3 class="h2">Champions fétiches</h3><div class="champs">' + card.champs.map((c) => '<div class="champ"><img src="' + iconUrl(cat, c[0]) + '" alt="" loading="lazy"><div><b>' + esc(champName(cat, c[0])) + '</b><span>' + c[1] + ' parties · ' + pct(c[2], c[1]) + ' %</span></div></div>').join('') + '</div></div>' : '')
-    + (card.variant === 'sign' ? '<p class="note">Édition Signature de ' + esc(card.name) + ' : le full art d\'un champion du monde, signé à son nom. Même joueur, même note que sa carte ordinaire. Elle prend parfois la place de la carte bonus d\'un pack : c\'est l\'une des cartes les plus rares du jeu. (La signature est dessinée par le jeu : ce n\'est pas son autographe.)</p>'
-      : card.variant === 'legend' ? '<p class="note">Édition légendaire de ' + esc(card.name) + ' : la carte la plus rare du jeu. Contrairement aux autres versions, elle a sa propre note et ses propres statistiques, et porte tous ses titres mondiaux. Elle prend parfois la place de la carte bonus d\'un pack.</p>'
+    + (card.variant === 'sign' ? '<p class="note">Édition Signature de ' + esc(card.name) + ' : le full art d\'un champion du monde, signé à son nom. Même joueur, même note que sa carte ordinaire. Elle prend parfois la place de la carte bonus d\'un pack : c\'est l\'une des cartes les plus rares du jeu. ' + (autographOf(card) ? '(Sa signature reproduit son autographe, d\'après une image du domaine public de Wikimedia Commons : la carte n\'est pas signée de sa main.)' : '(La signature est dessinée par le jeu : ce n\'est pas son autographe.)') + '</p>'
+      : card.variant === 'legend' ? '<p class="note">Édition légendaire de ' + esc(card.name) + ' : la carte la plus rare du jeu. Contrairement aux autres versions, elle a sa propre note et ses propres statistiques, et porte tous ses titres mondiaux. Elle prend parfois la place de la carte bonus d\'un pack.' + (LEGEND_ART_NOTE[card.base] ? ' ' + esc(LEGEND_ART_NOTE[card.base]) : '') + (autographOf(card) ? ' Sa signature reproduit son autographe, d\'après une image du domaine public de Wikimedia Commons : la carte n\'est pas signée de sa main.' : '') + '</p>'
       : card.variant ? '<p class="note">' + (card.variant === 'kc' ? 'Édition Karmine Corp de la carte de ' + esc(card.name) + ' (' + esc(karmineEra(cat, card)) + '), réservée à celles et ceux qui portent ou ont porté ses couleurs'
       : 'Version ' + (card.variant === 'holo' ? 'holographique' : 'full art') + ' de la carte de ' + esc(card.name)) + ' : même joueur, même note, un autre habillage. Elle sort parfois d\'un pack à la place de la carte ordinaire, et se collectionne à part.</p>' : '')
     + '<p class="note">Note calculée à partir des statistiques officielles de la saison ' + cat.season + ' (ligue, tournois internationaux, palmarès). Données : Leaguepedia.</p>'
@@ -1000,6 +1000,7 @@ async function viewProfile(main) {
     + '<p class="hint">Effectifs, statistiques et palmarès : <a href="https://lol.fandom.com/" target="_blank" rel="noopener">Leaguepedia</a>, licence CC BY-SA 3.0. Photos des joueurs : portraits officiels des équipes et des ligues, affichés depuis Leaguepedia. Images des champions : Riot Games (Data Dragon). Logos des équipes : marques de leurs clubs, affichés depuis Leaguepedia. Drapeaux : flag-icons (licence MIT).</p>'
     + '<p class="hint">Musiques : « For Originz », « Ascending the Vale », « Minima » et « Clash Defiant », Kevin MacLeod (<a href="https://incompetech.com/" target="_blank" rel="noopener">incompetech.com</a>), licence <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">Creative Commons Attribution 4.0</a>. '
     + 'Ambiance de tribune : un enregistrement de Félix Blume (<a href="https://freesound.org/people/felix.blume/sounds/500250/" target="_blank" rel="noopener">freesound.org</a>), versé au domaine public. Les autres sons sont fabriqués par le jeu.</p>'
+    + '<p class="hint">Autographe de Faker : d\'après « Faker autograph.svg » (<a href="https://commons.wikimedia.org/wiki/File:Faker_autograph.svg" target="_blank" rel="noopener">Wikimedia Commons</a>), dans le domaine public. Ce n\'est pas une carte signée de sa main.</p>'
     + '<p class="hint">' + esc(GAME_NAME) + ' was created under Riot Games\' "Legal Jibber Jabber" policy using assets owned by Riot Games. Riot Games does not endorse or sponsor this project. Ce jeu n\'est ni approuvé ni sponsorisé par Riot Games, ni par les équipes et les joueurs cités.</p>'
     + '<div class="actions"><a class="btn" href="../../">Retour à Bcorps Labs</a></div></section></div>';
 

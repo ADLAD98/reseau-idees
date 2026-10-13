@@ -78,7 +78,7 @@ body{background:
 .hub .tiers .v-holo{--tc:#9ccfff}
 .hub .tiers .v-full{--tc:#d6b877}
 .hub .tiers .v-kc{--tc:#39b8ff}
-.hub .tiers .v-legend{--tc:#cfeeff}
+.hub .tiers .v-legend{--tc:#f0cf7c}
 .hub .tiers .v-ceo{--tc:#f0cd72}
 /* mon équipe : sa note, ses dernières parties, ses six visages */
 .hub-rating{display:flex;align-items:center;gap:14px}

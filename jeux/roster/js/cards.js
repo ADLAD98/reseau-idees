@@ -1,5 +1,6 @@
 /* Fabrication d'une carte à l'écran. La même carte sert partout : collection, ouverture de pack, fiche détaillée, équipe. */
-import { COACH_STATS, DDRAGON, GAME_NAME, LEGEND_PHOTOS, PHOTOS, PLAYER_STATS, PRESTIGE_TEAMS, ROLE_LABEL } from './config.js';
+import { AUTOGRAPHS } from './autographs.js';
+import { COACH_STATS, DDRAGON, GAME_NAME, LEGEND_ART, LEGEND_PHOTOS, PHOTOS, PLAYER_STATS, PRESTIGE_TEAMS, ROLE_LABEL } from './config.js';
 import { FRAMES } from './frames.js';
 import { LOGOS } from './logos.js';
 
@@ -152,13 +153,43 @@ function framing(card, key) {
     qty (nombre d'exemplaires possédés : à partir de deux, la carte est posée sur une pile et le nombre s'affiche en bas à droite),
     serial (numéro de l'exemplaire, pour une carte en édition limitée).
     Cartes hors série : edition donne son habillage (« ceo » : Kameto, MY CEO), limited le nombre d'exemplaires, label ce qui s'écrit à la place du poste. */
+/* Ce que les cartes les plus récentes désignent par son nom (url(#…)) doit exister dans la page : on l'y ajoute ici, sans dépendre de
+   la version de la page que le navigateur a gardée.
+   reliefOr : un relief qui garde les couleurs de l'illustration (les parties claires ressortent, la lumière vient d'en haut à gauche,
+   les reflets sont dorés) ; autoGold : la feuille d'or d'un autographe. */
+function ensureDefs() {
+  if (typeof document === 'undefined' || !document.body || document.getElementById('reliefOr')) return;
+  const box = document.createElement('div');
+  box.innerHTML = '<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>'
+    + '<filter id="reliefOr" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">'
+    + '<feColorMatrix in="SourceGraphic" type="luminanceToAlpha" result="h"/><feGaussianBlur in="h" stdDeviation="1.5" result="hb"/>'
+    + '<feDiffuseLighting in="hb" surfaceScale="9" diffuseConstant="1.3" lighting-color="#fff2dc" result="lit"><feDistantLight azimuth="225" elevation="44"/></feDiffuseLighting>'
+    + '<feColorMatrix in="SourceGraphic" type="saturate" values="1.2" result="col"/><feBlend in="lit" in2="col" mode="multiply" result="carved"/>'
+    + '<feSpecularLighting in="hb" surfaceScale="9" specularConstant=".42" specularExponent="26" lighting-color="#ffd890" result="spec"><feDistantLight azimuth="225" elevation="44"/></feSpecularLighting>'
+    + '<feComposite in="carved" in2="spec" operator="arithmetic" k1="0" k2="1.25" k3="1" k4="-0.03"/></filter>'
+    + '<linearGradient id="autoGold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fffdf0"/><stop offset=".34" stop-color="#f6dc95"/><stop offset=".6" stop-color="#e0b858"/><stop offset="1" stop-color="#fff6d2"/></linearGradient>'
+    + '</defs></svg>';
+  document.body.appendChild(box.firstChild);
+}
+/* les pétales de l'édition légendaire : [place en %, durée de la chute en s, avance en s, dérive en cqw] */
+const PETALS = '<div class="card-petals" aria-hidden="true">' + [[9, 12, 1, -14], [27, 15, 6.5, 10], [45, 13, 9.5, -20], [62, 16, 3.2, 14], [78, 11.5, 7.4, -9], [91, 14, 11, -24]]
+  .map(([x, d, w, dx]) => '<i style="left:' + x + '%;--d:' + d + 's;--w:-' + w + 's;--x:' + dx + 'cqw"></i>').join('') + '</div>';
+/** L'autographe connu du joueur d'une carte (js/autographs.js), ou rien : la fiche de la carte dit alors d'où il vient. */
+export const autographOf = (card) => AUTOGRAPHS[card.base || card.id] || null;
+/** L'autographe d'un joueur, à la feuille d'or (a : son tracé, js/autographs.js). */
+const autoSVG = (a) => '<svg class="card-auto" viewBox="' + a.box + '" aria-hidden="true"><path fill="url(#autoGold)" d="' + a.d + '"/></svg>';
+
 export function cardHTML(card, cat, opts = {}) {
+  ensureDefs();
   const qty = opts.qty > 1 ? Math.floor(opts.qty) : 0;
   /* l'habillage d'une carte hors série (jamais sur une de ses versions) */
   const ed = !card.variant && card.edition ? card.edition : '';
   /* l'holographique, l'édition KC, la légendaire et les cartes hors série ont déjà leur propre lumière */
   const pr = card.variant === 'holo' || card.variant === 'kc' || card.variant === 'legend' || ed ? 0 : prestigeOf(card);
   const legend = card.variant === 'legend' && cat.legends ? cat.legends[card.base] : null;
+  /* édition légendaire : l'illustration sculptée derrière lui (un skin de son champion) ; légendaire et Signature : son autographe, s'il est connu */
+  const relic = card.variant === 'legend' ? LEGEND_ART[card.base] : null;
+  const auto = card.variant === 'legend' || card.variant === 'sign' ? AUTOGRAPHS[card.base] : null;
   const team = cat.teamById.get(card.team);
   const photo = photoUrl(card), v = card.variant || '';
   /* un nom long est écrit plus petit pour tenir sur la carte */
@@ -185,28 +216,32 @@ export function cardHTML(card, cat, opts = {}) {
     + '<div class="card-bg"></div>'
     + (pr > 1 ? '<div class="card-rays"></div>' : '')
     /* derrière le joueur, l'illustration de son champion fétiche (sur un full art : sculptée en bas-relief ; à défaut, le blason de son équipe) */
-    + (card.art && !ed && v !== 'kc' ? '<img class="card-art"' + (full ? ' style="filter:url(#basRelief) brightness(.8) contrast(1.08)"' : '') + ' src="' + DDRAGON + '/img/champion/loading/' + esc(card.art) + '.jpg" alt="" ' + load + '>' : full ? crestOf(card.team) : '')
+    + (relic ? '<img class="card-art" style="filter:url(#reliefOr) brightness(.6) contrast(1.12) saturate(1.15)" src="' + DDRAGON + '/img/champion/splash/' + esc(relic) + '.jpg" alt="" ' + load + '>'
+      : card.art && !ed && v !== 'kc' ? '<img class="card-art"' + (full ? ' style="filter:url(#basRelief) brightness(.8) contrast(1.08)"' : '') + ' src="' + DDRAGON + '/img/champion/loading/' + esc(card.art) + '.jpg" alt="" ' + load + '>' : full ? crestOf(card.team) : '')
     /* édition KC : le « mur bleu » et le blason de la Karmine en relief ; holographique et édition KC : une feuille de métal irisée, et ses paillettes */
     + (v === 'kc' ? '<div class="card-wall"></div>' + crestOf('KC') : '')
     + (v === 'holo' || v === 'kc' ? '<div class="card-foil"></div><div class="card-spark"></div>' : '')
-    /* édition légendaire : derrière le joueur, l'aurore, la couronne de rayons et les facettes d'un diamant */
-    + (v === 'legend' ? '<div class="card-aurora"></div><div class="card-crown"></div><div class="card-facets"></div>' : '')
+    /* édition légendaire : derrière le joueur, une couronne de fins rayons d'or */
+    + (v === 'legend' ? '<div class="card-crown"></div>' : '')
     /* MY CEO : « CEO » en très grand derrière lui, et une pluie d'étoiles d'or */
     + (ed === 'ceo' ? '<div class="card-ceo">CEO</div><div class="card-spark"></div>' : '')
     + '<span class="card-wm">' + esc(v === 'kc' ? 'KC' : team ? team.short : '') + '</span>'
-    /* édition légendaire : la feuille irisée, derrière lui (ses couleurs ne passent jamais sur son visage) */
+    /* édition légendaire : un contre-jour doré derrière son buste, pour que son maillot noir se détache */
+    + (v === 'legend' ? '<div class="card-halo"></div>' : '')
+    /* édition légendaire : la feuille d'or, derrière lui (ses reflets ne passent jamais sur son visage) */
     + (v === 'legend' ? '<div class="card-prism"></div>' : '')
     + picture
-    /* édition légendaire : devant lui, quelques éclats */
-    + (v === 'legend' ? '<div class="card-spark"></div>' : '')
+    /* édition légendaire : devant lui, des pétales qui tombent et quelques éclats */
+    + (v === 'legend' ? PETALS + '<div class="card-spark"></div>' : '')
     + '<div class="card-shade"></div>'
+    + (v === 'legend' && auto ? autoSVG(auto) : '')
     /* édition Signature : son nom, tracé au feutre doré en travers de la carte, et le trait qui le souligne */
-    + (v === 'sign' ? '<div class="card-sign" style="--n:' + len + '" aria-hidden="true"><span>' + esc(card.name) + '</span><i></i></div>' : '')
+    + (v === 'sign' ? '<div class="card-sign" style="--n:' + len + '" aria-hidden="true">' + (auto ? autoSVG(auto) : '<span>' + esc(card.name) + '</span><i></i>') + '</div>' : '')
     + '<div class="card-side"><span class="card-ovr">' + card.ovr + '</span><span class="card-role">' + esc(card.label || ROLE_LABEL[card.role]) + '</span><i></i>'
     + flag + (club ? '<img class="card-club" src="' + club + '" alt="" ' + load + '>' : '') + '<span class="card-league">' + esc(card.league) + '</span></div>'
-    + '<div class="card-plate">'
-    /* un trophée par titre mondial, avec son année */
+    /* édition légendaire : un trophée par titre mondial, avec son année, en colonne le long du bord droit (comme des décorations) */
     + (legend ? '<div class="card-cups" title="Champion du monde ' + legend.worlds.join(', ') + '">' + legend.worlds.map((y) => '<span><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-cup"/></svg><b>' + y + '</b></span>').join('') + '</div>' : '')
+    + '<div class="card-plate">'
     + (ed === 'ceo' ? '<div class="card-myceo">My CEO</div>' : '')
     + '<div class="card-name" style="--n:' + len + '">' + esc(card.name) + '</div>'
     /* sur une carte KC, le joueur est sous le maillot de la Karmine : c'est elle qui est écrite sous son nom */

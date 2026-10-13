@@ -19,9 +19,14 @@ export const PHOTOS = 'https://static.wikia.nocookie.net/lolesports_gamepedia_en
    Les joueurs et les coachs : tous ceux qui ont gagné les Worlds ou le MSI, où qu'ils soient aujourd'hui (palmarès lu dans le catalogue). */
 export const PRESTIGE_TEAMS = ['T1', 'GEN', 'HLE', 'BLG', 'DK'];
 
-/* La photo propre à une carte légendaire, tant que le serveur ne la donne pas lui-même : Faker aux Worlds 2019, sous le maillot de SK Telecom T1
-   (photo officielle référencée par Leaguepedia). */
-export const LEGEND_PHOTOS = { faker: 'c/cb/SKT_Faker_2019_WC.png' };
+/* La photo propre à une carte légendaire, tant que le serveur ne la donne pas lui-même : Faker en 2025, sous le maillot noir de T1 — un
+   portrait pris de plus loin, où on le voit jusqu'à la taille (photo officielle référencée par Leaguepedia). */
+export const LEGEND_PHOTOS = { faker: 'd/dd/T1_Faker_2025_Split_1.png' };
+/* L'illustration sculptée en relief derrière une légende : celle d'un skin de son champion (identifiant de Data Dragon).
+   Faker : « Ahri légende immortalisée » (Ahri_86), le skin du Hall of Legends créé en son honneur en 2024. */
+export const LEGEND_ART = { faker: 'Ahri_86' };
+/* Ce que la fiche de la carte dit de cette illustration (nom français du skin : Data Dragon ; Hall of Legends, 2024 : Leaguepedia). */
+export const LEGEND_ART_NOTE = { faker: 'Derrière lui, sculptée en relief : Ahri « légende immortalisée », le skin créé en son honneur pour son entrée au Hall of Legends, en 2024.' };
 
 /* La musique qui accompagne l'arrivée d'une carte légendaire, par carte : une vidéo de YouTube jouée par son lecteur officiel (le jeu ne
    contient aucun fichier de musique), de la seconde « start » à la seconde « end » — le refrain —, au volume donné (de 0 à 100).

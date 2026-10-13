@@ -351,9 +351,9 @@ b.v-full{color:#f1dca0;font-weight:600}
 .tiers .v-kc i{background:linear-gradient(135deg,#fff,#4cc3ff 45%,#0b47ff);box-shadow:0 0 9px #39b8ff}
 .chip.v-kc{border-color:#39b8ff;color:#bfe9ff;background:rgba(11,71,255,.16)}
 b.v-kc{color:#7fd4ff;font-weight:600}
-.tiers .v-legend i{background:linear-gradient(135deg,#fff,#bfe7ff 45%,#8fb4ff);box-shadow:0 0 9px #cfeeff}
-.chip.v-legend{border-color:#cfeeff;color:#eaf8ff;background:rgba(160,210,255,.12)}
-b.v-legend{color:#dff3ff;font-weight:600}
+.tiers .v-legend i{background:linear-gradient(135deg,#fff8e2,#f0cf7c 42%,#c0182e);box-shadow:0 0 9px #f0cf7c}
+.chip.v-legend{border-color:#f0cf7c;color:#fff3cf;background:rgba(200,30,50,.16)}
+b.v-legend{color:#ffd98a;font-weight:600}
 /* le poinçon de la version, en haut à droite */
 .card-mark{position:absolute;top:6.2%;right:7.4%;padding:1.1cqw 2.2cqw 1cqw;font:700 3.2cqw/1 var(--text);letter-spacing:.2em;text-indent:.2em;text-transform:uppercase;color:#07101d;white-space:nowrap;
   background:linear-gradient(105deg,#ff9cc6,#ffd88a 25%,#a8ffdc 50%,#9ccfff 75%,#d3b4ff 100%) var(--hx) 0/220% 100%;box-shadow:0 .4cqw 1.2cqw rgba(0,0,0,.5)}
@@ -445,6 +445,8 @@ body.fx .card.v-full .card-holo,.card.v-full .card-holo{opacity:.5;mix-blend-mod
   filter:drop-shadow(0 0 .4cqw rgba(8,6,2,.9)) drop-shadow(0 .5cqw .6cqw rgba(0,0,0,.8))}
 @keyframes signInk{0%,55%{background-position:115% 0}100%{background-position:-45% 0}}
 body.fx .card.v-sign:not(.tilting) .card-sign span{animation:signInk 7s ease-in-out infinite}
+/* (quand le jeu connaît le vrai autographe du joueur, c'est lui qui est reproduit, à la place du nom tracé) */
+.card-sign .card-auto{width:72%;margin-top:1cqw;filter:drop-shadow(0 0 .5cqw rgba(8,6,2,.95)) drop-shadow(0 .7cqw .9cqw rgba(0,0,0,.85)) drop-shadow(0 0 1.8cqw rgba(255,226,140,.4))}
 .card.v-sign .card-mark{background:linear-gradient(105deg,#fffbe9,#f3dc9a 34%,#b58a2e 60%,#fff3c4 100%) var(--hx) 0/220% 100%;box-shadow:0 0 2.4cqw rgba(255,226,140,.6)}
 .tiers .v-sign i{background:linear-gradient(135deg,#fffbe9,#f3dc9a 45%,#b58a2e);box-shadow:0 0 9px #f3dc9a}
 .chip.v-sign{border-color:#f3dc9a;color:#fff6d6;background:rgba(243,220,154,.12)}
@@ -501,90 +503,89 @@ body.fx .card.v-kc .card-front .card-frame::after{animation:spin 4.5s linear inf
 .card.missing .card-era,.card.missing .card-glint{display:none}
 .card.missing.v-kc .card-wall,.card.missing.v-kc .card-foil{opacity:.35}
 
-/* Édition légendaire : la pièce d'exception du jeu. Elle est faite de plusieurs plans posés les uns derrière les autres, qui glissent à des
-   vitesses différentes quand la lumière se déplace (--hx, --hy : sous le doigt, dans la vue d'examen, ou d'elle-même sur une grande carte) :
-   une nuit pourpre et bleu roi ; l'illustration de son champion, au loin ; une aurore aux couleurs du prisme qui tourne lentement ; une
-   couronne de rayons derrière sa tête ; les facettes d'un diamant ; lui, cerné d'or ; une pluie d'éclats devant lui ; et par-dessus, la
-   feuille irisée : deux trames de couleurs qui se croisent et défilent au moindre mouvement. Cadre de platine et d'or, trophées au-dessus du nom.
-   Ses couleurs remplacent celles du rang sur toute la face. */
-.card.v-legend .card-front{--tc:#f3e2ae;--hi:#ffffff;--lo:#8a7440}
+/* Édition légendaire : la pièce d'exception du jeu, aux couleurs du skin « légende immortalisée » de son champion — noir, rouge sang, or.
+   Elle est faite de plusieurs plans posés les uns derrière les autres, qui glissent à des vitesses différentes quand la lumière se déplace
+   (--hx, --hy : sous le doigt, dans la vue d'examen, ou d'elle-même sur une grande carte) : une nuit rouge sombre ; son champion dans ce
+   skin, sculpté en relief sans perdre ses couleurs ; une couronne de fins rayons d'or derrière sa tête ; lui, cerné d'or, vu jusqu'à la
+   taille ; des pétales rouges qui tombent lentement devant lui ; quelques éclats ; son autographe à la feuille d'or ; et par-dessus, une
+   feuille d'or qui s'allume là où passe la lumière. Cadre d'or, trophées au-dessus du nom. Ses couleurs remplacent celles du rang. */
+.card.v-legend .card-front{--tc:#f0cf7c;--hi:#fff8e2;--lo:#8a1626}
 .card.v-legend .card-bg{background:
-  radial-gradient(72% 50% at 16% 88%,rgba(214,30,58,.62) 0,rgba(120,12,40,.3) 44%,rgba(10,4,20,0) 78%),
-  radial-gradient(66% 46% at 88% 12%,rgba(64,110,255,.6) 0,rgba(30,50,150,.28) 46%,rgba(10,4,20,0) 80%),
-  radial-gradient(60% 40% at 52% 26%,rgba(255,236,190,.42) 0,rgba(255,236,190,0) 70%),
-  linear-gradient(180deg,#0d0820 0%,#07041a 52%,#030108 100%)}
-/* son champion, au loin : il bouge à l'opposé de la lumière */
-.card.v-legend .card-art{top:-6%;left:-9%;width:118%;height:84%;opacity:.5;filter:grayscale(.3) contrast(1.2) brightness(1.05);mix-blend-mode:screen;
-  transform:translate(calc((var(--hx) - 50%) * -.13),calc((var(--hy) - 50%) * -.09));
-  -webkit-mask-image:radial-gradient(86% 72% at 50% 38%,#000 32%,rgba(0,0,0,.5) 66%,transparent 100%);mask-image:radial-gradient(86% 72% at 50% 38%,#000 32%,rgba(0,0,0,.5) 66%,transparent 100%)}
-.card.v-legend.tilting .card-art{transform:translate(calc((var(--hx) - 50%) * -.13),calc((var(--hy) - 50%) * -.09))}
-/* l'aurore : les couleurs du prisme tournent lentement derrière lui */
-.card-aurora{position:absolute;inset:-12%;pointer-events:none;mix-blend-mode:screen;opacity:.38;filter:blur(6cqw);
-  background:conic-gradient(from var(--spin) at 50% 34%,#ff3d6e,#ffb347,#fff3a8,#6dffd0,#5aa8ff,#b36bff,#ff3d6e);
-  -webkit-mask-image:radial-gradient(52% 40% at 50% 34%,#000 0,rgba(0,0,0,.6) 46%,transparent 100%);mask-image:radial-gradient(52% 40% at 50% 34%,#000 0,rgba(0,0,0,.6) 46%,transparent 100%);
-  transform:translate(calc((var(--hx) - 50%) * -.07),calc((var(--hy) - 50%) * -.05))}
-body.fx .card-aurora{animation:spin 16s linear infinite}
-/* la couronne : de fins rayons d'or partent de derrière sa tête et tournent à contresens */
-.card-crown{position:absolute;left:-30%;top:-34%;width:164%;aspect-ratio:1;pointer-events:none;mix-blend-mode:screen;opacity:.34;
-  background:repeating-conic-gradient(from 0deg,rgba(255,236,180,.9) 0 .7deg,rgba(255,236,180,0) 1.6deg 7deg,rgba(255,255,255,.75) 7.6deg 8.2deg,rgba(255,255,255,0) 9.4deg 18deg);
-  -webkit-mask-image:radial-gradient(circle,transparent 0 14%,#000 22%,rgba(0,0,0,.4) 44%,transparent 62%);mask-image:radial-gradient(circle,transparent 0 14%,#000 22%,rgba(0,0,0,.4) 44%,transparent 62%)}
+  radial-gradient(84% 56% at 50% 18%,rgba(168,22,40,.8) 0,rgba(84,10,24,.5) 44%,rgba(8,3,6,0) 82%),
+  radial-gradient(64% 42% at 10% 88%,rgba(214,160,70,.22) 0,rgba(8,3,6,0) 72%),
+  linear-gradient(180deg,#1a070c 0%,#0c0407 54%,#050203 100%)}
+/* son champion, derrière lui, en relief : il bouge à l'opposé de la lumière. (Le filtre du relief est posé sur l'image elle-même, par
+   cards.js : dans une feuille de style séparée, Safari ne retrouverait pas le filtre défini dans la page.) */
+.card.v-legend .card-art{top:0;left:-39%;width:172%;height:74%;object-fit:cover;object-position:50% 0;opacity:1;mix-blend-mode:normal;
+  transform:translate(calc((var(--hx) - 50%) * -.11),calc((var(--hy) - 50%) * -.07));
+  -webkit-mask-image:linear-gradient(to bottom,#000 60%,rgba(0,0,0,.45) 82%,transparent 100%);mask-image:linear-gradient(to bottom,#000 60%,rgba(0,0,0,.45) 82%,transparent 100%)}
+.card.v-legend.tilting .card-art{transform:translate(calc((var(--hx) - 50%) * -.11),calc((var(--hy) - 50%) * -.07))}
+/* la couronne : de fins rayons d'or partent de derrière sa tête et tournent lentement */
+.card-crown{position:absolute;left:-30%;top:-27%;width:160%;aspect-ratio:1;pointer-events:none;mix-blend-mode:screen;opacity:.3;
+  background:repeating-conic-gradient(from 0deg,rgba(255,226,160,.9) 0 .7deg,rgba(255,226,160,0) 1.6deg 7deg,rgba(255,255,255,.7) 7.6deg 8.2deg,rgba(255,255,255,0) 9.4deg 18deg);
+  -webkit-mask-image:radial-gradient(circle,transparent 0 16%,#000 24%,rgba(0,0,0,.4) 44%,transparent 62%);mask-image:radial-gradient(circle,transparent 0 16%,#000 24%,rgba(0,0,0,.4) 44%,transparent 62%);
+  transform:translate(calc((var(--hx) - 50%) * -.05),calc((var(--hy) - 50%) * -.035))}
 body.fx .card-crown{animation:turn 70s linear infinite reverse}
-/* les facettes : elles s'allument là où passe la lumière, et glissent un peu avec elle */
-.card-facets{position:absolute;inset:-6%;pointer-events:none;mix-blend-mode:screen;
-  background:
-    conic-gradient(from 12deg at 52% 26%,rgba(255,255,255,.2) 0 14deg,rgba(255,255,255,0) 14deg 31deg,rgba(255,214,150,.17) 31deg 52deg,rgba(255,255,255,0) 52deg 77deg,rgba(255,255,255,.13) 77deg 96deg,rgba(255,255,255,0) 96deg 128deg,rgba(150,190,255,.17) 128deg 151deg,rgba(255,255,255,0) 151deg 186deg,rgba(255,255,255,.18) 186deg 204deg,rgba(255,255,255,0) 204deg 233deg,rgba(255,150,170,.15) 233deg 258deg,rgba(255,255,255,0) 258deg 287deg,rgba(255,255,255,.14) 287deg 309deg,rgba(255,255,255,0) 309deg 338deg,rgba(190,255,236,.13) 338deg 360deg),
-    conic-gradient(from 200deg at 20% 66%,rgba(255,255,255,.2) 0 22deg,rgba(255,255,255,0) 22deg 58deg,rgba(255,170,190,.18) 58deg 84deg,rgba(255,255,255,0) 84deg 360deg),
-    conic-gradient(from 20deg at 86% 60%,rgba(255,255,255,0) 0 190deg,rgba(255,255,255,.2) 190deg 214deg,rgba(255,255,255,0) 214deg 250deg,rgba(150,200,255,.2) 250deg 276deg,rgba(255,255,255,0) 276deg 360deg);
-  -webkit-mask-image:radial-gradient(110% 84% at var(--hx) var(--hy),#000 0,rgba(0,0,0,.6) 28%,rgba(0,0,0,.22) 60%,rgba(0,0,0,.1) 100%);
-  mask-image:radial-gradient(110% 84% at var(--hx) var(--hy),#000 0,rgba(0,0,0,.6) 28%,rgba(0,0,0,.22) 60%,rgba(0,0,0,.1) 100%);
-  transform:translate(calc((var(--hx) - 50%) * .05),calc((var(--hy) - 50%) * .035))}
 .card.v-legend .card-wm{display:none}
-/* lui : au premier plan, cerné d'or et d'une lueur pourpre ; il avance vers la lumière */
-.card.v-legend .card-photo{top:5.4%;left:-5%;width:110%;height:65%;filter:drop-shadow(0 0 1.1cqw rgba(255,232,170,.7)) drop-shadow(0 0 4.4cqw rgba(255,70,110,.34));
+/* le contre-jour : une lueur dorée derrière son buste, une ombre derrière sa tête (il se détache de l'illustration) */
+.card-halo{position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(50% 24% at 50% 56%,rgba(255,226,160,.85) 0,rgba(250,150,90,.45) 44%,rgba(230,40,70,0) 80%),radial-gradient(30% 17% at 50% 31%,rgba(5,2,3,.66) 0,rgba(5,2,3,.3) 55%,rgba(5,2,3,0) 100%)}
+/* lui : au premier plan, cerné d'or et d'une lueur rouge ; il avance vers la lumière */
+.card.v-legend .card-photo{top:19.5%;left:16%;width:68%;height:55%;object-fit:cover;object-position:50% 0;
+  filter:brightness(1.2) contrast(1.03) drop-shadow(0 0 .6cqw rgba(255,236,180,1)) drop-shadow(0 0 1.6cqw rgba(255,214,130,.6)) drop-shadow(0 0 5cqw rgba(230,40,70,.5));
   transform:translate(calc((50% - var(--hx)) * .06),calc((50% - var(--hy)) * .035));
-  -webkit-mask-image:linear-gradient(to bottom,#000 72%,transparent 98%);mask-image:linear-gradient(to bottom,#000 72%,transparent 98%)}
+  -webkit-mask-image:linear-gradient(to bottom,#000 80%,transparent 100%);mask-image:linear-gradient(to bottom,#000 80%,transparent 100%)}
 .card.v-legend.tilting .card-photo{transform:translate(calc((50% - var(--hx)) * .09),calc((50% - var(--hy)) * .05))}
+/* les pétales : quelques pétales rouge sang tombent lentement devant lui, de biais, chacun à son rythme (rien quand les animations sont coupées) */
+.card-petals{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.card-petals i{position:absolute;top:-6%;width:3.4cqw;height:2.1cqw;border-radius:80% 20% 80% 20%;background:linear-gradient(135deg,#ff6a7c,#b8142c 58%,#5c0814);box-shadow:0 0 1.2cqw rgba(255,60,90,.4);opacity:0}
+@keyframes petal{0%{opacity:0;transform:translate3d(0,0,0) rotate(0deg)}7%{opacity:.9}82%{opacity:.75}100%{opacity:0;transform:translate3d(var(--x,-16cqw),150cqw,0) rotate(520deg)}}
+body.fx .card-petals i{animation:petal var(--d,12s) linear var(--w,0s) infinite}
 .card.v-legend .card-shade{background:
-  linear-gradient(to top,#030108 0,rgba(3,1,8,.97) 27%,rgba(3,1,8,.8) 40%,rgba(3,1,8,.3) 53%,transparent 62%),
-  linear-gradient(100deg,rgba(3,1,8,.6) 0,rgba(3,1,8,.14) 22%,transparent 36%)}
-.card.v-legend .card-name{background:linear-gradient(180deg,#ffffff 20%,#fff4d2 52%,#e6c878 86%,#fff6dc 100%);-webkit-background-clip:text;background-clip:text;color:transparent;
-  filter:drop-shadow(0 .4cqw .5cqw rgba(0,0,0,.95)) drop-shadow(0 0 1.8cqw rgba(255,214,130,.6))}
-.card.v-legend .card-stats span{color:#cdbb8e}
-/* la rangée des trophées */
-.card-cups{display:flex;justify-content:center;gap:1.7cqw;margin-bottom:2cqw}
-.card-cups span{display:flex;flex-direction:column;align-items:center;gap:.7cqw}
-.card-cups svg{width:7cqw;height:7cqw;color:#ffd978;filter:drop-shadow(0 0 1.1cqw rgba(255,206,104,.85)) drop-shadow(0 .3cqw .5cqw rgba(0,0,0,.7))}
-.card-cups b{font:700 2.9cqw/1 var(--text);letter-spacing:.05em;color:#fff1c9;text-shadow:0 .2cqw .8cqw #000}
+  linear-gradient(to top,#050203 0,rgba(5,2,3,.97) 28%,rgba(5,2,3,.7) 33.5%,rgba(5,2,3,.16) 38%,transparent 42%),
+  linear-gradient(100deg,rgba(5,2,3,.66) 0,rgba(5,2,3,.16) 22%,transparent 36%)}
+/* son autographe, à la feuille d'or, en travers de son maillot (le tracé vient de js/autographs.js) */
+.card-auto{display:block;overflow:visible;pointer-events:none}
+.card.v-legend .card-auto{position:absolute;left:27%;top:48.5%;width:48%;transform:rotate(-8deg);
+  filter:drop-shadow(0 0 .5cqw rgba(8,4,2,.95)) drop-shadow(0 .6cqw .8cqw rgba(0,0,0,.85)) drop-shadow(0 0 1.8cqw rgba(255,214,130,.5))}
+.card.v-legend .card-name{color:#fff6dc;text-shadow:0 .3cqw .5cqw #000,0 0 1.2cqw rgba(0,0,0,.9),0 0 2.6cqw rgba(255,206,110,.75)}
+.card.v-legend .card-stats span{color:#d8c08a}
+/* les trophées : en colonne le long du bord droit, un par titre mondial, son année dessous */
+.card-cups{position:absolute;right:5.4%;top:15.5%;display:flex;flex-direction:column;align-items:center;gap:1.5cqw;pointer-events:none}
+.card-cups span{display:flex;flex-direction:column;align-items:center;gap:.5cqw}
+.card-cups svg{width:6.2cqw;height:6.2cqw;color:#ffd978;filter:drop-shadow(0 0 1.1cqw rgba(255,206,104,.85)) drop-shadow(0 .3cqw .5cqw rgba(0,0,0,.8))}
+.card-cups b{font:700 2.7cqw/1 var(--text);letter-spacing:.05em;color:#fff1c9;text-shadow:0 .2cqw .6cqw #000,0 0 1cqw #000}
 /* pendant l'apothéose (ouverture d'un pack), les trophées attendent dans l'ombre et s'allument un à un */
 .card.apo .card-cups span{opacity:.22;filter:grayscale(1);transition:opacity .5s,filter .5s,transform .5s cubic-bezier(.2,1.6,.4,1)}
 .card.apo .card-cups span.lit{opacity:1;filter:none;transform:scale(1.22)}
 /* les éclats, devant lui : quelques étoiles à quatre branches, sur les bords (jamais sur son visage), qui scintillent et glissent plus vite que tout le reste */
 .card.v-legend .card-spark{inset:-8%;-webkit-mask-image:none;mask-image:none;mix-blend-mode:screen;
-  background:var(--st) 10% 17%/6.4cqw 6.4cqw no-repeat,var(--st) 90% 25%/4.6cqw 4.6cqw no-repeat,var(--st) 79% 9%/3.2cqw 3.2cqw no-repeat,var(--st) 14% 47%/2.8cqw 2.8cqw no-repeat,
-    var(--st) 91% 51%/2.4cqw 2.4cqw no-repeat,var(--st) 31% 7%/2cqw 2cqw no-repeat,var(--st) 6% 68%/2.2cqw 2.2cqw no-repeat;
+  background:var(--st) 10% 17%/6.4cqw 6.4cqw no-repeat,var(--st) 71% 13%/4.2cqw 4.2cqw no-repeat,var(--st) 80% 60%/3cqw 3cqw no-repeat,var(--st) 14% 47%/2.8cqw 2.8cqw no-repeat,
+    var(--st) 26% 60%/2.4cqw 2.4cqw no-repeat,var(--st) 31% 7%/2cqw 2cqw no-repeat,var(--st) 6% 68%/2.2cqw 2.2cqw no-repeat;
   transform:translate(calc((50% - var(--hx)) * .2),calc((50% - var(--hy)) * .13))}
 body.fx .card.v-legend .card-spark{animation:twinkle 2.1s ease-in-out infinite alternate}
-/* la feuille irisée : deux trames de couleurs, à des angles différents, qui défilent quand la lumière bouge — là où elles se croisent, les
-   couleurs s'additionnent. On ne la voit bien qu'autour du point de lumière. */
-.card-prism{position:absolute;inset:0;pointer-events:none;mix-blend-mode:color-dodge;opacity:.85;
+/* la feuille d'or : deux trames de fins reflets — or, or pâle, rouge — à des angles différents, qui défilent quand la lumière bouge. On ne
+   la voit bien qu'autour du point de lumière ; elle est derrière lui : ses reflets ne passent jamais sur son visage. */
+.card-prism{position:absolute;inset:0;pointer-events:none;mix-blend-mode:color-dodge;opacity:.8;
   background:
-    repeating-linear-gradient(118deg,rgba(255,60,120,.3) 0,rgba(255,170,60,.3) 1.5%,rgba(255,240,120,.3) 3%,rgba(90,255,190,.3) 4.5%,rgba(80,170,255,.3) 6%,rgba(170,110,255,.3) 7.5%,rgba(255,60,120,.3) 9%) calc(var(--hx) * 2.6) calc(var(--hy) * 1.8)/180% 180%,
-    repeating-linear-gradient(64deg,rgba(255,255,255,0) 0,rgba(255,255,255,.22) .6%,rgba(255,255,255,0) 1.2%,rgba(255,255,255,0) 5%) calc(var(--hx) * -3.4) calc(var(--hy) * 2.2)/220% 220%;
-  /* seulement autour du point de lumière (elle est derrière lui : ses couleurs ne passent jamais sur son visage) */
+    repeating-linear-gradient(118deg,rgba(255,196,90,.3) 0,rgba(255,236,170,.3) 1.6%,rgba(255,130,90,.24) 3.2%,rgba(255,70,100,.2) 4.8%,rgba(255,214,130,.3) 6.4%,rgba(255,196,90,.3) 8%) calc(var(--hx) * 2.6) calc(var(--hy) * 1.8)/180% 180%,
+    repeating-linear-gradient(64deg,rgba(255,255,255,0) 0,rgba(255,244,210,.22) .6%,rgba(255,255,255,0) 1.2%,rgba(255,255,255,0) 5%) calc(var(--hx) * -3.4) calc(var(--hy) * 2.2)/220% 220%;
   -webkit-mask-image:radial-gradient(84% 58% at var(--hx) var(--hy),#000 0,rgba(0,0,0,.6) 36%,rgba(0,0,0,.16) 72%,transparent 100%);
   mask-image:radial-gradient(84% 58% at var(--hx) var(--hy),#000 0,rgba(0,0,0,.6) 36%,rgba(0,0,0,.16) 72%,transparent 100%)}
-/* une lumière blanche suit le mouvement, cernée d'un fin liseré de couleurs (la dispersion d'un diamant) ; un trait de lumière traverse la carte */
-body.fx .card.v-legend .card-holo,.card.v-legend .card-holo{opacity:.9;mix-blend-mode:screen;animation:none;
+/* une lumière chaude suit le mouvement ; un trait de lumière dorée traverse la carte */
+body.fx .card.v-legend .card-holo,.card.v-legend .card-holo{opacity:.85;mix-blend-mode:screen;animation:none;
   background:
-    linear-gradient(112deg,rgba(255,255,255,0) 42%,rgba(255,232,180,.34) 47.5%,rgba(255,255,255,.85) 50%,rgba(255,232,180,.34) 52.5%,rgba(255,255,255,0) 58%) 130% 0/270% 100% no-repeat,
-    radial-gradient(circle at var(--hx) var(--hy),rgba(255,255,255,.3) 0,rgba(255,236,200,.12) 20%,rgba(255,150,190,.1) 27%,rgba(150,255,226,.1) 32%,rgba(150,196,255,.08) 38%,rgba(255,255,255,0) 52%)}
+    linear-gradient(112deg,rgba(255,255,255,0) 42%,rgba(255,214,140,.34) 47.5%,rgba(255,250,232,.85) 50%,rgba(255,214,140,.34) 52.5%,rgba(255,255,255,0) 58%) 130% 0/270% 100% no-repeat,
+    radial-gradient(circle at var(--hx) var(--hy),rgba(255,244,214,.28) 0,rgba(255,206,120,.12) 22%,rgba(255,90,110,.08) 34%,rgba(255,255,255,0) 52%)}
 body.fx .card.v-legend .card-holo{animation:kcsweep 4.6s cubic-bezier(.45,0,.2,1) infinite}
-body.fx .card.v-legend .card-front .card-frame::after,.card.v-legend .card-front .card-frame::after{background:conic-gradient(from var(--spin),#ffffff,#ffe9b0,#c9a54e,#ffffff,#ffb3c8,#b9fff0,#a9c8ff,#fff3cf,#ffffff)}
+body.fx .card.v-legend .card-front .card-frame::after,.card.v-legend .card-front .card-frame::after{background:conic-gradient(from var(--spin),#fff8e2,#f0cf7c,#b8862e,#fff8e2,#e0344e,#7a1420,#f0cf7c,#fff8e2)}
 body.fx .card.v-legend .card-front .card-frame::after{animation:spin 6s linear infinite}
-.card.v-legend .card-mark{padding:1.3cqw 2.8cqw 1.2cqw;font-weight:800;font-size:3.5cqw;color:#1a0a12;background:linear-gradient(105deg,#fff,#ffe9b0 30%,#d9a94a 62%,#ffffff 100%) var(--hx) 0/220% 100%;box-shadow:0 0 2.6cqw rgba(255,224,150,.85)}
-.card.v-legend:not(.is-back):not(.missing){filter:drop-shadow(0 0 2.2cqw rgba(255,222,150,.6)) drop-shadow(0 0 5cqw rgba(255,70,110,.3))}
-.card.missing.v-legend .card-facets,.card.missing.v-legend .card-aurora,.card.missing.v-legend .card-crown,.card.missing.v-legend .card-prism{opacity:.2}
-.card.missing.v-legend .card-art{display:none}
+.card.v-legend .card-mark{padding:1.3cqw 2.8cqw 1.2cqw;font-weight:800;font-size:3.5cqw;color:#1a0508;background:linear-gradient(105deg,#fff8e2,#ffe2a0 30%,#d9a94a 62%,#fff8e2 100%) var(--hx) 0/220% 100%;box-shadow:0 0 2.6cqw rgba(255,214,130,.85)}
+.card.v-legend:not(.is-back):not(.missing){filter:drop-shadow(0 0 2.2cqw rgba(255,214,130,.6)) drop-shadow(0 0 5cqw rgba(230,40,70,.36))}
+/* le losange du haut est hors de la face : il reçoit ici l'or et le rouge de la carte (jamais tant qu'elle montre son dos) */
+.card.v-legend:not(.is-back):not(.turned):not(.missing) .card-gem{background:linear-gradient(135deg,#fff8e2,#f0cf7c 50%,#8a1626);box-shadow:0 0 0 .55cqw #060d18,0 0 3cqw rgba(240,207,124,.6)}
+.card.missing.v-legend .card-crown,.card.missing.v-legend .card-prism{opacity:.2}
+.card.missing.v-legend .card-art,.card.missing .card-petals,.card.missing .card-auto{display:none}
 .card.missing .card-cups svg{filter:none}
 
 /* « MY CEO » : Kameto, en édition limitée à 200 exemplaires numérotés — la plus belle carte du jeu. Bleu roi et or. Son portrait remplit
