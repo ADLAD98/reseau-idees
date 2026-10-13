@@ -402,15 +402,11 @@ document.addEventListener('click', (e) => {
   if (b) toggleVolume(b, syncTune);
 });
 
-/* Une carte que le joueur n'a pas est grisée, sous cadenas (missing). La légendaire fait exception : c'est la pièce que tout le monde
-   chasse, et presque personne ne la verrait jamais — elle se montre telle qu'elle est, sous un cadenas (showcase). */
-const lockCls = (card, own) => (own ? '' : card.variant === 'legend' ? 'showcase' : 'missing');
-
 /* ---------- carte cliquable ---------- */
 function tile(card, extra) {
   const own = S.owned.get(card.id);
   return '<button class="tile" type="button" data-card="' + esc(card.id) + '" aria-label="' + esc(card.name) + ', note ' + card.ovr + '">'
-    + cardHTML(card, S.cat, { cls: lockCls(card, own), qty: own ? own.qty : 0, serial: own ? serialOf(card.id) : 0 }) + (extra || '') + '</button>';
+    + cardHTML(card, S.cat, { cls: own ? '' : 'missing', qty: own ? own.qty : 0, serial: own ? serialOf(card.id) : 0 }) + (extra || '') + '</button>';
 }
 document.addEventListener('click', (e) => {
   const t = e.target.closest('[data-card]');
@@ -900,10 +896,10 @@ function showSheet(id) {
   const sheet = document.createElement('div');
   sheet.className = 'sheet';
   sheet.innerHTML = '<div class="sheet-box panel" role="dialog" aria-modal="true" aria-label="' + esc(card.name) + '" style="--tc:var(--t' + card.tier + ')">'
-    + '<div class="sheet-card">' + cardHTML(card, cat, { eager: true, cls: lockCls(card, own), qty: own ? own.qty : 0, serial: own ? serialOf(card.id) : 0 })
+    + '<div class="sheet-card">' + cardHTML(card, cat, { eager: true, cls: own ? '' : 'missing', qty: own ? own.qty : 0, serial: own ? serialOf(card.id) : 0 })
     + '<span>' + (own ? (own.qty > 1 ? own.qty + ' exemplaires' : '1 exemplaire') + ' · depuis le ' + frDate(own.at) : 'Carte manquante') + '</span>'
     /* l'examiner : seule, en grand, on la tourne et on la retourne du doigt */
-    + (own || lockCls(card, own) === 'showcase' ? '<button class="btn sheet-look" type="button" data-sheet="look">Examiner la carte</button>' : '') + '</div>'
+    + (own ? '<button class="btn sheet-look" type="button" data-sheet="look">Examiner la carte</button>' : '') + '</div>'
     + '<div class="sheet-info"><div class="sheet-title"><div><h2>' + esc(card.name) + '</h2>'
     + '<p>' + (card.country ? '<img src="' + flagUrl(card.country) + '" alt="">' + esc(cat.countries[card.country]) + ' · ' : '') + esc(card.title || ROLE_NAME[card.role]) + ' · ' + esc(team ? team.name : card.team) + '</p></div>'
     + '<span class="spacer"></span><button class="close" type="button" aria-label="Fermer">' + icon('i-close') + '</button></div>'
