@@ -582,6 +582,16 @@ body.fx .card.v-legend .card-front .card-frame::after,.card.v-legend .card-front
 body.fx .card.v-legend .card-front .card-frame::after{animation:spin 6s linear infinite}
 .card.v-legend .card-mark{padding:1.3cqw 2.8cqw 1.2cqw;font-weight:800;font-size:3.5cqw;color:#1a0508;background:linear-gradient(105deg,#fff8e2,#ffe2a0 30%,#d9a94a 62%,#fff8e2 100%) var(--hx) 0/220% 100%;box-shadow:0 0 2.6cqw rgba(255,214,130,.85)}
 .card.v-legend:not(.is-back):not(.missing){filter:drop-shadow(0 0 2.2cqw rgba(255,214,130,.6)) drop-shadow(0 0 5cqw rgba(230,40,70,.36))}
+/* la légendaire qu'on n'a pas encore se montre quand même telle qu'elle est (showcase) : un cadenas d'or scelle le haut de la carte,
+   à la place du losange. (Tout est dans l'image du cadenas : pas d'unité propre aux cartes sur ce calque, Safari ne les y résout pas.) */
+.card.showcase .card-gem{display:none}
+.card.showcase::after{content:"";position:absolute;left:43.5%;top:-3.3%;z-index:3;width:13%;aspect-ratio:1;pointer-events:none;
+  background:center/100% no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='18.4' fill='%230b0507' stroke='%23060d18' stroke-width='3'/%3E%3Ccircle cx='20' cy='20' r='15.6' fill='none' stroke='%23f0cf7c' stroke-width='1.5'/%3E%3Cg fill='none' stroke='%23ffe9b0' stroke-width='1.8' stroke-linejoin='round' stroke-linecap='round'%3E%3Crect x='13.5' y='18.6' width='13' height='9.4' rx='1'/%3E%3Cpath d='M16.2 18.6v-3.4a3.8 3.8 0 0 1 7.6 0v3.4'/%3E%3C/g%3E%3C/svg%3E");
+  filter:drop-shadow(0 0 3px rgba(240,207,124,.55))}
+/* dans la grille de la collection, la lueur d'une carte reste près d'elle : plus large, elle serait coupée net au bord de sa case.
+   (En pixels : sur la carte elle-même, une unité « cqw » se mesure à la fenêtre, pas à la carte.) */
+.grid .tile .card.v-legend:not(.is-back):not(.missing){filter:drop-shadow(0 0 3px rgba(255,214,130,.85))}
+.grid .tile .card.v-kc:not(.is-back):not(.missing){filter:drop-shadow(0 0 3px rgba(36,140,255,.7))}
 /* le losange du haut est hors de la face : il reçoit ici l'or et le rouge de la carte (jamais tant qu'elle montre son dos) */
 .card.v-legend:not(.is-back):not(.turned):not(.missing) .card-gem{background:linear-gradient(135deg,#fff8e2,#f0cf7c 50%,#8a1626);box-shadow:0 0 0 .55cqw #060d18,0 0 3cqw rgba(240,207,124,.6)}
 .card.missing.v-legend .card-crown,.card.missing.v-legend .card-prism{opacity:.2}
