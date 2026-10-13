@@ -43,8 +43,8 @@ function structureHTML(s, view) {
     + '<p class="cb-s-fx">' + (built ? esc(effectOf(s, s.level)) + '.' : 'Pas encore bâtie.') + '</p>'
     + (s.next !== null ? '<p class="cb-s-next">Niveau ' + (s.level + 1) + ' : ' + esc(effectOf(s, s.level + 1)) + '.</p>' : '')
     + '<div class="cb-s-acts">'
-    + (gate ? (gate.ready ? '<button class="btn primary slim" type="button" data-gate>Encaisser · +' + gate.amount + '</button>' : '<span class="cb-s-done">Billetterie encaissée aujourd\'hui</span>') : '')
-    + (s.next !== null ? '<button class="btn slim" type="button" data-build="' + esc(s.id) + '"' + (short ? ' disabled title="Il te manque ' + num(s.next - S.player.coins) + ' crédits"' : '') + '>' + (built ? 'Améliorer' : 'Bâtir') + ' · ' + num(s.next) + '</button>'
+    + (gate ? (gate.ready ? '<button class="btn primary slim" type="button" data-gate><span class="cb-b"><span>Encaisser</span><span class="cb-sep"> · </span><b>+' + gate.amount + '</b></span></button>' : '<span class="cb-s-done">Billetterie encaissée aujourd\'hui</span>') : '')
+    + (s.next !== null ? '<button class="btn slim" type="button" data-build="' + esc(s.id) + '"' + (short ? ' disabled title="Il te manque ' + num(s.next - S.player.coins) + ' crédits"' : '') + '><span class="cb-b"><span>' + (built ? 'Améliorer' : 'Bâtir') + '</span><span class="cb-sep"> · </span><b>' + num(s.next) + '</b></span></button>'
       : '<span class="cb-s-done">Niveau maximum</span>') + '</div></article>';
 }
 function draw() {

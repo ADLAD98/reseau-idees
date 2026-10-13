@@ -255,6 +255,12 @@ p.empty::before{content:"";display:block;width:13px;height:13px;margin:0 auto 16
 .cb-s-next{color:var(--mut);font-size:12.5px;line-height:1.35}
 .cb-s-acts{display:grid;gap:8px;width:100%;margin-top:auto;padding-top:4px}
 .cb-s-acts .btn{width:100%}
+/* bâtir, améliorer : le verbe, et le prix dessous — un prix à cinq chiffres ne tient pas sur une ligne dans une carte étroite */
+.cb-s-acts .btn[data-build],.cb-s-acts .btn[data-gate]{height:auto;min-height:46px;min-width:0;padding:8px 8px 7px}
+.cb-s-acts .btn[data-gate] b{color:inherit}
+.cb-b{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0;line-height:1}
+.cb-b .cb-sep{display:none}
+.cb-b b{font:600 14.5px/1 var(--text);letter-spacing:.05em;color:var(--gold-hi)}
 .cb-s-done{font:600 11px/1.35 var(--text);letter-spacing:.1em;text-transform:uppercase;color:var(--mut)}
 .cb-note{color:var(--mut);font-size:14px;line-height:1.5}
 /* sur la fiche d'un ami : son club en une ligne */
