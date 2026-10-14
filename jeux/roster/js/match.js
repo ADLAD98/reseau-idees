@@ -5,6 +5,8 @@ import { DDRAGON, ROLE_LABEL, STORE } from './config.js';
 import { createFans } from './fans.js';
 import { createFx } from './fx.js';
 import { BUILDS, BUILD_DEFAULT, ITEMS, SUPPORT_ITEM } from './items.js';
+/* (lu par l'objet du module : une page qui garderait l'ancien items.js en mémoire ne casse pas) */
+import * as itemData from './items.js';
 import { KITS, RESOURCES, SPELLS, SPELL_DEFAULT, SPELL_PICKS } from './kits.js';
 import { CAMPS, KILL_GAP, NEXUS, NEXUS_TOWERS, PIT, SHOW_LEAD, STRUCT, TRAILS, planMoves, sample } from './moves.js';
 import { cheer } from './music.js';
@@ -17,6 +19,13 @@ const clockText = (sec) => Math.floor(sec / 60) + ':' + String(Math.floor(sec % 
 const num = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '\u202f');
 /* le build d'un champion dont on ne connaît pas celui des pros à ce poste : celui du champion de la même classe (et des mêmes dégâts) le plus joué à ce poste */
 const defaultBuild = (role, info) => { const d = BUILD_DEFAULT[role] || {}; return d[(info.t || '') + '/' + (info.d || '')] || d[info.t || ''] || d[''] || []; };
+/* le build d'un champion à un poste : celui que les pros y prennent ; joué hors de ses postes, ses propres objets (ceux de son kit), avec l'objet
+   de départ et les bottes du poste ; à défaut seulement, le build de sa classe (OWN_CORE peut manquer face à un vieux items.js gardé en mémoire) */
+function buildOf(champ, role, info) {
+  if (BUILDS[champ] && BUILDS[champ][role]) return BUILDS[champ][role];
+  const base = defaultBuild(role, info), own = itemData.OWN_CORE ? itemData.OWN_CORE[champ] : null;
+  return own && role !== 'SUP' && base.length >= 2 ? [base[0], base[1], ...own] : base;
+}
 const kilo = (g) => (Math.round(g / 100) / 10).toFixed(1).replace('.', ',') + 'k';
 const icon = (id) => '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#' + id + '"/></svg>';
 const SIDE_COLORS = [['#4ea3ff', '#bfe0ff', '#ffffff'], ['#f0586a', '#ffc2c9', '#ffffff']];
@@ -88,7 +97,7 @@ export function runMatch({ data, cat, fx }) {
         sums: ((SPELL_PICKS[champ] && SPELL_PICKS[champ][ROLES[r]]) || SPELL_DEFAULT[ROLES[r]] || '').split('').filter((l) => SPELLS[l]),
         /* ce qu'il achète : le build que les pros prennent sur ce champion à ce poste (objet de départ, bottes, objets complets) ; pour un
            support, la forme finale de son objet de quête */
-        build: (BUILDS[champ] && BUILDS[champ][ROLES[r]]) || defaultBuild(ROLES[r], info),
+        build: buildOf(champ, ROLES[r], info),
         sup: SUPPORT_ITEM.final[champ] || SUPPORT_ITEM.final[''] });
     });
   }
