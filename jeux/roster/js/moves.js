@@ -885,7 +885,7 @@ export function planMoves(sim, kits = []) {
        s'il a beaucoup d'or sur lui : on ne se promène pas avec trois mille pièces d'or en poche. */
     const shopTrip = (deadline, spot) => {
       if (!econ.wants(i, cur.t)) return false;
-      const rich = econ.pocketAt(i, cur.t) >= 2200;
+      const rich = econ.pocketAt(i, cur.t) >= 1600;
       return cur.t + 1000 + (spot ? routeLen(home, spot) / (rich ? VRUSH : VFAST) : 900) < deadline - (rich ? 60 : 250);
     };
     function jungleAction(deadline, target) {

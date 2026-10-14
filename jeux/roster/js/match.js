@@ -257,7 +257,10 @@ export function runMatch({ data, cat, fx }) {
     const g = P.map((p, i) => plan.goldAt(i, tau));
     for (let i = 0; i < 10; i++) {
       const v = Math.round(g[i] / 100);
-      if (v !== gdLook[i]) { gdLook[i] = v; gdEls[i].textContent = kilo(g[i]); }
+      /* l'or gagné depuis le début (comme sur une retransmission), et dessous l'or en poche : il monte, puis retombe quand le joueur
+         rentre à la base et achète */
+      const purse = Math.max(0, Math.round(plan.pocketAt(i, tau) / 10) * 10), look = v + ':' + purse;
+      if (look !== gdLook[i]) { gdLook[i] = look; gdEls[i].innerHTML = kilo(g[i]) + '<small title="Or en poche : il le dépensera à son prochain passage à la boutique">' + purse + '<span class="hide-s"> en poche</span></small>'; }
       /* ses objets : ils ne changent qu'à la boutique ; celui qu'il vient d'acheter se pose avec un éclat */
       const ids = plan.itemsAt(i, tau), sig = ids.join(',');
       if (sig !== itLook[i]) {

@@ -450,15 +450,17 @@ export function planGold({ ev, at, casts, state, deaths, gameAt, tauOfGame, leve
   /** A-t-il de quoi faire un achat qui vaille un retour à la base ? */
   function wants(i, x) {
     const s = S[i], g = gameAt(x);
-    if (!s.visits || g < 150 || g - s.last < 150) return false;
+    /* comme les pros : on rentre dès qu'on peut finir son objet, ou s'offrir son plus gros composant (dès 900 PO), et jamais avec plus de
+       1 600 PO en poche ; pas deux retours à moins de deux minutes d'écart */
+    if (!s.visits || g < 150 || g - s.last < 120) return false;
     const t = target(s);
     if (!t) return false;
     const pocket = goldAt(i, x) - s.spent, whole = quote(t, s.inv.slice()).cost;
-    if (whole <= pocket) return true;
+    if (whole <= pocket || pocket >= 1600) return true;
     if (whole <= 1500) return false;
     let big = 0;
     for (const c of new Set(missing(t, s.inv.slice(), []))) big = Math.max(big, quote(c, s.inv.slice()).cost);
-    return pocket >= clamp(big, 1100, 1300);
+    return pocket >= clamp(big, 900, 1300);
   }
   /** À la fin : les dernières transformations. */
   function finish() { for (let i = 0; i < 10; i++) sync(i, total); }

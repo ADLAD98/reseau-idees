@@ -552,6 +552,7 @@
 .mv-it img.new{animation:itemIn .7s cubic-bezier(.2,.8,.3,1.25)}
 @keyframes itemIn{from{transform:scale(1.9);filter:brightness(2.4)}}
 .mv-gd{grid-area:gd;font:600 13px/1 var(--text);color:var(--gold);font-variant-numeric:tabular-nums;white-space:nowrap}
+.mv-gd small{display:block;margin-top:3px;font:500 10.5px/1 var(--text);color:var(--mut);letter-spacing:.02em}
 /* les deux sorts d'invocateur, l'un sous l'autre contre le portrait : grisés, avec les secondes qui restent, tant qu'ils ne sont pas revenus */
 .mv-sp{grid-area:sp;display:flex;flex-direction:column;gap:3px}
 .mv-sum{position:relative;display:block;width:20px;height:20px;overflow:hidden;box-shadow:0 0 0 1px #2c3b4e}
