@@ -625,9 +625,11 @@ async function openBooster(kind, from) {
       /* au bilan, un doublon se revend sur-le-champ (si le serveur sait racheter les doublons) */
       quick: S.shop && S.shop.quick ? {
         price: (card) => quickPrice(card),
-        sell: async (card) => {
+        /* (« tout vendre » ne prend que les cartes ordinaires jusqu'à ce rang : le bouton unique du bilan, sur téléphone, fait de même) */
+        bulkTier: S.shop.quick.bulkTier || 3,
+        sell: async (card, qty = 1) => {
           try {
-            const res = await call('POST', '/api/market/quick', { card: card.id, qty: 1 });
+            const res = await call('POST', '/api/market/quick', { card: card.id, qty });
             applyState(res);
             for (const [id, left] of res.cards) PLAY.owned(id, left);
             return { coins: res.coins, left: (S.owned.get(card.id) || { qty: 1 }).qty };

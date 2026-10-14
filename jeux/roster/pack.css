@@ -191,6 +191,16 @@ body.fx .pack.ready .pk-glare{animation:pkshine 5.6s cubic-bezier(.4,0,.2,1) inf
 .op-sell.sure{transition:none;color:#010a13;background:linear-gradient(#ffe7a8,#c8aa6e);border-color:var(--gold-hi)}
 .op-sell.sold{border-color:transparent;background:none;color:var(--ok);cursor:default}
 .op-sell:disabled{opacity:.6!important}
+/* le bouton unique qui revend les doublons du bilan : sur téléphone seulement (la scène est alors étroite : .narrow), sous le bilan ;
+   les boutons de chaque carte y disparaissent (ils tomberaient sous la rangée du bas) */
+.op-sellall{display:none;align-items:center;justify-content:center;height:42px;margin:12px auto 0;padding:0 18px;border:1px solid var(--gold-lo);background:linear-gradient(#1e2328,#14181d);
+  color:var(--gold-hi);font:400 14px/1 var(--title);letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;cursor:pointer}
+.op.narrow[data-stage="done"] .op-sellall{display:flex}
+.op.narrow .op-sell{display:none}
+.op-sellall.sure{color:#010a13;background:linear-gradient(#ffe7a8,#c8aa6e);border-color:var(--gold-hi)}
+.op-sellall.sold{border-color:transparent;background:none;color:var(--ok);cursor:default}
+.op-sellall:disabled{opacity:.6}
+.op-sellall.sold:disabled{opacity:1}
 .op-hint{display:block;margin-top:6px;color:var(--faint);font-size:13.5px;letter-spacing:.04em}
 /* le présentoir : cinq emplacements où viennent se ranger les cartes découvertes */
 .op-tray{position:absolute;left:50%;top:50%;display:flex;gap:var(--tg);margin-top:var(--trayY);transform:translate(-50%,-50%);opacity:0;transition:opacity .5s;pointer-events:none}

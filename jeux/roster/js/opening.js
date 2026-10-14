@@ -103,6 +103,7 @@ export async function runOpening({ request, getCat, fx, size, from, look, quick 
     const r = stage.getBoundingClientRect();
     M.w = r.width; M.h = r.height; M.x = r.left + r.width / 2; M.y = r.top + r.height / 2;
     M.narrow = M.w < 700;
+    op.classList.toggle('narrow', M.narrow);
     /* le présentoir du bas, la carte en grand, le sachet, puis les cartes du bilan */
     M.tw = Math.min(M.w * 0.15, 86); M.th = M.tw * 1.4; M.tg = Math.min(M.w * 0.022, 14);
     const gap = M.narrow ? 24 : 30;
@@ -190,6 +191,7 @@ export async function runOpening({ request, getCat, fx, size, from, look, quick 
   let data = null, pulls = [], boxes = [], imgs = [], ready = false;
   let k = 0, shown = false, busy = true, goTo = null, leave = null, closed = false;
   let gen = 0;                 // change quand le joueur passe l'animation : ce qui était en cours s'arrête
+  let bulk = [];               // les doublons ordinaires du bilan, que le bouton unique du téléphone revend d'un coup
   let hints = 2;               // nombre de fois où l'on rappelle « touche pour continuer »
   let tearP = 0, tearDir = 1, drag = null;   // part de la bande déjà déchirée (0 à 1), sens du geste, geste en cours
   const setStage = (name) => { op.dataset.stage = name; };
@@ -762,7 +764,14 @@ export async function runOpening({ request, getCat, fx, size, from, look, quick 
       const gain = p.qty > 1 && !p.card.limited ? quick.price(p.card) : 0;
       if (gain > 0) boxes[i].insertAdjacentHTML('beforeend', '<button class="op-sell" type="button" data-sell="' + i + '" data-say="Revendre · +' + gain + '">Revendre · +' + gain + '</button>');
     });
+    /* Sur téléphone, les cartes du bilan sont sur deux rangées : le bouton d'une carte du haut tomberait sous la rangée du bas. Un seul
+       bouton, sous le bilan, revend alors d'un coup tous les exemplaires en trop (il en reste toujours un) — des cartes ordinaires
+       seulement, comme « Tout vendre » au marché : une belle carte en double se vend une par une, depuis la collection. */
+    bulk = quick ? pulls.map((p, i) => ({ p, i, n: p.qty - 1 })).filter((x) => x.n > 0 && !x.p.card.limited && !x.p.card.variant && x.p.card.tier <= quick.bulkTier) : [];
+    const total = bulk.reduce((sum, x) => sum + x.n * quick.price(x.p.card), 0), copies = bulk.reduce((sum, x) => sum + x.n, 0);
+    const say = 'Revendre ' + (copies > 1 ? 'les ' + copies + ' doublons' : 'le doublon') + ' · +' + total;
     setInfo('<b>' + (fresh ? fresh + (fresh > 1 ? ' nouvelles cartes' : ' nouvelle carte') : 'Aucune nouvelle carte') + '</b>'
+      + (total > 0 ? '<button class="op-sellall" type="button" data-sellall data-say="' + say + '">' + say + '</button>' : '')
       + (matchMedia('(pointer: coarse)').matches ? '' : '<span class="op-hint">Clique une carte pour l\'examiner</span>'), false);
     if (fx) sfx.done();
     busy = false;
@@ -796,6 +805,34 @@ export async function runOpening({ request, getCat, fx, size, from, look, quick 
     else { btn.classList.remove('sure'); btn.classList.add('sold'); btn.textContent = '+' + res.coins + ' crédits'; }
   }
 
+  /** Téléphone : revend d'un coup les exemplaires en trop des doublons ordinaires du bilan. Le premier toucher arme le bouton, le second vend. */
+  async function sellAll(btn) {
+    if (!btn.classList.contains('sure')) {
+      btn.classList.add('sure');
+      btn.textContent = 'Confirmer · +' + btn.dataset.say.split('+').pop();
+      setTimeout(() => { if (btn.isConnected && btn.classList.contains('sure') && !btn.disabled) { btn.classList.remove('sure'); btn.textContent = btn.dataset.say; } }, 3500);
+      return;
+    }
+    btn.disabled = true;
+    let coins = 0;
+    for (const x of bulk) {
+      if (x.p.qty <= 1) continue;
+      const res = await quick.sell(x.p.card, x.p.qty - 1);
+      if (closed) return;
+      if (!res) continue;
+      coins += res.coins;
+      x.p.qty = res.left;
+      const tag = boxes[x.i].querySelector('.op-tag');
+      if (tag) tag.textContent = '×' + res.left;
+      /* son propre bouton (sur un écran plus large) n'a plus rien à vendre */
+      const own = boxes[x.i].querySelector('.op-sell');
+      if (own && res.left <= 1) { own.classList.remove('sure'); own.classList.add('sold'); own.textContent = '+' + res.coins + ' crédits'; }
+    }
+    btn.classList.remove('sure');
+    if (coins > 0) { sfx.done(); btn.classList.add('sold'); btn.textContent = '+' + coins + ' crédits'; }
+    else { btn.disabled = false; btn.textContent = btn.dataset.say; }
+  }
+
   /* ---------- gestes ---------- */
   function onClick(e) {
     const act = e.target.closest('[data-act]');
@@ -814,6 +851,8 @@ export async function runOpening({ request, getCat, fx, size, from, look, quick 
     if (endApo) { endApo(); return; }
     if (op.dataset.stage === 'stack') { advance(); return; }
     if (op.dataset.stage === 'done') {
+      const all = e.target.closest('[data-sellall]');
+      if (all) { if (!all.disabled && !all.classList.contains('sold')) sellAll(all); return; }
       const btn = e.target.closest('[data-sell]');
       if (btn) { if (!btn.disabled && !btn.classList.contains('sold')) sell(btn); return; }
       const box = e.target.closest('.op-cardbox');
