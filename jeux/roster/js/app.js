@@ -5,6 +5,7 @@ import { VARIANTS, autographOf, cardHTML, champName, esc, flagUrl, iconUrl, karm
 import { clubSectionHTML, loadClub } from './club.js';
 import { GAME_NAME, LEGEND_ART_NOTE, ROLE_LABEL, ROLE_NAME, ROLE_ORDER, STORE } from './config.js';
 import { dailyLook, drawDaily, loadDaily } from './daily.js';
+import { avatarHTML, loadProfile, profileSectionHTML } from './vitrine.js';
 import { createDuels } from './duel.js';
 import { sellCard, showOnMarket, viewMarket } from './market.js';
 import { queueText } from './online.js';
@@ -332,7 +333,7 @@ function shell() {
     + '<button class="tune' + (musicOn() ? '' : ' off') + '" type="button" id="tune" aria-haspopup="dialog" title="Réglage du son" aria-label="Régler le son : musique de fond et effets">' + icon('i-note') + '</button>'
     + '<a class="purse" href="#/' + (S.live ? 'marche' : 'jouer') + '" title="Tes crédits : gagnés en jouant, dépensés au marché">' + icon('i-coin') + '<b id="credits">' + S.player.coins + '</b></a>'
     /* le joueur : son initiale dans un losange, puis son pseudo */
-    + '<a class="who" href="#/profil"><i class="who-av"><span>' + esc(S.player.name.charAt(0).toUpperCase()) + '</span></i><b>' + esc(S.player.name) + '</b></a></header>'
+    + '<a class="who" href="#/profil">' + avatarHTML(S.player.avatar, S.player.name) + '<b>' + esc(S.player.name) + '</b></a></header>'
     + '<main class="main" id="main"></main>'
     + '<nav class="tabs">' + tabs().map((t) => '<a href="#/' + t[0] + '" data-tab="' + t[0] + '">' + icon(t[2]) + t[1] + pip(t[0]) + '</a>').join('') + '</nav>';
   drawPulse();
@@ -977,12 +978,14 @@ async function viewProfile(main) {
   const p = S.player;
   /* en tête : le losange du joueur, son équipe, puis ses chiffres */
   const games = p.wins + p.losses, titles = p.titles || 0;
-  main.innerHTML = '<div class="col-head"><div class="pf-id"><i class="who-av pf-av"><span>' + esc(p.name.charAt(0).toUpperCase()) + '</span></i><div><h1 class="h1" style="--n:' + Math.max(6, p.name.length) + '">' + esc(p.name) + '</h1>'
+  main.innerHTML = '<div class="col-head"><div class="pf-id">' + avatarHTML(p.avatar, p.name, 'pf-av') + '<div><h1 class="h1" style="--n:' + Math.max(6, p.name.length) + '">' + esc(p.name) + '</h1>'
     + '<p>Joueur depuis le ' + frDate(p.createdAt) + (p.team ? ' · équipe <b>' + esc(p.team.name) + '</b> (' + esc(p.team.short) + ')' : '') + '</p></div></div>'
     + '<div class="tally"><div><b>' + num(p.wins) + '</b><span>' + (p.wins > 1 ? 'victoires' : 'victoire') + '</span></div><div><b>' + (games ? pct(p.wins, games) + '<small> %</small>' : '–') + '</b><span>de réussite</span></div>'
     + '<div><b>' + p.cardsUnique + '<small>/' + S.cat.cards.length + '</small></b><span>cartes</span></div>'
     + (S.live ? '<div class="gold"><b>' + titles + '</b><span>' + (titles > 1 ? 'Mondiaux' : 'Mondial') + '</span></div>' : '') + '</div></div>'
     /* mon club : sa carte et ses infrastructures (rempli quand le serveur a répondu) */
+    /* mon profil : mon blason et ma vitrine (rempli quand le serveur a répondu) */
+    + profileSectionHTML()
     + (S.club ? clubSectionHTML() : '') + '<div class="panels">'
     + '<section class="panel"><h3>Mon compte</h3><div class="kv"><span>Packs ouverts</span><b>' + p.packsOpened + '</b><span>Cartes différentes</span><b>' + p.cardsUnique + ' / ' + S.cat.cards.length + '</b><span>Exemplaires</span><b>' + p.cardsTotal + '</b><span>Parties gagnées</span><b>' + p.wins + ' sur ' + (p.wins + p.losses) + '</b>'
     + (S.live ? '<span>Défis entre joueurs</span><b>' + (p.duelWins || 0) + ' V – ' + (p.duelLosses || 0) + ' D</b><span>Mondiaux remportés</span><b>' + (p.titles || 0) + '</b>' : '')
@@ -1008,6 +1011,7 @@ async function viewProfile(main) {
     + '<div class="actions"><a class="btn" href="../../">Retour à Bcorps Labs</a></div></section></div>';
 
   loadClub(PLAY);
+  loadProfile(PLAY);
   $('#fxSwitch').addEventListener('click', (e) => {
     S.fx = !S.fx;
     e.currentTarget.setAttribute('aria-pressed', String(S.fx));

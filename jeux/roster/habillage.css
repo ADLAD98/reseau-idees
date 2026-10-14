@@ -458,3 +458,60 @@ body.fx .dg-won{animation:fade .5s}
   .pf-av{width:38px;height:38px;margin:0 9px}
   .pf-av span{font-size:18px}
 }
+
+/* ---------- profil : le blason (logo d'une équipe battue) et la vitrine ---------- */
+.who-av.logo{background:radial-gradient(circle,#16324c,#081424 72%)}
+.who-av .av-logo{width:78%;height:78%;object-fit:contain;transform:rotate(-45deg);filter:drop-shadow(0 1px 2px rgba(0,0,0,.6))}
+.pfx{display:grid;gap:18px;margin:0 0 34px}
+.pfx-top{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:18px}
+.pfx-badge,.pfx-show{position:relative;padding:22px;border:1px solid var(--line2);background:linear-gradient(160deg,rgba(18,40,64,.55),rgba(6,13,24,.85))}
+.pfx-badge{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center}
+.pfx-badge>div{min-width:0}
+.pfx-badge .btn{white-space:normal;height:auto;min-height:34px;padding:8px 14px}
+.pfx-badge h3{margin:4px 0 6px;font:400 22px/1.15 var(--title);letter-spacing:.06em;text-transform:uppercase;color:var(--gold-hi)}
+.pfx-badge p{margin:0 0 12px;color:var(--mut);font-size:14px;line-height:1.45}
+.pfx-av{width:92px;height:92px;margin:14px;border-color:var(--gold);box-shadow:0 0 0 1px #010a13,0 0 0 8px rgba(200,170,110,.08),0 0 34px rgba(200,170,110,.35)}
+.pfx-av span{font-size:40px}
+.pfx-show .hint{margin:4px 0 14px}
+.pfx-shelf{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+.pfx-slot{position:relative;min-width:0}
+.pfx-slot .card{--w:100%}
+.pfx-pick,.pfx-card{display:block;width:100%;padding:0;border:0;background:none;cursor:pointer}
+.pfx-empty{display:grid;place-items:center;align-content:center;gap:6px;width:100%;aspect-ratio:5/7;border:1px dashed var(--line2);background:rgba(6,14,27,.5);color:var(--mut);cursor:pointer;font:600 12px/1.2 var(--text)}
+.pfx-empty b{font:300 34px/1 var(--title);color:var(--gold)}
+.pfx-empty:hover{border-color:var(--gold-lo);color:var(--ink)}
+.pfx-rm{position:absolute;top:-8px;right:-8px;z-index:3;width:26px;height:26px;border:1px solid var(--gold-lo);border-radius:50%;background:#0b1626;color:var(--gold-hi);font:600 16px/1 var(--text);cursor:pointer}
+.pfx-all{padding:16px 20px;border:1px solid var(--line2);background:rgba(6,13,24,.6)}
+.pfx-all summary{cursor:pointer;font:600 13px/1 var(--text);letter-spacing:.12em;text-transform:uppercase;color:var(--ink)}
+.pfx-all summary b{margin-left:6px;color:var(--gold-hi)}
+.pfx-league h4{margin:18px 0 10px;font:600 12px/1 var(--text);letter-spacing:.16em;text-transform:uppercase;color:var(--mut)}
+.pfx-logos{display:flex;flex-wrap:wrap;gap:10px}
+.pfx-logo{position:relative;display:grid;place-items:center;width:62px;height:62px;padding:8px;border:1px solid var(--line2);background:#07101d;cursor:pointer}
+.pfx-logo .pfx-img{max-width:100%;max-height:100%;object-fit:contain}
+.pfx-logo span{font:600 12px/1 var(--text);color:var(--ink)}
+.pfx-logo:hover{border-color:var(--gold-lo)}
+.pfx-logo.on{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold),0 0 16px rgba(200,170,110,.35)}
+.pfx-logo.locked{cursor:not-allowed}
+.pfx-logo.locked .pfx-img,.pfx-logo.locked span{filter:grayscale(1) brightness(.45);opacity:.6}
+.pfx-lock{position:absolute;right:3px;bottom:3px;width:15px;height:15px;background:center/contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c8aa6e' stroke-width='1.8'%3E%3Crect x='5' y='11' width='14' height='9'/%3E%3Cpath d='M8 11V7a4 4 0 0 1 8 0v4'/%3E%3C/svg%3E")}
+.pfx-sheet{max-width:860px}
+.pfx-choose{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:12px;max-height:62vh;overflow:auto;padding:4px}
+.pfx-card .card{--w:100%}
+.soc-prof{display:flex;align-items:center;gap:20px;padding:14px 0}
+.soc-prof h3{margin:0 0 8px;font:600 12px/1 var(--text);letter-spacing:.14em;text-transform:uppercase;color:var(--mut)}
+.soc-prof>div{flex:1;min-width:0}
+.soc-big{width:58px;height:58px;margin:10px}
+.soc-big span{font-size:24px}
+.soc-prof .pfx-shelf{gap:8px}
+@media (max-width:860px){
+  .pfx-top{grid-template-columns:1fr}
+  .pfx-badge{padding:18px;gap:8px}
+  .pfx-av{width:70px;height:70px;margin:10px}
+  .pfx-av span{font-size:30px}
+  .pfx-show{padding:18px 14px}
+  .pfx-shelf{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+  .pfx-logo{width:52px;height:52px;padding:6px}
+  .pfx-choose{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .soc-prof{flex-direction:column;align-items:stretch}
+  .soc-prof .who-av{align-self:center}
+}

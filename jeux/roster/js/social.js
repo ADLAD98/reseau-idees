@@ -3,6 +3,7 @@
 import { ApiError } from './api.js';
 import { cardHTML, esc } from './cards.js';
 import { crestHTML, structuresLine } from './club.js';
+import { avatarHTML, showcaseHTML } from './vitrine.js';
 import { confirmSheet, openSheet, plural, sheetTitle, since } from './ui.js';
 
 const $ = (sel, root) => (root || document).querySelector(sel);
@@ -231,6 +232,8 @@ async function openFriend(id, focus) {
     /* son club : son blason, son niveau, son rang au classé, ses infrastructures */
     + (p.club ? '<div class="soc-club">' + crestHTML(p.team, p.club.short, 'small') + '<span><b>' + esc(p.team) + '</b><i>Club de niveau ' + p.club.level + (p.rank ? ' · ' + esc(p.rank.label) : '') + '</i></span>'
       + '<span class="soc-club-s">' + structuresLine(p.club.levels) + '</span></div>' : '')
+    /* son profil : son blason (le logo d'une équipe qu'il a battue) et sa vitrine */
+    + (p.avatar || (p.showcase && p.showcase.length) ? '<div class="soc-prof">' + avatarHTML(p.avatar, p.name, 'soc-big') + (p.showcase && p.showcase.length ? '<div><h3>Sa vitrine</h3>' + showcaseHTML(p.showcase, cat) + '</div>' : '<p class="hint">Pas encore de cartes en vitrine.</p>') + '</div>' : '')
     + '<div class="foe-cards">' + team + '</div>'
     + '<div class="soc-duel" id="duelBox"><h3>Le défier</h3><div class="pills" id="fmt">' + FORMATS.map((f) => '<button type="button" data-format="' + f[0] + '"' + (f[0] === format ? ' class="on"' : '') + '>' + f[1] + '</button>').join('') + '</div>'
     + (canFearless ? '<label class="soc-fear" id="fearBox"' + (format > 1 ? '' : ' hidden') + '><input type="checkbox" id="fear"' + (fearless ? ' checked' : '') + '><span><b>Fearless</b> : un champion joué dans une manche ne peut plus l\'être dans les suivantes, par aucune des deux équipes.</span></label>' : '')
