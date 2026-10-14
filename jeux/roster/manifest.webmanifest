@@ -1,0 +1,17 @@
+{
+  "name": "Roster — jeu de cartes e-sport",
+  "short_name": "Roster",
+  "description": "Ouvre des packs, collectionne les joueurs pros de la saison et fais-les s'affronter.",
+  "lang": "fr",
+  "start_url": "./#/packs",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#010a13",
+  "theme_color": "#010a13",
+  "icons": [
+    { "src": "img/icone-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "img/icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "img/icone-512-masque.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
