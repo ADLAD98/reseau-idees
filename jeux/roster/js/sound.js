@@ -223,6 +223,44 @@ export const sfx = {
   },
   /** Un ultime part, pendant un ralenti : un souffle qui s'ouvre, une note grave. */
   ult() { noise({ dur: 0.3, vol: 0.05, freq: 500, to: 3000, q: 0.8 }); bell(E5 / 2, 0.02, 0.06, 0.6); },
+  /** L'ultime d'un champion, selon ce qu'il fait (ULT_FX, kits.js) et ses dégâts (ad physiques, ap magiques, mx mixtes) : une explosion de
+      zone gronde, un engagement fend l'air puis frappe le sol, une exécution tranche net, une protection tinte, un ultime global siffle en
+      tombant du ciel, un renforcement monte en puissance. Tout est fabriqué ici, sans fichier, et reste discret. */
+  ultOf(f = 'blast', d = 'mx') {
+    if (f === 'blast') {
+      tone(118, { dur: 0.62, to: 38, vol: 0.2 });
+      noise({ dur: 0.7, vol: 0.12, type: 'lowpass', freq: 2200, to: 180 });
+      noise({ t: 0.03, dur: 0.18, vol: 0.05, type: 'highpass', freq: 3800 });
+    } else if (f === 'engage') {
+      noise({ dur: 0.24, vol: 0.07, freq: 380, to: 2600, q: 0.8, swell: true });
+      tone(160, { t: 0.22, dur: 0.38, to: 46, vol: 0.24 });
+      noise({ t: 0.22, dur: 0.34, vol: 0.12, type: 'lowpass', freq: 1400, to: 160 });
+    } else if (f === 'execute') {
+      noise({ dur: 0.22, vol: 0.07, freq: 5200, to: 9000, q: 4 });
+      tone(1760, { dur: 0.32, vol: 0.035, type: 'triangle' });
+      tone(2640, { t: 0.01, dur: 0.22, vol: 0.02, type: 'triangle' });
+      tone(130, { t: 0.05, dur: 0.24, to: 60, vol: 0.14 });
+    } else if (f === 'ward') {
+      bell(E6, 0, 0.05, 1.1); bell(G6, 0.07, 0.04, 1.1); bell(B6, 0.14, 0.035, 1.3);
+      noise({ dur: 0.9, vol: 0.025, type: 'highpass', freq: 6000, swell: true });
+    } else if (f === 'strike') {
+      tone(1300, { dur: 0.16, to: 280, vol: 0.05, type: 'sawtooth' });
+      noise({ dur: 0.1, vol: 0.06, type: 'highpass', freq: 3000 });
+      tone(140, { t: 0.08, dur: 0.22, to: 70, vol: 0.13 });
+    } else if (f === 'surge') {
+      tone(170, { dur: 0.55, to: 520, vol: 0.09, type: 'triangle', swell: true });
+      noise({ dur: 0.55, vol: 0.05, freq: 500, to: 3600, q: 1.4, swell: true });
+      bell(E5, 0.55, 0.04, 0.7);
+    } else if (f === 'global') {
+      tone(1900, { dur: 0.7, to: 260, vol: 0.045, type: 'sine' });
+      noise({ dur: 0.7, vol: 0.03, freq: 3000, to: 600, q: 2 });
+      tone(120, { t: 0.66, dur: 0.6, to: 36, vol: 0.22 });
+      noise({ t: 0.66, dur: 0.6, vol: 0.12, type: 'lowpass', freq: 2000, to: 160 });
+    }
+    /* la couleur des dégâts : un éclat de cristal pour la magie, un grain plus rugueux pour les coups physiques */
+    if (d === 'ap') bell(B6, 0.05, 0.02, 0.6);
+    else if (d === 'ad') noise({ t: 0.02, dur: 0.12, vol: 0.04, freq: 900, q: 0.6 });
+  },
   /** Début d'un ralenti : tout descend. */
   slowmo() { tone(520, { dur: 0.7, to: 130, vol: 0.11, type: 'triangle' }); noise({ dur: 0.7, vol: 0.09, freq: 4200, to: 500, q: 0.8 }); },
   /** Le Nexus explose. */

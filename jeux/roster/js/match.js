@@ -8,6 +8,8 @@ import { BUILDS, BUILD_DEFAULT, ITEMS, SUPPORT_ITEM } from './items.js';
 /* (lu par l'objet du module : une page qui garderait l'ancien items.js en mémoire ne casse pas) */
 import * as itemData from './items.js';
 import { KITS, RESOURCES, SPELLS, SPELL_DEFAULT, SPELL_PICKS } from './kits.js';
+/* (lu par l'objet du module : une page qui garderait l'ancien kits.js en mémoire ne casse pas) */
+import * as kitData from './kits.js';
 import { CAMPS, KILL_GAP, NEXUS, NEXUS_TOWERS, PIT, SHOW_LEAD, STRUCT, TRAILS, planMoves, sample } from './moves.js';
 import { cheer } from './music.js';
 import { ROLES, signed } from './rules.js';
@@ -569,9 +571,7 @@ export function runMatch({ data, cat, fx }) {
     for (const i of ev.fr || []) {
       const side = i < 5 ? 0 : 1;
       beam(pos[i], at, side, true);
-      ring(at, side, true);
-      again(tokens[i], 'ulting');
-      if (slow) sfx.ult();
+      ultCast(i, at, slow, 'global');
     }
   }
   /** Un événement, en direct. Les joueurs concernés sont déjà sur place : ils y sont venus à pied, par leur propre chemin. */
@@ -658,6 +658,26 @@ export function runMatch({ data, cat, fx }) {
     requestAnimationFrame(() => requestAnimationFrame(() => { node.style.left = to[0] / 10 + '%'; node.style.top = to[1] / 10 + '%'; }));
   }
   const ring = (p, side, big) => fxNode('mv-ring s' + side + (big ? ' big' : ''), p, big ? 1000 : 750);
+  /* L'ultime du joueur i, en p : son animation et son son dépendent de ce qu'il fait (kitData.ULT_FX) et de ses dégâts — braise pour les
+     coups physiques, arcane pour la magie, or pour les deux. f : forcer une famille (global : l'ultime qui tombe de l'autre bout de la carte). */
+  const ULT_COLORS = { ad: ['#fff1c9', '#ffb35a', '#ff5a3c'], ap: ['#f1e6ff', '#b98cff', '#5fd6ff'], mx: ['#fff8e2', '#f0cf7c', '#ffb347'] };
+  const ULT_PARTS = {
+    blast: { count: 34, speed: [90, 330], life: [0.4, 0.9], gravity: 0 },
+    engage: { count: 26, speed: [120, 380], life: [0.35, 0.8], gravity: 520, shapes: ['spark', 'diamond'] },
+    execute: { count: 16, speed: [260, 520], life: [0.25, 0.55], gravity: 0, shapes: ['spark'], spread: 0.5, angle: -0.65 },
+    ward: { count: 22, speed: [30, 120], life: [0.8, 1.4], gravity: -70, shapes: ['dot', 'diamond'] },
+    strike: { count: 14, speed: [80, 240], life: [0.3, 0.6], gravity: 0, shapes: ['spark'] },
+    surge: { count: 20, speed: [40, 150], life: [0.6, 1.1], gravity: -160, shapes: ['dot', 'spark'] },
+    global: { count: 36, speed: [100, 360], life: [0.45, 1], gravity: 0 },
+  };
+  function ultCast(i, p, slow, f) {
+    const fam = f || (kitData.ULT_FX && kitData.ULT_FX[P[i].champ]) || 'blast';
+    const dt = (cat.champions[P[i].champ] || {}).d, d = dt === 'AD' ? 'ad' : dt === 'AP' ? 'ap' : 'mx';
+    const node = fxNode('mv-ult f-' + fam + ' d-' + d + ' s' + sideOf(i), p, 1500);
+    again(tokens[i], 'ulting');
+    if (fx) { const c = clientOf(node); particles.burst(c[0], c[1], Object.assign({ colors: ULT_COLORS[d], size: [1.5, 4] }, ULT_PARTS[fam] || ULT_PARTS.blast)); }
+    if (slow) sfx.ultOf(fam, d);
+  }
 
   /* Le titre affiché pendant un temps fort : il dit où l'on se bat, jamais qui gagne. */
   const LANE_WORD = { top: 'en haut', mid: 'au milieu', bot: 'en bas' };
@@ -718,9 +738,7 @@ export function runMatch({ data, cat, fx }) {
       /* les ultimes partent, presque ensemble : un anneau éclate autour de chacun de ceux qui lancent le leur */
       for (const i of ulted) {
         if (stopped(mine) || skipSlow) break;
-        ring(here.get(i), sideOf(i), true);
-        again(tokens[i], 'ulting');
-        sfx.ult();
+        ultCast(i, here.get(i), true);
         await nap(120, null, 2);
       }
       if (ulted.size) await nap(260, null, 2);

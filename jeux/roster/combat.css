@@ -462,6 +462,46 @@
 /* l'anneau d'un ultime : plus large, à la couleur du camp, liseré clair */
 .mv-ring.big{width:14%;margin:-7% 0 0 -7%;border-width:1.5px;border-color:color-mix(in srgb,var(--c) 55%,#fff);animation-duration:.9s}
 @keyframes ring{0%{transform:scale(.15);opacity:1}100%{transform:scale(1.25);opacity:0}}
+/* ---------- les ultimes : une animation par ce qu'ils font, aux couleurs de leurs dégâts (braise, arcane, or) ---------- */
+.mv-ult{--u1:#fff8e2;--u2:#f0cf7c;--u3:#ffb347;position:absolute;z-index:2;width:15%;aspect-ratio:1;margin:-7.5% 0 0 -7.5%;border-radius:50%;pointer-events:none}
+.mv-ult.d-ad{--u1:#fff1c9;--u2:#ffb35a;--u3:#ff5a3c}
+.mv-ult.d-ap{--u1:#f1e6ff;--u2:#b98cff;--u3:#5fd6ff}
+.mv-ult::before,.mv-ult::after{content:"";position:absolute;inset:0;border-radius:50%}
+/* zone : un souffle de feu ou d'énergie qui s'étend, et l'onde de choc qui le devance */
+.mv-ult.f-blast,.mv-ult.f-global{background:radial-gradient(circle,var(--u1) 0,color-mix(in srgb,var(--u2) 85%,transparent) 22%,color-mix(in srgb,var(--u3) 45%,transparent) 44%,transparent 64%);animation:ublast .95s cubic-bezier(.15,.7,.3,1) forwards}
+.mv-ult.f-blast::after,.mv-ult.f-global::after{border:2px solid var(--u1);box-shadow:0 0 12px var(--u2);animation:ushock .8s ease-out forwards}
+.mv-ult.f-global{width:19%;margin:-9.5% 0 0 -9.5%}
+@keyframes ublast{0%{transform:scale(.2);opacity:1}60%{opacity:.9}100%{transform:scale(1.2);opacity:0}}
+@keyframes ushock{0%{transform:scale(.3);opacity:1}100%{transform:scale(1.6);opacity:0}}
+/* engagement : le lanceur s'abat, le sol se fend en étoile, une onde basse */
+.mv-ult.f-engage{width:12%;margin:-6% 0 0 -6%;background:radial-gradient(circle,var(--u1) 0,color-mix(in srgb,var(--u2) 70%,transparent) 30%,transparent 62%);animation:uslam .9s ease-out forwards}
+.mv-ult.f-engage::before{inset:-35%;background:repeating-conic-gradient(from 10deg,color-mix(in srgb,var(--u2) 90%,transparent) 0 3deg,transparent 3deg 40deg);
+  -webkit-mask:radial-gradient(circle,transparent 18%,#000 24%,#000 46%,transparent 62%);mask:radial-gradient(circle,transparent 18%,#000 24%,#000 46%,transparent 62%);animation:ucrack .9s ease-out forwards}
+.mv-ult.f-engage::after{border:3px solid var(--u2);animation:ushock .75s .08s ease-out both}
+@keyframes uslam{0%{transform:scale(1.7);opacity:0}18%{transform:scale(.9);opacity:1}100%{transform:scale(1.1);opacity:0}}
+@keyframes ucrack{0%{transform:scale(.4) rotate(-10deg);opacity:0}20%{opacity:1}100%{transform:scale(1.15) rotate(0);opacity:0}}
+/* exécution : deux entailles qui se croisent, nettes et brèves */
+.mv-ult.f-execute::before,.mv-ult.f-execute::after{inset:46% -10%;border-radius:2px;background:linear-gradient(90deg,transparent,var(--u1) 35%,#fff 50%,var(--u1) 65%,transparent);box-shadow:0 0 10px var(--u3);
+  transform:rotate(-38deg) scaleX(0);animation:uslash .55s cubic-bezier(.2,.9,.2,1) forwards}
+.mv-ult.f-execute::after{transform:rotate(38deg) scaleX(0);animation-delay:.12s}
+@keyframes uslash{0%{opacity:1}55%{transform:var(--r,rotate(-38deg)) scaleX(1);opacity:1}100%{transform:var(--r,rotate(-38deg)) scaleX(1.05);opacity:0}}
+.mv-ult.f-execute::after{--r:rotate(38deg)}
+/* protection : un dôme lumineux qui se pose et respire */
+.mv-ult.f-ward{width:13%;margin:-6.5% 0 0 -6.5%;border:2px solid color-mix(in srgb,var(--u1) 70%,#fff);background:radial-gradient(circle,transparent 45%,color-mix(in srgb,var(--u2) 35%,transparent) 70%,color-mix(in srgb,var(--u1) 55%,transparent));
+  box-shadow:0 0 16px color-mix(in srgb,var(--u2) 70%,transparent),inset 0 0 14px color-mix(in srgb,var(--u1) 50%,transparent);animation:uward 1.4s ease-out forwards}
+@keyframes uward{0%{transform:scale(.5);opacity:0}20%{transform:scale(1.05);opacity:1}45%{transform:scale(.97)}70%{transform:scale(1.02);opacity:.9}100%{transform:scale(1.08);opacity:0}}
+/* frappe ciblée : un trait qui tombe sur la cible, un éclat */
+.mv-ult.f-strike{width:9%;margin:-4.5% 0 0 -4.5%;background:radial-gradient(circle,#fff 0,var(--u2) 26%,transparent 60%);animation:ustrike .6s .12s ease-out both}
+.mv-ult.f-strike::before{inset:-160% 44% 50%;border-radius:2px;background:linear-gradient(transparent,var(--u1) 70%,#fff);box-shadow:0 0 8px var(--u2);transform-origin:50% 100%;animation:ubolt .3s ease-in forwards}
+@keyframes ustrike{0%{transform:scale(.2);opacity:1}100%{transform:scale(1.4);opacity:0}}
+@keyframes ubolt{0%{transform:scaleY(0);opacity:1}70%{transform:scaleY(1);opacity:1}100%{transform:scaleY(1);opacity:0}}
+/* renforcement : une aura qui monte autour du lanceur, en deux vagues */
+.mv-ult.f-surge{width:11%;margin:-5.5% 0 0 -5.5%;background:radial-gradient(circle,color-mix(in srgb,var(--u2) 55%,transparent) 0,transparent 62%);animation:usurge 1.3s ease-out forwards}
+.mv-ult.f-surge::before,.mv-ult.f-surge::after{border:2px solid var(--u2);box-shadow:0 0 10px var(--u3);animation:urise 1s ease-out forwards}
+.mv-ult.f-surge::after{animation-delay:.3s;opacity:0}
+@keyframes usurge{0%{transform:scale(.6);opacity:0}25%{opacity:1}100%{transform:scale(1.25);opacity:0}}
+@keyframes urise{0%{transform:scale(1.5);opacity:0}30%{opacity:1}100%{transform:scale(.5);opacity:0}}
+body:not(.fx) .mv-ult{display:none}
 /* retour à la base : un anneau se resserre autour du joueur, qui disparaît puis reparaît à sa fontaine */
 .tk.recall{animation:recall .45s linear forwards}
 @keyframes recall{0%{box-shadow:0 0 0 2px var(--c),0 0 0 3px #010a13,0 0 0 16px color-mix(in srgb,var(--c) 0%,transparent)}100%{box-shadow:0 0 0 2px #fff,0 0 0 3px #010a13,0 0 0 5px var(--c)}}
