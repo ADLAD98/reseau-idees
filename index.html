@@ -463,6 +463,42 @@ a.btn{color:var(--txt);text-decoration:none}
 .mini-cal .has{background:var(--acc-soft);border-color:var(--acc-line)}
 .mini-cal .ok{background:rgba(57,255,159,.22);border-color:var(--ok)}
 .mini-cal .late{background:rgba(255,42,109,.22);border-color:var(--alert)}
+
+/* ---------- MOD-03 : le tableau de bord de Roster ---------- */
+#rstats{position:fixed;inset:0;z-index:40;display:flex;flex-direction:column;
+  background:
+    linear-gradient(rgba(120,200,255,.02) 1px,transparent 1px) 0 0/100% 44px,
+    linear-gradient(90deg,rgba(120,200,255,.02) 1px,transparent 1px) 0 0/44px 100%,
+    var(--bg)}
+#rstats[hidden]{display:none}
+body.fx #rstats{animation:tool-in .22s ease-out}
+#rHome{width:32px;height:32px;display:grid;place-items:center;padding:0;border:0;background:none}
+#rHome:hover{background:var(--raise)}
+#rHome svg{width:22px;height:22px;stroke:none}
+#rWhen{margin-left:8px;color:var(--faint);font:11px/1 var(--mono);letter-spacing:.08em;white-space:nowrap}
+.r-body{flex:1;overflow:auto;padding:18px 16px calc(24px + env(safe-area-inset-bottom))}
+.r-grid{max-width:1180px;margin:0 auto;display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(min(100%,270px),1fr))}
+.r-card{min-width:0;padding:14px 16px;border:1px solid var(--line);background:var(--panel)}
+.r-card.wide{grid-column:1/-1}
+.r-card h3{margin:0 0 12px;font:11px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--mut)}
+.r-kpi{display:flex;flex-wrap:wrap;gap:14px 26px}
+.r-kpi div{min-width:80px}
+.r-kpi b{display:block;font:600 26px/1.1 var(--ui);color:var(--txt)}
+.r-kpi span{font:11px/1.3 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+.r-bars{display:grid;grid-template-columns:repeat(14,1fr);gap:4px;align-items:end;height:84px}
+.r-bars i{display:block;min-height:2px;border:1px solid var(--acc-line);background:var(--acc-soft)}
+.r-bars i.t{background:var(--acc)}
+.r-axis{display:flex;justify-content:space-between;margin-top:6px;font:10px/1 var(--mono);color:var(--faint)}
+.r-sum{margin:0 0 10px;font:600 15px/1.2 var(--ui);color:var(--txt)}
+.r-list{display:grid;gap:7px;margin:0;padding:0;list-style:none}
+.r-list li{display:flex;justify-content:space-between;gap:10px;padding-bottom:7px;border-bottom:1px solid var(--line);font:13px/1.35 var(--ui);color:var(--txt)}
+.r-list li:last-child{border-bottom:0;padding-bottom:0}
+.r-list small{white-space:nowrap;color:var(--faint);font:11px/1.35 var(--mono)}
+.r-ok{color:var(--ok)}.r-warn{color:var(--warn)}.r-bad{color:var(--alert)}
+.r-empty{margin:0;color:var(--faint);font:13px/1.5 var(--ui)}
+.mini-bars{position:absolute;left:10px;right:10px;top:14px;bottom:10px;display:flex;align-items:flex-end;gap:3px}
+.mini-bars i{flex:1;min-height:2px;border:1px solid var(--acc-line);background:var(--acc-soft)}
+.mini-bars i:last-child{background:var(--acc)}
 .mini-cal .t{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc)}
 
 @media (max-width:1180px){
@@ -827,12 +863,33 @@ body.fx #patch{animation:tool-in .22s ease-out}
           </span>
           <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
         </button>
+        <button class="mod" id="toolRoster">
+          <span class="m-view"><span id="rosterPreview" class="mini-bars"></span></span>
+          <span class="m-body">
+            <span class="m-head mono"><span>MOD-03</span><span class="live" id="rosterLive">Roster</span></span>
+            <span class="m-name">Roster · tableau de bord</span>
+            <span class="m-data mono" id="rosterStats"></span>
+          </span>
+          <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
       </div>
     </aside>
   </main>
 </div>
 <div id="toasts" aria-live="polite">
 </div>
+
+<section id="rstats" hidden>
+  <header class="a-bar">
+    <button id="rHome" aria-label="Console Bcorps Labs" title="Console Bcorps Labs"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="38" fill="none" stroke="#00e5ff" stroke-width="20"/><circle cx="60" cy="60" r="9" fill="#e8f1f8"/></svg></button>
+    <nav class="crumbs"><span class="c1">BL//NET</span><i>›</i><span class="a-name">Roster · tableau de bord</span></nav>
+    <span id="rWhen"></span>
+    <span class="spacer"></span>
+    <a class="btn" href="/jeux/roster/" target="_blank" rel="noopener">Ouvrir le jeu</a>
+    <button id="rRefresh" class="btn solid">Actualiser</button>
+  </header>
+  <div class="r-body"><div class="r-grid" id="rGrid"></div></div>
+</section>
 
 <section id="agenda" hidden>
   <header class="a-bar">
@@ -2581,7 +2638,7 @@ function openAgenda(){
   var h=$('hub');
   if(!selDay) selDay=todayIso();
   syncCal();
-  hubOpen=false; agendaOpen=true; pnOpen=false; $('patch').hidden=true; $('agenda').hidden=false; renderAgenda();
+  hubOpen=false; agendaOpen=true; pnOpen=false; rosterOpen=false; $('patch').hidden=true; $('rstats').hidden=true; $('agenda').hidden=false; renderAgenda();
   document.title='Planificateur · Bcorps Labs'; setHash('agenda');
   h.classList.add('out');
   setTimeout(function(){ if(h.classList.contains('out')) h.hidden=true; },300);
@@ -2836,7 +2893,7 @@ function saveKey(){
 }
 function openPatch(g){
   var h=$('hub');
-  pnGame=g; hubOpen=false; agendaOpen=false; pnOpen=true;
+  pnGame=g; hubOpen=false; agendaOpen=false; pnOpen=true; rosterOpen=false; $('rstats').hidden=true;
   $('agenda').hidden=true; $('patch').hidden=false;
   closeEditor(); renderPatch();
   document.title='Patch notes '+g.name+' · Bcorps Labs'; setHash('patch-'+g.placeId);
@@ -3153,16 +3210,95 @@ function showHub(){
   hb.style.color=(!bk||days>7)?'var(--alert)':'var(--ok)';
   $('hubClock').textContent=clock();
   document.title='Bcorps Labs';
+  rosterOpen=false; $('rstats').hidden=true;
   hubOpen=true; h.hidden=false; void h.offsetWidth; h.classList.remove('out');
   drawPreview(state);
 }
 function openTool(){
   var h=$('hub');
-  hubOpen=false; agendaOpen=false; pnOpen=false; $('agenda').hidden=true; $('patch').hidden=true;
+  hubOpen=false; agendaOpen=false; pnOpen=false; rosterOpen=false; $('agenda').hidden=true; $('patch').hidden=true; $('rstats').hidden=true;
   h.classList.add('out'); renderBoards(); touch();
   setTimeout(function(){ if(h.classList.contains('out')) h.hidden=true; },300);
 }
 $('toolReseau').onclick=openTool;
+
+/* ---------- MOD-03 : le tableau de bord de Roster ----------
+   Les chiffres viennent du serveur du jeu, lus derrière la porte de bcorpslabs.com (/prive/stats.json) : sur l'ancienne adresse, ou
+   sans être passé par la porte, le module le dit simplement. */
+var rosterOpen=false, rosterData=null, rosterErr='', rosterAt=0;
+function rsEsc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function rsNum(n){return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g,' ');}
+function loadRoster(){
+  if(!window.fetch) return;
+  fetch('/prive/stats.json',{cache:'no-store',credentials:'same-origin'}).then(function(r){
+    if(r.status===401) throw new Error('porte');
+    if(!r.ok) throw new Error('serveur');
+    return r.json();
+  }).then(function(d){ rosterData=d; rosterErr=''; rosterAt=Date.now(); rosterHub(); if(rosterOpen) renderRoster(); })
+    .catch(function(e){ rosterErr=location.hostname==='bcorpslabs.com'?(e&&e.message==='porte'?'porte':'serveur'):'adresse'; rosterHub(); if(rosterOpen) renderRoster(); });
+}
+/* le module sur la console : trois chiffres, et les packs ouverts des 14 derniers jours en petites barres */
+function rosterHub(){
+  var st=$('rosterStats'), pv=$('rosterPreview'), live=$('rosterLive'), d=rosterData;
+  st.textContent=''; pv.textContent='';
+  if(!d){ live.textContent=rosterErr==='adresse'?'Sur bcorpslabs.com':'Hors ligne'; return; }
+  live.textContent='En ligne';
+  st.appendChild(row('Joueurs',d.players)); st.appendChild(row('Actifs 24 h',d.active.day)); st.appendChild(row('Packs 7 j',d.days.packs.slice(-7).reduce(function(a,b){return a+b;},0)));
+  var max=Math.max.apply(null,d.days.packs.concat([1]));
+  d.days.packs.forEach(function(n){ var i=el('i'); i.style.height=Math.max(4,Math.round(100*n/max))+'%'; pv.appendChild(i); });
+}
+function rsBars(title,list){
+  var max=Math.max.apply(null,list.concat([1])), sum=list.reduce(function(a,b){return a+b;},0), last7=list.slice(-7).reduce(function(a,b){return a+b;},0);
+  var day=function(k){var t=new Date(Date.now()-(13-k)*864e5);return two0(t.getDate())+'/'+two0(t.getMonth()+1);};
+  return '<div class="r-card"><h3>'+rsEsc(title)+'</h3><p class="r-sum">'+rsNum(last7)+' ces 7 jours · '+rsNum(sum)+' en 14 jours</p><div class="r-bars">'
+    +list.map(function(n,k){return '<i'+(k===13?' class="t"':'')+' style="height:'+Math.max(2,Math.round(100*n/max))+'%" title="'+day(k)+' : '+n+'"></i>';}).join('')
+    +'</div><div class="r-axis"><span>'+day(0)+'</span><span>aujourd\'hui</span></div></div>';
+}
+function renderRoster(){
+  var g=$('rGrid'), d=rosterData;
+  $('rWhen').textContent=rosterAt?'mis à jour à '+two0(new Date(rosterAt).getHours())+':'+two0(new Date(rosterAt).getMinutes()):'';
+  if(!d){
+    g.innerHTML='<div class="r-card wide"><h3>Indisponible</h3><p class="r-empty">'+(rosterErr==='adresse'
+      ?'Le tableau de bord se lit sur bcorpslabs.com (ta partie privée), pas sur cette adresse.'
+      :rosterErr==='porte'?'La porte s\'est refermée : repasse par bcorpslabs.com/prive.'
+      :'Le serveur du jeu ne répond pas pour l\'instant. Réessaie dans un moment.')+'</p></div>';
+    return;
+  }
+  var use=d.usage, useCls=use>=70?'r-bad':use>=40?'r-warn':'r-ok';
+  var backup=d.backups.last?d.backups.last.split('-').reverse().join('/'):'aucune';
+  g.innerHTML=''
+    +'<div class="r-card wide"><h3>Joueurs</h3><div class="r-kpi">'
+      +'<div><b>'+rsNum(d.players)+'</b><span>comptes</span></div>'
+      +'<div><b>'+rsNum(d.active.day)+'</b><span>actifs 24 h</span></div>'
+      +'<div><b>'+rsNum(d.active.week)+'</b><span>actifs 7 jours</span></div>'
+      +'<div><b>'+rsNum(d.active.month)+'</b><span>actifs 30 jours</span></div>'
+      +'<div><b class="'+useCls+'">'+use+' %</b><span>de la limite gratuite</span></div>'
+    +'</div></div>'
+    +rsBars('Nouveaux joueurs',d.days.fresh)+rsBars('Packs ouverts',d.days.packs)+rsBars('Matchs joués',d.days.matches)+rsBars('Défis entre joueurs',d.days.duels)
+    +'<div class="r-card"><h3>Plus belles cartes de la semaine</h3>'+(d.pulls.length?'<ul class="r-list">'+d.pulls.map(function(p){
+        return '<li><span><b>'+rsEsc(p.card)+'</b> · '+rsEsc(p.label)+'</span><small>'+rsEsc(p.player)+'</small></li>';}).join('')+'</ul>'
+      :'<p class="r-empty">Aucune carte très rare sortie cette semaine.</p>')+'</div>'
+    +'<div class="r-card"><h3>Plus grandes collections</h3>'+(d.top.length?'<ul class="r-list">'+d.top.map(function(p){
+        return '<li><span><b>'+rsEsc(p.name)+'</b></span><small>'+rsNum(p.cards)+' cartes · '+rsNum(p.packs)+' packs · '+rsNum(p.wins)+' V</small></li>';}).join('')+'</ul>'
+      :'<p class="r-empty">Pas encore de joueur.</p>')+'</div>'
+    +'<div class="r-card"><h3>Le jeu tourne</h3><ul class="r-list">'
+      +'<li><span>Sauvegardes gardées</span><small class="'+(d.backups.count?'r-ok':'r-bad')+'">'+d.backups.count+' · dernière le '+rsEsc(backup)+'</small></li>'
+      +'<li><span>Marché</span><small>'+rsNum(d.market.open)+' en vente · '+rsNum(d.market.sold)+' vendues en 7 j</small></li>'
+      +'<li><span>Rappel « pack prêt » activé</span><small>'+rsNum(d.reminders)+' joueur'+(d.reminders>1?'s':'')+'</small></li>'
+      +'<li><span>Code de secours créé</span><small>'+rsNum(d.recovery)+' / '+rsNum(d.players)+'</small></li>'
+    +'</ul></div>';
+}
+function openRoster(){
+  var h=$('hub');
+  hubOpen=false; agendaOpen=false; pnOpen=false; rosterOpen=true; $('agenda').hidden=true; $('patch').hidden=true; $('rstats').hidden=false;
+  renderRoster(); loadRoster();
+  document.title='Roster · tableau de bord · Bcorps Labs'; setHash('roster');
+  h.classList.add('out');
+  setTimeout(function(){ if(h.classList.contains('out')) h.hidden=true; },300);
+}
+$('toolRoster').onclick=openRoster;
+$('rHome').onclick=showHub;
+$('rRefresh').onclick=loadRoster;
 /* halo lumineux qui suit le curseur sur la console */
 $('hub').addEventListener('pointermove',function(e){
   this.style.setProperty('--mx',e.clientX+'px'); this.style.setProperty('--my',e.clientY+'px');
@@ -3195,6 +3331,7 @@ var start=startId?byId(startId):null;
 loadTasks();
 renderHubLinks();
 loadNotes();
+loadRoster();
 vaultStart();
 /* application installable : garde une copie du site pour l'ouvrir hors connexion */
 if('serviceWorker' in navigator&&location.protocol==='https:') navigator.serviceWorker.register('sw.js').catch(function(){});
@@ -3205,6 +3342,7 @@ try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist(
 var startGame=startId.indexOf('patch-')===0?gameById(startId.slice(6)):null;
 if(startGame){ $('hub').hidden=true; $('hub').classList.add('out'); openPatch(startGame); }
 else if(startId==='agenda'){ $('hub').hidden=true; $('hub').classList.add('out'); openAgenda(); }
+else if(startId==='roster'){ $('hub').hidden=true; $('hub').classList.add('out'); openRoster(); }
 else if(start){ hubOpen=false; $('hub').hidden=true; $('hub').classList.add('out'); renderBoards(); select(start); fit(); reveal(start); }
 else showHub();
 requestAnimationFrame(draw);
