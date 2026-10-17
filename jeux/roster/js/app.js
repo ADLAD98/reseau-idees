@@ -3,7 +3,7 @@
 import { ApiError, call, clearSession, deriveKey, loadSession, saveSession } from './api.js';
 import { VARIANTS, autographOf, cardHTML, champName, esc, flagUrl, iconUrl, karmineEra, logoHTML, photoUrl, prepare, statsOf, tiltCard, variantRank, watchCards } from './cards.js';
 import { clubSectionHTML, loadClub } from './club.js';
-import { GAME_NAME, LEGEND_ART_NOTE, ROLE_LABEL, ROLE_NAME, ROLE_ORDER, STORE } from './config.js';
+import { DISCORD_INVITE, GAME_NAME, LEGEND_ART_NOTE, ROLE_LABEL, ROLE_NAME, ROLE_ORDER, STORE } from './config.js';
 import { dailyLook, drawDaily, loadDaily } from './daily.js';
 import { isOldHome, moveIfOld, takeTransfer } from './demenagement.js';
 import { disablePush, enablePush, pushOn, pushSupport } from './rappels.js';
@@ -1217,6 +1217,9 @@ async function viewProfile(main) {
     + '<div class="switch setting"><span>Son<small>musique de fond et effets</small></span><button class="btn" type="button" id="volBtn" aria-haspopup="dialog">Régler le volume</button></div>'
     /* le rappel « pack prêt » (rappels.js) : montré seulement si cet appareil peut le recevoir, ou dire comment */
     + '<div class="switch setting" id="pushRow" hidden><span>Rappel « pack prêt »<small id="pushHint">une notification sur cet appareil quand ton pack gratuit est disponible</small></span><button class="btn" type="button" id="pushBtn">Activer</button></div>'
+    /* le Discord de Roster : une fois qu'il existe (config.js), et face à un serveur qui connaît le réglage */
+    + (DISCORD_INVITE && 'discordOk' in S.player ? '<div class="switch setting"><span>Discord de Roster<small>les cartes très rares tirées par les joueurs y sont annoncées</small></span><a class="btn" id="discordJoin" href="' + esc(DISCORD_INVITE) + '" target="_blank" rel="noopener">Rejoindre</a></div>'
+      + '<div class="switch setting"><span>Mon pseudo dans les annonces<small>sinon, le Discord dit « un joueur »</small></span><button type="button" id="discordSwitch" aria-pressed="' + !!S.player.discordOk + '" aria-label="Mon pseudo dans les annonces du Discord"></button></div>' : '')
     + '<div class="actions"><button class="btn" type="button" id="logout">Se déconnecter</button><button class="btn danger" type="button" id="askDelete">Supprimer mon compte</button></div>'
     + '<form id="deleteForm" hidden style="display:grid;gap:10px"><p class="hint">Ton compte et toutes tes cartes seront effacés pour de bon. Tape ton mot de passe pour confirmer.</p>'
     + '<input class="inp" name="password" type="password" autocomplete="current-password" placeholder="Mot de passe" required><p class="form-error" role="alert"></p>'
@@ -1251,6 +1254,20 @@ async function viewProfile(main) {
   });
   $('#volBtn').addEventListener('click', (e) => { sfx.click(); toggleVolume(e.currentTarget, syncTune); });
   drawPush();
+  const discord = document.getElementById('discordSwitch');
+  if (discord) discord.addEventListener('click', async () => {
+    const on = discord.getAttribute('aria-pressed') !== 'true';
+    sfx.click();
+    discord.disabled = true;
+    try {
+      const r = await call('POST', '/api/discord', { on });
+      S.player.discordOk = r.discordOk;
+      discord.setAttribute('aria-pressed', String(r.discordOk));
+      toast(r.discordOk ? 'Ton pseudo apparaîtra dans les annonces du Discord.' : 'Le Discord dira « un joueur ».');
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : 'Réglage non enregistré.', true);
+    } finally { discord.disabled = false; }
+  });
   $('#logout').addEventListener('click', async () => {
     try { await call('POST', '/api/logout'); } catch (err) { /* la connexion sera de toute façon oubliée ici */ }
     clearSession();

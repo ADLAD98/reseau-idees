@@ -19,6 +19,10 @@ export const API_BASE = LOCAL ? 'http://127.0.0.1:8787' : 'https://jeu-cartes.je
 export const HOME_URL = LOCAL ? 'http://localhost:' + location.port + '/jeux/roster/' : 'https://bcorpslabs.com/jeux/roster/';
 export const OLD_HOSTS = LOCAL ? ['127.0.0.1'] : ['adlad98.github.io'];
 
+/* le serveur Discord de Roster : son lien d'invitation (vide tant qu'il n'existe pas : le Profil n'en parle pas). Sur ce PC, un essai
+   peut en poser un (window.ROSTER_DISCORD). */
+export const DISCORD_INVITE = (LOCAL && window.ROSTER_DISCORD) || '';
+
 /* préfixe de tout ce que le jeu garde dans le navigateur */
 export const STORE = 'bcorps-cartes-';
 
