@@ -7,6 +7,7 @@ import { GAME_NAME, LEGEND_ART_NOTE, ROLE_LABEL, ROLE_NAME, ROLE_ORDER, STORE } 
 import { dailyLook, drawDaily, loadDaily } from './daily.js';
 import { isOldHome, moveIfOld, takeTransfer } from './demenagement.js';
 import { disablePush, enablePush, pushOn, pushSupport } from './rappels.js';
+import { achievementsSectionHTML, checkAchievements, loadAchievements } from './succes.js';
 import { avatarHTML, loadProfile, profileSectionHTML } from './vitrine.js';
 import { createDuels } from './duel.js';
 import { sellCard, showOnMarket, viewMarket } from './market.js';
@@ -438,7 +439,7 @@ function route() {
      — après un achat, une revente… — ne rejoue rien.) */
   const from = shownTab, order = tabs().map((t) => t[0]), mine = ++pageTurn;
   shownTab = tab;
-  if (from !== null && from !== tab) sfx.page();
+  if (from !== null && from !== tab) { sfx.page(); checkAchievements(PLAY); }
   if (!S.fx || from === tab) { main.classList.remove('page-out'); show(); return; }
   const enter = () => {
     main.classList.remove('page-out', 'page-in');
@@ -1133,6 +1134,8 @@ async function viewProfile(main) {
     /* mon club : sa carte et ses infrastructures (rempli quand le serveur a répondu) */
     /* mon profil : mon blason et ma vitrine (rempli quand le serveur a répondu) */
     + profileSectionHTML()
+    /* mes succès (remplis quand le serveur a répondu) */
+    + achievementsSectionHTML()
     + (S.club ? clubSectionHTML() : '') + '<div class="panels">'
     + '<section class="panel"><h3>Mon compte</h3><div class="kv"><span>Packs ouverts</span><b>' + p.packsOpened + '</b><span>Cartes différentes</span><b>' + p.cardsUnique + ' / ' + S.cat.cards.length + '</b><span>Exemplaires</span><b>' + p.cardsTotal + '</b><span>Parties gagnées</span><b>' + p.wins + ' sur ' + (p.wins + p.losses) + '</b>'
     + (S.live ? '<span>Défis entre joueurs</span><b>' + (p.duelWins || 0) + ' V – ' + (p.duelLosses || 0) + ' D</b><span>Mondiaux remportés</span><b>' + (p.titles || 0) + '</b>' : '')
@@ -1169,6 +1172,7 @@ async function viewProfile(main) {
 
   loadClub(PLAY);
   loadProfile(PLAY);
+  loadAchievements(PLAY);
   $('#fxSwitch').addEventListener('click', (e) => {
     S.fx = !S.fx;
     e.currentTarget.setAttribute('aria-pressed', String(S.fx));

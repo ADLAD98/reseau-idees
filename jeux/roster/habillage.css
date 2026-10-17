@@ -529,3 +529,23 @@ body.fx .dg-won{animation:fade .5s}
 .rc-box .actions{display:flex;gap:10px;flex-wrap:wrap}
 .rc-box .actions .btn{flex:1}
 .rc-panel.rc-todo{border-color:var(--gold-mid);box-shadow:0 0 0 1px rgba(200,155,60,.35)}
+
+/* ---------- les succès (Profil) ---------- */
+.ach-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.ach-head h3{margin:0}
+.ach-count{color:var(--mut);font:600 14px/1 var(--text)}
+.ach-count b{color:var(--gold-hi);font:400 22px/1 var(--title)}
+.ach-cat{margin:18px 0 8px;color:var(--mut);font:600 12px/1.2 var(--text);letter-spacing:.14em;text-transform:uppercase}
+.ach-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,230px),1fr));gap:8px}
+.ach-tile{display:flex;gap:12px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);background:rgba(1,10,19,.45)}
+.ach-mark{flex:none;width:22px;height:22px;margin-top:2px;border:1px solid var(--line2);transform:rotate(45deg) scale(.8);background:rgba(1,10,19,.6)}
+.ach-txt{min-width:0}
+.ach-txt b{display:block;color:var(--mut);font:600 14px/1.25 var(--text)}
+.ach-txt small{display:block;color:var(--faint);font:13px/1.35 var(--text)}
+.ach-bar{display:block;height:4px;margin:7px 0 4px;background:rgba(200,170,110,.12)}
+.ach-bar i{display:block;height:100%;background:var(--gold-lo)}
+.ach-num{font-variant-numeric:tabular-nums}
+.ach-tile.done{border-color:rgba(200,170,110,.45);background:linear-gradient(90deg,rgba(200,155,60,.1),rgba(1,10,19,.45) 60%)}
+.ach-tile.done .ach-mark{border-color:var(--gold);background:linear-gradient(135deg,#f0e6d2,#c8aa6e 55%,#785a28);box-shadow:0 0 10px rgba(200,155,60,.45)}
+.ach-tile.done .ach-txt b{color:var(--gold-hi)}
+.ach-tile.done .ach-txt small{color:var(--mut)}
