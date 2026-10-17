@@ -5,6 +5,7 @@ import { VARIANTS, autographOf, cardHTML, champName, esc, flagUrl, iconUrl, karm
 import { clubSectionHTML, loadClub } from './club.js';
 import { GAME_NAME, LEGEND_ART_NOTE, ROLE_LABEL, ROLE_NAME, ROLE_ORDER, STORE } from './config.js';
 import { dailyLook, drawDaily, loadDaily } from './daily.js';
+import { isOldHome, moveIfOld, takeTransfer } from './demenagement.js';
 import { avatarHTML, loadProfile, profileSectionHTML } from './vitrine.js';
 import { createDuels } from './duel.js';
 import { sellCard, showOnMarket, viewMarket } from './market.js';
@@ -227,6 +228,12 @@ for (const type of ['pointerdown', 'click', 'keydown', 'input', 'wheel', 'touchs
 beat();
 document.addEventListener('visibilitychange', () => { if (!document.hidden) { lastPulse = Date.now(); pulse(); beat(); } });
 async function boot() {
+  /* à l'ancienne adresse du jeu : direction la nouvelle, connexion et réglages compris ; à l'arrivée, on les reprend */
+  if (isOldHome()) {
+    app.innerHTML = '<div class="center"><div><div class="spin"></div>Roster déménage sur bcorpslabs.com…</div></div>';
+    if (await moveIfOld()) return;
+  }
+  await takeTransfer();
   try { S.fx = localStorage.getItem(STORE + 'fx') !== '0'; } catch (e) { S.fx = true; }
   try { S.pack = localStorage.getItem(STORE + 'booster') === 'credits' ? 'credits' : 'free'; } catch (e) { S.pack = 'free'; }
   try {

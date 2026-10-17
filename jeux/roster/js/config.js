@@ -14,6 +14,11 @@ export const HOSTS = [
 const LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
 export const API_BASE = LOCAL ? 'http://127.0.0.1:8787' : 'https://jeu-cartes.jeu-cartes-serveur.workers.dev';
 
+/* l'adresse du jeu, et son ancienne adresse : ouvert à l'ancienne, le jeu emmène le joueur à la nouvelle, connexion et réglages compris
+   (js/demenagement.js). Sur ce PC, pour l'essayer : 127.0.0.1 joue l'ancienne adresse, localhost la nouvelle. */
+export const HOME_URL = LOCAL ? 'http://localhost:' + location.port + '/jeux/roster/' : 'https://bcorpslabs.com/jeux/roster/';
+export const OLD_HOSTS = LOCAL ? ['127.0.0.1'] : ['adlad98.github.io'];
+
 /* préfixe de tout ce que le jeu garde dans le navigateur */
 export const STORE = 'bcorps-cartes-';
 
