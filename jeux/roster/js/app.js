@@ -24,6 +24,7 @@ import { toggleVolume } from './volume.js';
 import { inspectCard } from './inspect.js';
 import { confirmSheet, num } from './ui.js';
 import { viewWorlds } from './worlds.js';
+import { startLive } from './direct.js';
 
 const app = document.getElementById('app');
 const $ = (sel, root) => (root || document).querySelector(sel);
@@ -424,10 +425,13 @@ function shell() {
     + '<button class="tune' + (musicOn() ? '' : ' off') + '" type="button" id="tune" aria-haspopup="dialog" title="Réglage du son" aria-label="Régler le son : musique de fond et effets">' + icon('i-note') + '</button>'
     + '<a class="purse" href="#/' + (S.live ? 'marche' : 'jouer') + '" title="Tes crédits : gagnés en jouant, dépensés au marché">' + icon('i-coin') + '<b id="credits">' + S.player.coins + '</b></a>'
     /* le joueur : son initiale dans un losange, puis son pseudo */
-    + '<a class="who" href="#/profil">' + avatarHTML(S.player.avatar, S.player.name) + '<b>' + esc(S.player.name) + '</b></a></header>'
+    + '<a class="who" href="#/profil">' + avatarHTML(S.player.avatar, S.player.name) + '<b>' + esc(S.player.name) + '</b></a>'
+    /* sur ordinateur, un vrai match pro en cours : un petit encadré sous la barre, à droite (direct.js) */
+    + '<div class="live-tab" id="liveTab" hidden></div></header>'
     + '<main class="main" id="main"></main>'
     + '<nav class="tabs">' + tabs().map((t) => '<a href="#/' + t[0] + '" data-tab="' + t[0] + '">' + icon(t[2]) + t[1] + pip(t[0]) + '</a>').join('') + '</nav>';
   drawPulse();
+  startLive(PLAY);
 }
 /* ce que l'application prête aux autres écrans (Jouer, Marché, Joueurs, Mondial) */
 const PLAY = {

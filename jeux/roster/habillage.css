@@ -611,3 +611,20 @@ body:not(.fx) .pr-dot{animation:none}
   .pr-head .pr-live{flex:none;width:min(380px,42%);margin:-8px 0 0}
   .pr-soon{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
 }
+
+/* ---------- « En direct » : sur ordinateur, une fine bande sous la barre du haut, à droite (js/direct.js) ---------- */
+.live-tab{position:absolute;top:calc(100% + 6px);right:max(22px,env(safe-area-inset-right));z-index:21;border:1px solid var(--line2);border-left:2px solid #e84057;
+  background:linear-gradient(180deg,rgba(10,22,38,.97),rgba(2,12,23,.97));box-shadow:0 8px 22px rgba(0,0,0,.5)}
+.live-tab[hidden]{display:none}
+.lt-link{display:flex;align-items:center;gap:10px;height:30px;padding:0 30px 0 10px;color:var(--mut);text-decoration:none;white-space:nowrap}
+.lt-link:hover{background:rgba(232,64,87,.07)}
+.lt-live{color:#ff8a9a;font:700 11px/1 var(--text);letter-spacing:.1em;text-transform:uppercase}
+.lt-score{display:flex;align-items:center;gap:8px}
+.lt-team{display:flex;align-items:center;gap:5px;color:var(--ink);font:700 13px/1 var(--text);letter-spacing:.04em}
+.lt-team:last-child{flex-direction:row-reverse}
+.lt-logo{width:18px;height:18px;object-fit:contain;flex:none}
+.lt-score strong{color:var(--gold-hi);font:700 14px/1 var(--text)}
+.lt-foot{color:var(--faint);font-size:12px}
+.lt-close{position:absolute;top:50%;right:4px;width:22px;height:22px;margin-top:-11px;padding:0;border:0;background:none;color:var(--faint);font-size:17px;line-height:1;cursor:pointer}
+.lt-close:hover{color:var(--ink)}
+@media (max-width:860px){.live-tab{display:none}}
