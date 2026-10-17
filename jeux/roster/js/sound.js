@@ -95,6 +95,11 @@ function audio() {
   if (ctx.state === 'suspended') ctx.resume();
   return ctx;
 }
+/* L'heure de départ d'un son, calée sur un échantillon. Une source de bruit peut sortir son premier échantillon une fraction d'échantillon
+   avant que son enveloppe de volume ne commence : cet échantillon-là passait au volume par défaut du nœud (le maximum), un « pop » d'un seul
+   échantillon jusqu'à −0,45, de temps en temps selon l'arrondi de l'heure (mesuré le 17/10, outils/diag-son-onde.mjs) — le « clic qui
+   sature » en changeant de page. D'où : départ calé sur un échantillon, et chaque son muet (filtre déjà réglé) avant son enveloppe. */
+const startAt = (c, t) => Math.ceil(t * c.sampleRate) / c.sampleRate;
 /* compte une source de son jusqu'à ce qu'elle se taise */
 function track(src) {
   voices++;
@@ -127,8 +132,9 @@ for (const type of ['pointerdown', 'keydown', 'touchstart']) document.addEventLi
 function tone(freq, o = {}) {
   const c = audio();
   if (!c || voices >= MAX_VOICES) return;
-  const t0 = c.currentTime + LEAD + (o.t || 0), dur = o.dur || 0.4, vol = o.vol || 0.15;
+  const t0 = startAt(c, c.currentTime + LEAD + (o.t || 0)), dur = o.dur || 0.4, vol = o.vol || 0.15;
   const osc = c.createOscillator(), gain = c.createGain();
+  gain.gain.value = 0;
   track(osc);
   osc.type = o.type || 'sine';
   osc.frequency.setValueAtTime(freq, t0);
@@ -149,8 +155,10 @@ function tone(freq, o = {}) {
 function noise(o = {}) {
   const c = audio();
   if (!c || voices >= MAX_VOICES) return;
-  const t0 = c.currentTime + LEAD + (o.t || 0), dur = o.dur || 0.2, vol = o.vol || 0.15;
+  const t0 = startAt(c, c.currentTime + LEAD + (o.t || 0)), dur = o.dur || 0.2, vol = o.vol || 0.15;
   const src = c.createBufferSource(), filter = c.createBiquadFilter(), gain = c.createGain();
+  gain.gain.value = 0;
+  filter.frequency.value = o.freq || 2000;
   track(src);
   src.buffer = noiseBuf; src.loop = true;
   filter.type = o.type || 'bandpass';
