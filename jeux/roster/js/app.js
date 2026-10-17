@@ -25,6 +25,7 @@ import { inspectCard } from './inspect.js';
 import { confirmSheet, num } from './ui.js';
 import { viewWorlds } from './worlds.js';
 import { startLive } from './direct.js';
+import { badgesHTML, eventSectionHTML, loadEvent } from './evenement.js';
 
 const app = document.getElementById('app');
 const $ = (sel, root) => (root || document).querySelector(sel);
@@ -615,6 +616,7 @@ function viewPacks(main) {
   /* les missions avancent en jouant : on les redemande à chaque passage sur cet écran */
   loadMissions();
   loadWeekly();
+  loadEvent(PLAY);
   loadPredictions(PLAY);
   loadHubTeam();
   const recent = [...S.owned.entries()].sort((a, b) => b[1].at - a[1].at).slice(0, 6).map(([id]) => S.cat.cardById.get(id)).filter(Boolean);
@@ -631,6 +633,8 @@ function viewPacks(main) {
     + '<div id="packAction" data-sig="' + packSig() + '">' + packActionHTML() + '</div></div></section>'
     + '<div class="dg-teaser" id="dailyTeaser" hidden></div>'
     + hubHTML()
+    /* l'événement du moment (evenement.js) : le Mondial 2026 */
+    + eventSectionHTML()
     + '<section class="missions" id="missions"' + (S.missions ? '' : ' hidden') + '>' + (S.missions ? missionsHTML() : '') + '</section>'
     + '<section class="missions weekly" id="weekly"' + (S.weekly ? '' : ' hidden') + '>' + (S.weekly ? weeklyHTML() : '') + '</section>'
     /* les pronostics sur les vrais matchs (pronostics.js) */
@@ -1198,7 +1202,9 @@ async function viewProfile(main) {
   /* en tête : le losange du joueur, son équipe, puis ses chiffres */
   const games = p.wins + p.losses, titles = p.titles || 0;
   main.innerHTML = '<div class="col-head"><div class="pf-id">' + avatarHTML(p.avatar, p.name, 'pf-av') + '<div><h1 class="h1" style="--n:' + Math.max(6, p.name.length) + '">' + esc(p.name) + '</h1>'
-    + '<p>Joueur depuis le ' + frDate(p.createdAt) + (p.team ? ' · équipe <b>' + esc(p.team.name) + '</b> (' + esc(p.team.short) + ')' : '') + '</p></div></div>'
+    + '<p>Joueur depuis le ' + frDate(p.createdAt) + (p.team ? ' · équipe <b>' + esc(p.team.name) + '</b> (' + esc(p.team.short) + ')' : '') + '</p>'
+    /* ses titres de profil, gagnés aux événements */
+    + ((p.badges || []).length ? '<p class="pf-badges">' + badgesHTML(p.badges) + '</p>' : '') + '</div></div>'
     + '<div class="tally"><div><b>' + num(p.wins) + '</b><span>' + (p.wins > 1 ? 'victoires' : 'victoire') + '</span></div><div><b>' + (games ? pct(p.wins, games) + '<small> %</small>' : '–') + '</b><span>de réussite</span></div>'
     + '<div><b>' + p.cardsUnique + '<small>/' + S.cat.cards.length + '</small></b><span>cartes</span></div>'
     + (S.live ? '<div class="gold"><b>' + titles + '</b><span>' + (titles > 1 ? 'Mondiaux' : 'Mondial') + '</span></div>' : '') + '</div></div>'

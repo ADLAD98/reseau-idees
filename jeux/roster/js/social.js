@@ -4,6 +4,7 @@ import { ApiError } from './api.js';
 import { cardHTML, esc } from './cards.js';
 import { crestHTML, structuresLine } from './club.js';
 import { avatarHTML, showcaseHTML } from './vitrine.js';
+import { badgesHTML } from './evenement.js';
 import { confirmSheet, openSheet, plural, sheetTitle, since } from './ui.js';
 
 const $ = (sel, root) => (root || document).querySelector(sel);
@@ -226,7 +227,7 @@ async function openFriend(id, focus) {
   try { format = Number(localStorage.getItem('bcorps-cartes-format')) || 1; fearless = localStorage.getItem('bcorps-cartes-fearless') !== '0'; } catch (e) { format = 1; }
   /* (le fearless n'est proposé que si le serveur le connaît) */
   const canFearless = !!S.shop;
-  const s = openSheet(sheetTitle(esc(p.name), (p.online ? '<i class="dot on"></i>En ligne' : 'Vu ' + since(now - p.seenAt)) + ' · joueur depuis le ' + frDate(p.createdAt))
+  const s = openSheet(sheetTitle(esc(p.name), (p.online ? '<i class="dot on"></i>En ligne' : 'Vu ' + since(now - p.seenAt)) + ' · joueur depuis le ' + frDate(p.createdAt) + ((p.badges || []).length ? ' ' + badgesHTML(p.badges) : ''))
     + '<div class="tally soc-tally"><div><b>' + data.lineup.rating + '</b><span>Note d\'équipe</span></div><div><b>' + p.duelWins + ' – ' + p.duelLosses + '</b><span>Défis</span></div>'
     + '<div><b>' + p.cards + '</b><span>Cartes</span></div><div class="gold"><b>' + p.titles + '</b><span>' + (p.titles > 1 ? 'Mondiaux' : 'Mondial') + '</span></div></div>'
     /* son club : son blason, son niveau, son rang au classé, ses infrastructures */

@@ -26,7 +26,7 @@ function matchHTML(m) {
   const side = (k) => '<button type="button" class="pr-team' + (pick === k + 1 ? ' on' : '') + '" data-pick="' + (k + 1) + '" title="' + esc(m.teams[k].name) + '">' + team(m.teams[k]) + '<b>' + esc(m.teams[k].code) + '</b></button>';
   /* les scores qui vont avec l'équipe choisie */
   const scores = pick && m.scores.length ? m.scores.filter((s) => { const [a, b] = s.split('-').map(Number); return pick === 1 ? a > b : b > a; }) : [];
-  return '<div class="pr-match" data-match="' + esc(m.id) + '"><div class="pr-meta"><span>' + esc(m.leagueName) + (m.block ? ' · ' + esc(m.block) : '') + ' · Bo' + m.bestOf + '</span><time>' + esc(WHEN.format(m.start)) + '</time></div>'
+  return '<div class="pr-match' + (m.bonus > 1 ? ' big' : '') + '" data-match="' + esc(m.id) + '"><div class="pr-meta"><span>' + esc(m.leagueName) + (m.block ? ' · ' + esc(m.block) : '') + ' · Bo' + m.bestOf + (m.bonus > 1 ? ' <b class="pr-x2">gains ×' + m.bonus + '</b>' : '') + '</span><time>' + esc(WHEN.format(m.start)) + '</time></div>'
     + '<div class="pr-vs">' + side(0) + '<i>contre</i>' + side(1) + '</div>'
     + (scores.length ? '<div class="pr-scores"><span>Score exact (+' + D.prize.exact + ') :</span>' + scores.map((s) => '<button type="button" class="pr-score' + (score === s ? ' on' : '') + '" data-score="' + s + '">' + s + '</button>').join('') + '</div>' : '')
     + '</div>';

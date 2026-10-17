@@ -631,3 +631,29 @@ body:not(.fx) .pr-dot{animation:none}
 .pr-live p>span{display:flex;flex-wrap:wrap;align-items:baseline;column-gap:6px}
 .pr-live small{flex-basis:100%;color:var(--faint);font-size:12.5px}
 #prono{scroll-margin-top:calc(var(--top) + 46px)}
+
+/* ---------- l'événement du moment (js/evenement.js) : le Mondial 2026 ---------- */
+.missions.event{position:relative;padding:22px 22px 20px;border:1px solid var(--line2);
+  background:radial-gradient(120% 140% at 100% 0,rgba(10,200,185,.12),transparent 55%),radial-gradient(90% 120% at 0 100%,rgba(200,155,60,.14),transparent 60%),linear-gradient(180deg,#0b1a2e,#06111f)}
+.missions.event::before{content:"";position:absolute;inset:-1px -1px auto;height:2px;background:linear-gradient(90deg,transparent,var(--gold),var(--blue),transparent)}
+.ev-head{display:grid;grid-template-columns:auto 1fr;gap:6px 22px;align-items:center;margin-bottom:16px}
+.ev-mark{grid-row:span 2;display:grid;justify-items:center;padding:10px 16px;border:1px solid var(--gold-lo);background:rgba(1,10,19,.55)}
+.ev-mark span{color:var(--blue);font:600 10.5px/1 var(--text);letter-spacing:.24em;text-transform:uppercase}
+.ev-mark b{margin-top:6px;color:var(--gold-hi);font:400 26px/1 var(--title);letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;text-shadow:0 0 18px rgba(200,155,60,.35)}
+.ev-lead{margin:0;color:var(--mut);font-size:14.5px;line-height:1.45}
+.ev-lead b{color:var(--gold-hi);font-weight:600}
+.ev-when{margin:0;color:var(--gold);font:600 12.5px/1.3 var(--text);letter-spacing:.06em}
+.missions.event .ms.bonus{border-left-color:var(--blue)}
+@media (max-width:860px){
+  .missions.event{padding:18px 14px 16px}
+  .ev-head{grid-template-columns:1fr}
+  .ev-mark{grid-row:auto;justify-self:start;justify-items:start}
+}
+/* un titre de profil gagné à un événement */
+.badge-title{display:inline-flex;align-items:center;gap:6px;padding:3px 9px 3px 7px;border:1px solid var(--gold-lo);background:linear-gradient(180deg,rgba(200,155,60,.16),rgba(200,155,60,.04));
+  color:var(--gold-hi);font:600 11.5px/1.2 var(--text);letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;vertical-align:middle}
+.badge-title i{width:9px;height:9px;transform:rotate(45deg);background:linear-gradient(135deg,#f6e7b8,#c89b3c);box-shadow:0 0 6px rgba(200,155,60,.6)}
+.pf-badges{margin-top:8px}
+/* un gros match des Worlds : gains doublés */
+.pr-x2{margin-left:6px;padding:1px 6px;border:1px solid var(--blue-lo);color:var(--blue-hi);font:700 11px/1.3 var(--text);letter-spacing:.04em;white-space:nowrap}
+.pr-match.big{border-color:var(--blue-lo)}
