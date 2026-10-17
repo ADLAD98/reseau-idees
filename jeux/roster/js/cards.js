@@ -237,7 +237,10 @@ export function cardHTML(card, cat, opts = {}) {
     + (v === 'legend' && auto ? autoSVG(auto) : '')
     /* édition Signature : son nom, tracé au feutre doré en travers de la carte, et le trait qui le souligne */
     + (v === 'sign' ? '<div class="card-sign" style="--n:' + len + '" aria-hidden="true">' + (auto ? autoSVG(auto) : '<span>' + esc(card.name) + '</span><i></i>') + '</div>' : '')
-    + '<div class="card-side"><span class="card-ovr">' + card.ovr + '</span><span class="card-role">' + esc(card.label || ROLE_LABEL[card.role]) + '</span><i></i>'
+    + '<div class="card-side"><span class="card-ovr">' + card.ovr + '</span>'
+    /* la forme du moment (app.js, applyForm) : ▲ en forme, ▼ en difficulté, cette semaine */
+    + (card.form ? '<span class="card-form ' + (card.form > 0 ? 'up' : 'down') + '" title="' + (card.form > 0 ? 'En forme' : 'En difficulté') + ' cette semaine : ' + (card.form > 0 ? '+' : '') + card.form + '">' + (card.form > 0 ? '▲' : '▼') + Math.abs(card.form) + '</span>' : '')
+    + '<span class="card-role">' + esc(card.label || ROLE_LABEL[card.role]) + '</span><i></i>'
     + flag + (club ? '<img class="card-club" src="' + club + '" alt="" ' + load + '>' : '') + '<span class="card-league">' + esc(card.league) + '</span></div>'
     /* édition légendaire : un trophée par titre mondial, avec son année, en colonne le long du bord droit (comme des décorations) */
     + (legend ? '<div class="card-cups" title="Champion du monde ' + legend.worlds.join(', ') + '">' + legend.worlds.map((y) => '<span><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-cup"/></svg><b>' + y + '</b></span>').join('') + '</div>' : '')

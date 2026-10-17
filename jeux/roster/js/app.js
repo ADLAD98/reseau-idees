@@ -141,6 +141,24 @@ async function loadCatalogue(version) {
     try { localStorage.setItem(STORE + 'catalogue', JSON.stringify(raw)); } catch (e) { /* pas de place : on le redemandera */ }
   }
   S.cat = prepare(raw);
+  await applyForm(S.cat);
+}
+/* La forme du moment (serveur : forme.ts) : chaque semaine, la note d'un joueur pro bouge d'au plus deux points selon ses vrais matchs.
+   Ajoutée à toutes les versions de sa carte (card.form : le supplément ; card.formInfo : ses chiffres de la semaine). Sans réponse du
+   serveur : les notes de la saison, telles quelles. */
+async function applyForm(cat) {
+  let f = null;
+  try { f = await call('GET', '/api/form'); } catch (e) { return; }
+  if (!f || !f.players) return;
+  for (const card of cat.cardById.values()) {
+    const p = f.players[card.base || card.id];
+    if (!p || !p.d || card.form) continue;
+    card.form = p.d;
+    card.formInfo = p;
+    card.ovr = Math.min(99, card.ovr + p.d);
+    /* ses caractéristiques bougent comme sa note (comme dans les équipes, côté serveur) */
+    if (card.stats) card.stats = Object.fromEntries(Object.entries(card.stats).map(([k, v]) => [k, typeof v === 'number' ? Math.min(99, Math.max(1, v + p.d)) : v]));
+  }
 }
 async function loadCollection() {
   const data = await call('GET', '/api/collection');
@@ -1054,7 +1072,7 @@ function showSheet(id) {
     + '<div class="sheet-info"><div class="sheet-title"><div><h2>' + esc(card.name) + '</h2>'
     + '<p>' + (card.country ? '<img src="' + flagUrl(card.country) + '" alt="">' + esc(cat.countries[card.country]) + ' · ' : '') + esc(card.title || ROLE_NAME[card.role]) + ' · ' + esc(team ? team.name : card.team) + '</p></div>'
     + '<span class="spacer"></span><button class="close" type="button" aria-label="Fermer">' + icon('i-close') + '</button></div>'
-    + '<div class="chips"><span class="chip">' + esc(tier.name) + ' · ' + card.ovr + '</span>' + (card.variant ? '<span class="chip v-' + card.variant + '">' + VARIANTS[card.variant].name + '</span>' : '')
+    + '<div class="chips"><span class="chip">' + esc(tier.name) + ' · ' + card.ovr + '</span>' + (card.form ? '<span class="chip form-' + (card.form > 0 ? 'up' : 'down') + '">' + (card.form > 0 ? 'En forme · +' : 'En difficulté · ') + card.form + '</span>' : '') + (card.variant ? '<span class="chip v-' + card.variant + '">' + VARIANTS[card.variant].name + '</span>' : '')
     + (card.limited ? '<span class="chip v-ceo">Édition limitée · ' + card.limited + ' exemplaires</span>' + (own && serialOf(card.id) ? '<span class="chip v-ceo">N° ' + (S.prints.get(card.id) || []).join(', ') + '</span>' : '') : '') + '<span class="chip" style="--tc:var(--mut)">' + esc(card.league) + (league ? ' · ' + esc(league.region) : '') + '</span>' + titles + '</div>'
     + '<div><h3 class="h2">Statistiques de la carte</h3><div class="bars">' + statsOf(card).map((s) => '<div title="' + esc(s[3]) + '"><span>' + s[2] + '</span><span class="bar"><i style="width:' + card.stats[s[0]] + '%"></i></span><b>' + card.stats[s[0]] + '</b></div>').join('') + '</div></div>'
     + (facts ? '<div><h3 class="h2">Saison ' + cat.season + (card.kind === 'c' ? ' de son équipe' : ' en chiffres') + '</h3><div class="facts">' + facts + '</div></div>'
@@ -1066,6 +1084,7 @@ function showSheet(id) {
       : card.variant === 'legend' ? '<p class="note">Édition légendaire de ' + esc(card.name) + ' : la carte la plus rare du jeu. Contrairement aux autres versions, elle a sa propre note et ses propres statistiques, et porte tous ses titres mondiaux. Elle prend parfois la place de la carte bonus d\'un pack.' + (LEGEND_ART_NOTE[card.base] ? ' ' + esc(LEGEND_ART_NOTE[card.base]) : '') + (autographOf(card) ? ' Sa signature reproduit son autographe, d\'après une image du domaine public de Wikimedia Commons : la carte n\'est pas signée de sa main.' : '') + '</p>'
       : card.variant ? '<p class="note">' + (card.variant === 'kc' ? 'Édition Karmine Corp de la carte de ' + esc(card.name) + ' (' + esc(karmineEra(cat, card)) + '), réservée à celles et ceux qui portent ou ont porté ses couleurs'
       : 'Version ' + (card.variant === 'holo' ? 'holographique' : 'full art') + ' de la carte de ' + esc(card.name)) + ' : même joueur, même note, un autre habillage. Elle sort parfois d\'un pack à la place de la carte ordinaire, et se collectionne à part.</p>' : '')
+    + (card.form && card.formInfo ? '<p class="note">Forme du moment : ' + (card.form > 0 ? '+' : '') + card.form + ' cette semaine, d\'après ses ' + card.formInfo.g + ' dernières parties officielles (KDA ' + String(card.formInfo.kda).replace('.', ',') + ', ' + card.formInfo.kp + ' % de participation, ' + card.formInfo.gpm + ' or par minute), comparées à sa saison et aux autres joueurs. Elle est recalculée chaque lundi.</p>' : '')
     + '<p class="note">Note calculée à partir des statistiques officielles de la saison ' + cat.season + ' (ligue, tournois internationaux, palmarès). Données : Leaguepedia.</p>'
     /* le marché : vendre un exemplaire, ou chercher qui vend cette carte */
     + (S.live && !S.busy && !S.opening ? '<div class="actions sheet-acts">' + (own ? '<button class="btn" type="button" data-sheet="sell">Vendre un exemplaire</button>' : '')

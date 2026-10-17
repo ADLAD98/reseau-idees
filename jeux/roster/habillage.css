@@ -583,3 +583,10 @@ body.fx .dg-won{animation:fade .5s}
 .pr-past li.good{border-left-color:var(--gold)}.pr-past li.good em{color:var(--gold-hi)}
 .pr-past li.bad em{color:var(--faint)}
 .pr-total{margin:10px 0 0;color:var(--mut)}.pr-total b{color:var(--gold-hi)}
+
+/* ---------- la forme du moment ---------- */
+.card-form{display:block;margin:-.6cqw 0 .8cqw;font:800 5.4cqw/1 var(--text);letter-spacing:.02em;text-align:center}
+.card-form.up{color:#4be3a4;text-shadow:0 0 1.2cqw rgba(75,227,164,.55)}
+.card-form.down{color:#ff6b7f;text-shadow:0 0 1.2cqw rgba(255,107,127,.45)}
+.chip.form-up{border-color:rgba(75,227,164,.6);color:#8ff0c6}
+.chip.form-down{border-color:rgba(255,107,127,.55);color:#ffa3af}
