@@ -6,6 +6,7 @@ import { clubSectionHTML, loadClub } from './club.js';
 import { GAME_NAME, LEGEND_ART_NOTE, ROLE_LABEL, ROLE_NAME, ROLE_ORDER, STORE } from './config.js';
 import { dailyLook, drawDaily, loadDaily } from './daily.js';
 import { isOldHome, moveIfOld, takeTransfer } from './demenagement.js';
+import { disablePush, enablePush, pushOn, pushSupport } from './rappels.js';
 import { avatarHTML, loadProfile, profileSectionHTML } from './vitrine.js';
 import { createDuels } from './duel.js';
 import { sellCard, showOnMarket, viewMarket } from './market.js';
@@ -1046,6 +1047,31 @@ function showSheet(id) {
   if (S.fx && own) tiltCard($('.sheet-card .card', sheet), 22);
 }
 
+/* ---------- le rappel « pack prêt » (Profil) ---------- */
+async function drawPush() {
+  const row = document.getElementById('pushRow'), btn = document.getElementById('pushBtn'), hint = document.getElementById('pushHint');
+  if (!row) return;
+  const support = pushSupport();
+  if (support === 'no') return;
+  row.hidden = false;
+  if (support === 'ios') { hint.textContent = 'sur iPhone : ajoute d\'abord Roster à l\'écran d\'accueil (Partager, puis « Sur l\'écran d\'accueil »), et ouvre-le depuis là'; btn.hidden = true; return; }
+  if (support === 'denied') { hint.textContent = 'les notifications de ce site sont bloquées dans ton navigateur : autorise-les dans ses réglages'; btn.hidden = true; return; }
+  const on = await pushOn();
+  btn.textContent = on ? 'Couper' : 'Activer';
+  btn.classList.toggle('on', on);
+  btn.onclick = async () => {
+    sfx.click();
+    btn.disabled = true;
+    try {
+      if (on) { await disablePush(); toast('Rappel coupé sur cet appareil.'); }
+      else if (await enablePush()) toast('C\'est noté : tu seras prévenu ici quand ton pack gratuit sera prêt.');
+      else toast('Le rappel a besoin de ta permission pour les notifications.', true);
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : 'Cet appareil n\'a pas pu activer le rappel.', true);
+    } finally { btn.disabled = false; drawPush(); }
+  };
+}
+
 /* ---------- partager une carte ---------- */
 /* Le lien bcorpslabs.com/carte/<id>?de=<pseudo> : sur Discord, WhatsApp ou un réseau, son aperçu montre la carte (nom, rang, note,
    illustration) ; ouvert, il mène au jeu, sur cette carte (openPendingCard). */
@@ -1117,6 +1143,8 @@ async function viewProfile(main) {
       + '<p class="hint">Le nom (3 à 24 caractères) et le sigle (2 à 4 lettres) sous lesquels ton équipe joue ses matchs, ses défis et le Mondial. Vide : elle porte ton pseudo.</p><p class="form-error" role="alert"></p></form>' : '')
     + '<div class="switch"><span>Animations</span><button type="button" id="fxSwitch" aria-pressed="' + S.fx + '" aria-label="Animations"></button></div>'
     + '<div class="switch setting"><span>Son<small>musique de fond et effets</small></span><button class="btn" type="button" id="volBtn" aria-haspopup="dialog">Régler le volume</button></div>'
+    /* le rappel « pack prêt » (rappels.js) : montré seulement si cet appareil peut le recevoir, ou dire comment */
+    + '<div class="switch setting" id="pushRow" hidden><span>Rappel « pack prêt »<small id="pushHint">une notification sur cet appareil quand ton pack gratuit est disponible</small></span><button class="btn" type="button" id="pushBtn">Activer</button></div>'
     + '<div class="actions"><button class="btn" type="button" id="logout">Se déconnecter</button><button class="btn danger" type="button" id="askDelete">Supprimer mon compte</button></div>'
     + '<form id="deleteForm" hidden style="display:grid;gap:10px"><p class="hint">Ton compte et toutes tes cartes seront effacés pour de bon. Tape ton mot de passe pour confirmer.</p>'
     + '<input class="inp" name="password" type="password" autocomplete="current-password" placeholder="Mot de passe" required><p class="form-error" role="alert"></p>'
@@ -1148,6 +1176,7 @@ async function viewProfile(main) {
     try { localStorage.setItem(STORE + 'fx', S.fx ? '1' : '0'); } catch (err) { /* réglage non gardé */ }
   });
   $('#volBtn').addEventListener('click', (e) => { sfx.click(); toggleVolume(e.currentTarget, syncTune); });
+  drawPush();
   $('#logout').addEventListener('click', async () => {
     try { await call('POST', '/api/logout'); } catch (err) { /* la connexion sera de toute façon oubliée ici */ }
     clearSession();
