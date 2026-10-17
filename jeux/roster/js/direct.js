@@ -82,8 +82,11 @@ function onClick(e) {
   const begun = Date.now();
   const reach = () => {
     const box = document.getElementById('prono');
-    if (box && !box.hidden) box.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    else if (Date.now() - begun < 4000) setTimeout(reach, 120);
+    if (box && !box.hidden) {
+      box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      /* les blocs du dessus (missions, événement) arrivent après lui et le repoussent : on recale une fois l'écran posé */
+      setTimeout(() => { const t = box.getBoundingClientRect().top; if (t < 0 || t > innerHeight * 0.4) box.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 900);
+    } else if (Date.now() - begun < 4000) setTimeout(reach, 120);
   };
   setTimeout(reach, 60);
 }
