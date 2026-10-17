@@ -266,7 +266,7 @@ function showAuth(message) {
     + '<p class="hint" data-only="register" hidden>Aucune adresse e-mail n\'est demandée : note bien ton mot de passe, il ne pourra pas être retrouvé.</p>'
     + '<p class="form-error" role="alert">' + esc(message || '') + '</p>'
     + '<button class="btn primary big" type="submit">Entrer</button>'
-    + '<p class="legal">Projet de fan gratuit, sans lien avec Riot Games ni avec les équipes citées. <a href="../../">Retour à Bcorps Labs</a></p>'
+    + '<p class="legal">Projet de fan gratuit, sans lien avec Riot Games ni avec les équipes citées. <a href="legal.html">Mentions légales</a> · <a href="legal.html#confidentialite">Confidentialité</a> · <a href="../../">Bcorps Labs</a></p>'
     + '</form></div>';
   const form = $('#authForm'), error = $('.form-error', form), submit = $('button[type=submit]', form);
   const setMode = (m) => {
@@ -1002,6 +1002,7 @@ async function viewProfile(main) {
     + '<div class="actions"><button class="btn danger" type="submit">Effacer définitivement</button><button class="btn" type="button" id="cancelDelete">Annuler</button></div></form></section>'
     + '<section class="panel"><h3>Chances des boosters</h3><div id="odds"><p class="hint">Chargement…</p></div></section>'
     + '<section class="panel"><h3>À propos</h3>'
+    + '<p class="hint"><a href="legal.html">Mentions légales</a> · <a href="legal.html#confidentialite">Confidentialité et données personnelles</a></p>'
     + '<p class="hint">' + esc(GAME_NAME) + ' est un projet de fan gratuit de Bcorps Labs. Les cartes représentent les joueurs et coachs en activité dans les ligues majeures (LCK, LPL, LEC, LCS, LCP, CBLOL), saison ' + S.cat.season + '. Catalogue du ' + frDate(Date.parse(S.cat.generated)) + '.</p>'
     + '<p class="hint">Effectifs, statistiques et palmarès : <a href="https://lol.fandom.com/" target="_blank" rel="noopener">Leaguepedia</a>, licence CC BY-SA 3.0. Photos des joueurs : portraits officiels des équipes et des ligues, affichés depuis Leaguepedia. Images des champions : Riot Games (Data Dragon). Logos des équipes : marques de leurs clubs, affichés depuis Leaguepedia. Drapeaux : flag-icons (licence MIT).</p>'
     + '<p class="hint">Musiques : « For Originz », « Ascending the Vale », « Minima » et « Clash Defiant », Kevin MacLeod (<a href="https://incompetech.com/" target="_blank" rel="noopener">incompetech.com</a>), licence <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">Creative Commons Attribution 4.0</a>. '

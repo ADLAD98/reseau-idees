@@ -1,6 +1,13 @@
 /* Réglages du jeu. Le nom affiché et l'adresse du serveur se changent ici, nulle part ailleurs
    (sauf l'adresse du serveur, à reporter aussi dans la ligne « Content-Security-Policy » de index.html). */
 export const GAME_NAME = 'Roster';
+/* Les hébergeurs, tels que les mentions légales les citent (legal.html). À changer ici — et seulement ici — si le site ou le serveur du
+   jeu déménage (Cloudflare Pages, nom de domaine…) : la page des mentions légales se met à jour d'elle-même. L'adresse du site, elle,
+   est lue dans la barre d'adresse. */
+export const HOSTS = [
+  { role: 'Les pages du site', name: 'GitHub, Inc. (service GitHub Pages)', address: '88 Colin P. Kelly Jr. Street, San Francisco, CA 94107, États-Unis', site: 'https://github.com' },
+  { role: 'Le serveur du jeu et sa base de données', name: 'Cloudflare, Inc. (services Workers et D1)', address: '101 Townsend Street, San Francisco, CA 94107, États-Unis', site: 'https://www.cloudflare.com', note: 'les données des comptes sont stockées dans l\'Union européenne' },
+];
 
 /* le jeu ouvert sur ce PC (essais) parle au serveur lancé sur ce PC ; le jeu en ligne parle au serveur Cloudflare */
 const LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
