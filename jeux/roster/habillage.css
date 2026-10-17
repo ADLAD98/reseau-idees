@@ -590,3 +590,17 @@ body.fx .dg-won{animation:fade .5s}
 .card-form.down{color:#ff6b7f;text-shadow:0 0 1.2cqw rgba(255,107,127,.45)}
 .chip.form-up{border-color:rgba(75,227,164,.6);color:#8ff0c6}
 .chip.form-down{border-color:rgba(255,107,127,.55);color:#ffa3af}
+
+/* ---------- pronostics : en direct, et bientôt ---------- */
+.pr-live{display:grid;gap:6px;margin:0 0 12px}
+.pr-live p{display:flex;align-items:center;gap:10px;margin:0;padding:9px 12px;border-left:2px solid #e84057;background:rgba(232,64,87,.08);color:var(--mut);font:14px/1.35 var(--text)}
+.pr-live b{color:#ff8a9a;font-size:12px;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
+.pr-live strong{color:var(--ink)}
+.pr-dot{flex:none;width:8px;height:8px;border-radius:50%;background:#e84057;box-shadow:0 0 8px #e84057;animation:prPulse 1.6s ease-in-out infinite}
+@keyframes prPulse{50%{opacity:.35}}
+body:not(.fx) .pr-dot{animation:none}
+@media (prefers-reduced-motion:reduce){.pr-dot{animation:none}}
+.pr-soon{display:grid;gap:6px;margin:0;padding:0;list-style:none}
+.pr-soon li{display:flex;justify-content:space-between;gap:10px;padding:8px 10px;border-left:2px solid var(--line2);background:rgba(1,10,19,.35);color:var(--mut);font:14px/1.35 var(--text)}
+.pr-soon time{color:var(--gold);white-space:nowrap;font-size:13px}
+.pr-note{margin:8px 0 0;color:var(--faint);font-size:13px}
