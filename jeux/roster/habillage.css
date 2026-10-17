@@ -657,3 +657,20 @@ body:not(.fx) .pr-dot{animation:none}
 /* un gros match des Worlds : gains doublés */
 .pr-x2{margin-left:6px;padding:1px 6px;border:1px solid var(--blue-lo);color:var(--blue-hi);font:700 11px/1.3 var(--text);letter-spacing:.04em;white-space:nowrap}
 .pr-match.big{border-color:var(--blue-lo)}
+
+/* ---------- le tutoriel de la première partie (js/tuto.js) ---------- */
+.tuto-ring{position:fixed;z-index:45;pointer-events:none;border:2px solid var(--blue);box-shadow:0 0 0 4px rgba(10,200,185,.18),0 0 26px rgba(10,200,185,.55);
+  transition:left .25s,top .25s,width .25s,height .25s;animation:tutoPulse 1.8s ease-in-out infinite}
+@keyframes tutoPulse{50%{box-shadow:0 0 0 7px rgba(10,200,185,.08),0 0 34px rgba(10,200,185,.7)}}
+body:not(.fx) .tuto-ring{animation:none;transition:none}
+@media (prefers-reduced-motion:reduce){.tuto-ring{animation:none;transition:none}}
+.tuto-bubble{position:fixed;z-index:46;padding:14px 16px 12px;border:1px solid var(--blue-lo);border-top:2px solid var(--blue);
+  background:linear-gradient(180deg,#0d2133,#071322);box-shadow:0 16px 40px rgba(0,0,0,.6);color:var(--ink);transition:left .25s,top .25s}
+body:not(.fx) .tuto-bubble{transition:none}
+.tuto-ring[hidden],.tuto-bubble[hidden]{display:none}
+.tuto-n{display:block;margin-bottom:6px;color:var(--blue);font:700 11px/1 var(--text);letter-spacing:.16em;text-transform:uppercase}
+.tuto-bubble p{margin:0;font-size:15px;line-height:1.45}
+.tuto-act{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px}
+.tuto-act .btn{height:34px;padding:0 16px;font-size:13px}
+.tuto-skip{margin-left:auto;padding:4px 0;border:0;background:none;color:var(--faint);font:13px/1.2 var(--text);text-decoration:underline;cursor:pointer}
+.tuto-skip:hover{color:var(--mut)}

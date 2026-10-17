@@ -26,6 +26,7 @@ import { confirmSheet, num } from './ui.js';
 import { viewWorlds } from './worlds.js';
 import { startLive } from './direct.js';
 import { badgesHTML, eventSectionHTML, loadEvent } from './evenement.js';
+import { startTutorial } from './tuto.js';
 
 const app = document.getElementById('app');
 const $ = (sel, root) => (root || document).querySelector(sel);
@@ -433,6 +434,8 @@ function shell() {
     + '<nav class="tabs">' + tabs().map((t) => '<a href="#/' + t[0] + '" data-tab="' + t[0] + '">' + icon(t[2]) + t[1] + pip(t[0]) + '</a>').join('') + '</nav>';
   drawPulse();
   startLive(PLAY);
+  /* un nouveau joueur : le tutoriel de la première partie (tuto.js) */
+  startTutorial(PLAY);
 }
 /* ce que l'application prête aux autres écrans (Jouer, Marché, Joueurs, Mondial) */
 const PLAY = {
