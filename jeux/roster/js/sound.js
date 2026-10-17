@@ -14,6 +14,11 @@ const MAX_VOICES = 48;
    (rattrapage = (1 / gain à pleine échelle) ^ 0,6) : on le retire juste après, pour qu'un son ordinaire garde exactement son volume. */
 const LIMIT_DB = -6, LIMIT_RATIO = 20;
 const MAKEUP = Math.pow(10, (-0.6 * LIMIT_DB * (1 - 1 / LIMIT_RATIO)) / 20);
+/* Chaque son part avec LEAD secondes d'avance sur l'horloge du son : programmé pour « maintenant », il arriverait un rien en retard et
+   perdrait le début de son enveloppe — une attaque brutale, qui claque ou grésille (surtout les sons très courts, comme le clic). */
+const LEAD = 0.025;
+/* un téléphone (écran tactile) : c'est là qu'un passage en arrière-plan peut dérégler le son */
+const MOBILE = (() => { try { return matchMedia('(pointer: coarse)').matches; } catch (e) { return false; } })();
 try {
   on = localStorage.getItem(STORE + 'son') !== '0';
   const saved = localStorage.getItem(STORE + 'volume-sons');
@@ -48,7 +53,10 @@ function audio() {
   if (!ctx) {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return null;
-    const c = new AC();
+    /* une réserve « équilibrée » : un peu plus de marge qu'au plus court, pour qu'un ordinateur très occupé (un stream en cours) ne
+       fasse pas de trous dans le son */
+    let c;
+    try { c = new AC({ latencyHint: 'balanced' }); } catch (e) { c = new AC(); }
     ctx = c;
     voices = 0;
     const limit = c.createDynamicsCompressor(), after = c.createGain();
@@ -79,8 +87,9 @@ function track(src) {
 }
 
 /* Un contexte audio peut rester déréglé — le son grésille ou sature jusqu'au rechargement de la page — après un changement de sortie
-   (casque, Bluetooth), un appel, une vidéo jouée par-dessus (la carte légendaire) ou un passage en arrière-plan. Dans ces cas on le note
-   usé, et au geste suivant du joueur on en crée un neuf (un navigateur ne laisse démarrer le son qu'à un geste). */
+   (casque, Bluetooth), un appel, une vidéo jouée par-dessus (la carte légendaire) ou, sur téléphone, un passage en arrière-plan. Dans ces
+   cas on le note usé, et dès le geste suivant du joueur (un navigateur ne laisse démarrer le son qu'à un geste) on en crée un neuf : à
+   l'appui du doigt ou du bouton de la souris, pour qu'il soit déjà lancé quand le son du clic part, au relâché. */
 export function soundStale() { if (ctx) stale = true; }
 let video = false;
 function renew() {
@@ -92,8 +101,10 @@ function renew() {
   const old = ctx;
   ctx = null; out = null; noiseBuf = null; voices = 0;
   try { old.close().catch(() => { /* déjà fermé */ }); } catch (e) { /* navigateur sans close() */ }
+  audio();
 }
-document.addEventListener('visibilitychange', () => { if (document.hidden) soundStale(); });
+/* (sur un ordinateur, changer de fenêtre ne dérègle rien : on garde le même) */
+document.addEventListener('visibilitychange', () => { if (document.hidden && MOBILE) soundStale(); });
 try { navigator.mediaDevices.addEventListener('devicechange', soundStale); } catch (e) { /* pas de détection des sorties audio */ }
 for (const type of ['pointerdown', 'keydown', 'touchstart']) document.addEventListener(type, renew, { capture: true, passive: true });
 
@@ -101,7 +112,7 @@ for (const type of ['pointerdown', 'keydown', 'touchstart']) document.addEventLi
 function tone(freq, o = {}) {
   const c = audio();
   if (!c || voices >= MAX_VOICES) return;
-  const t0 = c.currentTime + (o.t || 0), dur = o.dur || 0.4, vol = o.vol || 0.15;
+  const t0 = c.currentTime + LEAD + (o.t || 0), dur = o.dur || 0.4, vol = o.vol || 0.15;
   const osc = c.createOscillator(), gain = c.createGain();
   track(osc);
   osc.type = o.type || 'sine';
@@ -123,7 +134,7 @@ function tone(freq, o = {}) {
 function noise(o = {}) {
   const c = audio();
   if (!c || voices >= MAX_VOICES) return;
-  const t0 = c.currentTime + (o.t || 0), dur = o.dur || 0.2, vol = o.vol || 0.15;
+  const t0 = c.currentTime + LEAD + (o.t || 0), dur = o.dur || 0.2, vol = o.vol || 0.15;
   const src = c.createBufferSource(), filter = c.createBiquadFilter(), gain = c.createGain();
   track(src);
   src.buffer = noiseBuf; src.loop = true;
