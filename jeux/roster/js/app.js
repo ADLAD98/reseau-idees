@@ -8,6 +8,7 @@ import { dailyLook, drawDaily, loadDaily } from './daily.js';
 import { isOldHome, moveIfOld, takeTransfer } from './demenagement.js';
 import { disablePush, enablePush, pushOn, pushSupport } from './rappels.js';
 import { achievementsSectionHTML, checkAchievements, loadAchievements } from './succes.js';
+import { loadReferral, referralSectionHTML } from './parrainage.js';
 import { avatarHTML, loadProfile, profileSectionHTML } from './vitrine.js';
 import { createDuels } from './duel.js';
 import { sellCard, showOnMarket, viewMarket } from './market.js';
@@ -238,11 +239,11 @@ async function boot() {
   }
   await takeTransfer();
   /* un lien de partage (?carte=…) : la carte s'ouvrira une fois le jeu prêt, même après la connexion ; l'adresse redevient propre */
-  const shared = new URLSearchParams(location.search).get('carte');
-  if (shared) {
-    try { sessionStorage.setItem(STORE + 'carte', shared); } catch (e) { /* tant pis */ }
-    history.replaceState(null, '', location.pathname + location.hash);
-  }
+  const query = new URLSearchParams(location.search), shared = query.get('carte'), sponsor = query.get('parrain');
+  if (shared) { try { sessionStorage.setItem(STORE + 'carte', shared); } catch (e) { /* tant pis */ } }
+  /* le lien de parrainage d'un ami (?parrain=…) : retenu jusqu'à l'inscription (parrainage.ts du serveur) */
+  if (sponsor && /^[2-9A-Za-z]{6}$/.test(sponsor)) { try { sessionStorage.setItem(STORE + 'parrain', sponsor.toUpperCase()); } catch (e) { /* tant pis */ } }
+  if (shared || sponsor) history.replaceState(null, '', location.pathname + location.hash);
   try { S.fx = localStorage.getItem(STORE + 'fx') !== '0'; } catch (e) { S.fx = true; }
   try { S.pack = localStorage.getItem(STORE + 'booster') === 'credits' ? 'credits' : 'free'; } catch (e) { S.pack = 'free'; }
   try {
@@ -269,6 +270,8 @@ async function boot() {
 }
 
 /* ---------- connexion ---------- */
+/* le code du parrain, venu par son lien (?parrain=…), tant que le joueur ne s'est pas inscrit */
+const sponsorCode = () => { try { return sessionStorage.getItem(STORE + 'parrain') || ''; } catch (e) { return ''; } };
 function showAuth(message) {
   let mode = 'login';
   app.innerHTML = '<div class="auth"><div class="auth-brand">'
@@ -283,6 +286,7 @@ function showAuth(message) {
     + '<label class="field"><span id="pwLabel">Mot de passe</span><input name="password" type="password" autocomplete="current-password" required></label>'
     + '<label class="field" data-only="register recover" hidden>Mot de passe, une seconde fois<input name="password2" type="password" autocomplete="new-password"></label>'
     + '<p class="hint" data-only="register" hidden>Aucune adresse e-mail n\'est demandée. Une fois inscrit, tu recevras un code de secours : garde-le, il te permettra de choisir un nouveau mot de passe si tu oublies le tien.</p>'
+    + (sponsorCode() ? '<p class="hint sponsor" data-only="register" hidden><b>Invité par un ami</b> : après ton premier match, vous gagnez chacun un pack.</p>' : '')
     + '<p class="hint" data-only="recover" hidden>Le code de secours t\'a été donné à l\'inscription (ou dans ton Profil). Avec lui, tu choisis un nouveau mot de passe ; tu en recevras aussi un nouveau code.</p>'
     + '<p class="form-error" role="alert">' + esc(message || '') + '</p>'
     + '<button class="btn primary big" type="submit">Entrer</button>'
@@ -301,6 +305,8 @@ function showAuth(message) {
     error.textContent = '';
   };
   form.addEventListener('click', (e) => { const b = e.target.closest('[data-mode]'); if (b) setMode(b.dataset.mode); });
+  /* venu par le lien d'un ami : directement sur l'inscription */
+  if (sponsorCode()) setMode('register');
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const name = form.name.value.trim(), password = form.password.value, code = form.code.value.toUpperCase().replace(/[^0-9A-Z]/g, '');
@@ -315,7 +321,9 @@ function showAuth(message) {
     try {
       const key = await deriveKey(name, password);
       const data = mode === 'recover' ? await call('POST', '/api/recover', { name, code, key })
-        : await call('POST', mode === 'register' ? '/api/register' : '/api/login', { name, key });
+        : mode === 'register' ? await call('POST', '/api/register', sponsorCode() ? { name, key, ref: sponsorCode() } : { name, key })
+          : await call('POST', '/api/login', { name, key });
+      if (mode === 'register') { try { sessionStorage.removeItem(STORE + 'parrain'); } catch (err) { /* tant pis */ } }
       S.session = { token: data.token, name: data.player.name };
       saveSession(S.session);
       /* (un autre compte sur le même écran : rien de l'équipe ni des missions du précédent ne doit rester) */
@@ -1172,6 +1180,8 @@ async function viewProfile(main) {
     + profileSectionHTML()
     /* mes succès (remplis quand le serveur a répondu) */
     + achievementsSectionHTML()
+    /* mon lien de parrainage */
+    + referralSectionHTML()
     + (S.club ? clubSectionHTML() : '') + '<div class="panels">'
     + '<section class="panel"><h3>Mon compte</h3><div class="kv"><span>Packs ouverts</span><b>' + p.packsOpened + '</b><span>Cartes différentes</span><b>' + p.cardsUnique + ' / ' + S.cat.cards.length + '</b><span>Exemplaires</span><b>' + p.cardsTotal + '</b><span>Parties gagnées</span><b>' + p.wins + ' sur ' + (p.wins + p.losses) + '</b>'
     + (S.live ? '<span>Défis entre joueurs</span><b>' + (p.duelWins || 0) + ' V – ' + (p.duelLosses || 0) + ' D</b><span>Mondiaux remportés</span><b>' + (p.titles || 0) + '</b>' : '')
@@ -1209,6 +1219,7 @@ async function viewProfile(main) {
   loadClub(PLAY);
   loadProfile(PLAY);
   loadAchievements(PLAY);
+  loadReferral(PLAY);
   $('#fxSwitch').addEventListener('click', (e) => {
     S.fx = !S.fx;
     e.currentTarget.setAttribute('aria-pressed', String(S.fx));

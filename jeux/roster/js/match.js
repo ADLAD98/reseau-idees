@@ -899,7 +899,9 @@ export function runMatch({ data, cat, fx }) {
     else {
       prize = '<div class="prize"><span>' + (won ? 'Récompense' : 'Lot de consolation') + '</span><b>+' + rewards.coins + ' crédits</b>'
         + (rewards.easy ? '<i>Adversaire bien plus faible : gain réduit.</i>' : '') + '</div>'
-        + (rewards.pack ? '<div class="prize bonus"><span>Première victoire contre ' + esc(foeTeam ? foeTeam.name : M.opp) + '</span><b>+1 pack</b><i>Il t\'attend dans l\'onglet Packs.</i></div>' : '');
+        + (rewards.pack ? '<div class="prize bonus"><span>Première victoire contre ' + esc(foeTeam ? foeTeam.name : M.opp) + '</span><b>+1 pack</b><i>Il t\'attend dans l\'onglet Packs.</i></div>' : '')
+        /* le premier match d'un joueur venu par le lien d'un ami : un pack pour chacun des deux */
+        + (rewards.referral ? '<div class="prize bonus"><span>Ton premier match, grâce à ton parrain</span><b>+1 pack</b><i>Ton parrain en reçoit un aussi.</i></div>' : '');
     }
     endEl.innerHTML = '<div class="end-box panel ' + (won ? 'win' : 'lose') + '"><div class="end-title' + (rewards.title && rewards.title.length > 9 ? ' long' : '') + '">' + esc(rewards.title || (won ? 'Victoire' : 'Défaite')) + '</div>'
       + '<div class="end-score"><span class="s0">' + esc(short(0)) + '</span><b>' + sim.kills[0] + ' – ' + sim.kills[1] + '</b><span class="s1">' + esc(short(1)) + '</span></div>'
@@ -910,8 +912,8 @@ export function runMatch({ data, cat, fx }) {
       + '<table class="end-stats"><thead><tr><td class="num s0">' + esc(short(0)) + '</td><th></th><td class="num s1">' + esc(short(1)) + '</td></tr></thead><tbody>'
       + line('Éliminations', sim.kills[0], sim.kills[1]) + line('Or', kilo(plan.teamGoldAt(0, plan.total)), kilo(plan.teamGoldAt(1, plan.total))) + line('Tours', sim.towers[0], sim.towers[1])
       + line('Dragons', sim.dragons[0], sim.dragons[1]) + line('Barons', sim.barons[0], sim.barons[1]) + '</tbody></table></div></div>'
-      + '<div class="end-actions actions"><button class="btn primary big" type="button" data-go="' + (rewards.pack ? 'packs' : 'jouer') + '">' + (rewards.pack ? 'Ouvrir mon pack' : esc(rewards.next || 'Continuer')) + '</button>'
-      + (rewards.pack ? '<button class="btn big" type="button" data-go="jouer">Continuer</button>' : '')
+      + '<div class="end-actions actions"><button class="btn primary big" type="button" data-go="' + (rewards.pack || rewards.referral ? 'packs' : 'jouer') + '">' + (rewards.pack || rewards.referral ? 'Ouvrir mon pack' : esc(rewards.next || 'Continuer')) + '</button>'
+      + (rewards.pack || rewards.referral ? '<button class="btn big" type="button" data-go="jouer">Continuer</button>' : '')
       + '<button class="btn big" type="button" data-act="again">' + (fx ? 'Revoir la partie' : 'Voir la partie') + '</button></div>'
       + '<details class="more" open><summary>Joueurs</summary><div class="end-boards">' + board(0) + board(1) + '</div></details>'
       + '<details class="more"><summary>Bilan de la draft</summary><div class="end-boards">' + draft(0) + draft(1) + '</div>'
