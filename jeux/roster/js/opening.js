@@ -532,10 +532,27 @@ export async function runOpening({ request, getCat, fx, size, from, look, quick 
   }
   /* ---------- l'apothéose d'une carte légendaire ---------- */
   /* La musique : le lecteur officiel de YouTube, dans une petite vignette qui reste visible ; il démarre muet, puis on règle son volume et on
-     lui rend le son (les navigateurs laissent toujours démarrer un lecteur muet). Le jeu ne lui parle que par messages, sans charger de script. */
+     lui rend le son (les navigateurs laissent toujours démarrer un lecteur muet). Le jeu ne lui parle que par messages, sans charger de script.
+     YouTube n'est contacté qu'à la demande du joueur (RGPD : pas de service tiers sans son accord) : d'abord un bouton « Écouter », puis,
+     s'il le touche, le lecteur. */
   function startSong(card) {
     const def = LEGEND_SONGS[card.base || card.id];
     if (!def || !soundOn() || song) return;
+    const ask = document.createElement('div');
+    ask.className = 'op-song-ask';
+    ask.innerHTML = '<button type="button">' + icon('i-sound') + '<span><b>Écouter « ' + esc(def.title) + ' »</b><small>lecteur YouTube</small></span></button>';
+    op.appendChild(ask);
+    song = { tile: ask, tell: () => {}, vol: () => 0, volume: 0, timer: setTimeout(() => stopSong(true), (def.end - def.start + 4) * 1000) };
+    ask.querySelector('button').addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!song || song.tile !== ask) return;
+      clearTimeout(song.timer);
+      song = null;
+      ask.remove();
+      playSong(def);
+    });
+  }
+  function playSong(def) {
     const tile = document.createElement('div');
     tile.className = 'op-song';
     tile.innerHTML = '<iframe title="' + esc(def.title) + '" allow="autoplay; encrypted-media" referrerpolicy="strict-origin-when-cross-origin" src="' + YT + '/embed/' + encodeURIComponent(def.video)
@@ -847,7 +864,7 @@ export async function runOpening({ request, getCat, fx, size, from, look, quick 
     if (act && act.dataset.act === 'skip') { skip(); return; }
     const go = e.target.closest('[data-go]');
     if (go) { if (leave && op.dataset.stage === 'done') { goTo = go.dataset.go; leave(); } return; }
-    if (e.target.closest('.op-head') || e.target.closest('.op-song')) return;
+    if (e.target.closest('.op-head') || e.target.closest('.op-song') || e.target.closest('.op-song-ask')) return;
     if (endApo) { endApo(); return; }
     if (op.dataset.stage === 'stack') { advance(); return; }
     if (op.dataset.stage === 'done') {

@@ -307,7 +307,7 @@ function showAuth(message) {
     + '<label class="field" data-only="recover" hidden>Code de secours<input name="code" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="29" placeholder="XXXXX-XXXXX-XXXXX-XXXXX"></label>'
     + '<label class="field"><span id="pwLabel">Mot de passe</span><input name="password" type="password" autocomplete="current-password" required></label>'
     + '<label class="field" data-only="register recover" hidden>Mot de passe, une seconde fois<input name="password2" type="password" autocomplete="new-password"></label>'
-    + '<p class="hint" data-only="register" hidden>Aucune adresse e-mail n\'est demandée. Une fois inscrit, tu recevras un code de secours : garde-le, il te permettra de choisir un nouveau mot de passe si tu oublies le tien.</p>'
+    + '<p class="hint" data-only="register" hidden><b>Cinq packs t\'attendent pour démarrer.</b> Aucune adresse e-mail n\'est demandée. Une fois inscrit, tu recevras un code de secours : garde-le, il te permettra de choisir un nouveau mot de passe si tu oublies le tien.</p>'
     + (sponsorCode() ? '<p class="hint sponsor" data-only="register" hidden><b>Invité par un ami</b> : après ton premier match, vous gagnez chacun un pack.</p>' : '')
     + '<p class="hint" data-only="recover" hidden>Le code de secours t\'a été donné à l\'inscription (ou dans ton Profil). Avec lui, tu choisis un nouveau mot de passe ; tu en recevras aussi un nouveau code.</p>'
     + '<p class="form-error" role="alert">' + esc(message || '') + '</p>'
@@ -1252,7 +1252,7 @@ async function viewProfile(main) {
     + '<p class="hint">Musiques : « For Originz », « Ascending the Vale », « Minima » et « Clash Defiant », Kevin MacLeod (<a href="https://incompetech.com/" target="_blank" rel="noopener">incompetech.com</a>), licence <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">Creative Commons Attribution 4.0</a>. '
     + 'Ambiance de tribune : un enregistrement de Félix Blume (<a href="https://freesound.org/people/felix.blume/sounds/500250/" target="_blank" rel="noopener">freesound.org</a>), versé au domaine public. Les autres sons sont fabriqués par le jeu.</p>'
     + '<p class="hint">Autographe de Faker : d\'après « Faker autograph.svg » (<a href="https://commons.wikimedia.org/wiki/File:Faker_autograph.svg" target="_blank" rel="noopener">Wikimedia Commons</a>), dans le domaine public. Ce n\'est pas une carte signée de sa main.</p>'
-    + '<p class="hint">' + esc(GAME_NAME) + ' was created under Riot Games\' "Legal Jibber Jabber" policy using assets owned by Riot Games. Riot Games does not endorse or sponsor this project. Ce jeu n\'est ni approuvé ni sponsorisé par Riot Games, ni par les équipes et les joueurs cités.</p>'
+    + '<p class="hint">' + esc(GAME_NAME) + ' est un projet de fan non officiel qui utilise des éléments appartenant à Riot Games. Il n\'est ni approuvé ni sponsorisé par Riot Games, ni par les équipes, les ligues et les joueurs cités. <a href="legal.html#regles">Règles d\'utilisation</a>.</p>'
     + '</section></div>';
 
   loadClub(PLAY);
