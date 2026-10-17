@@ -9,6 +9,7 @@ import { isOldHome, moveIfOld, takeTransfer } from './demenagement.js';
 import { disablePush, enablePush, pushOn, pushSupport } from './rappels.js';
 import { achievementsSectionHTML, checkAchievements, loadAchievements } from './succes.js';
 import { loadReferral, referralSectionHTML } from './parrainage.js';
+import { loadPredictions, predictionsSectionHTML } from './pronostics.js';
 import { avatarHTML, loadProfile, profileSectionHTML } from './vitrine.js';
 import { createDuels } from './duel.js';
 import { sellCard, showOnMarket, viewMarket } from './market.js';
@@ -592,6 +593,7 @@ function viewPacks(main) {
   /* les missions avancent en jouant : on les redemande à chaque passage sur cet écran */
   loadMissions();
   loadWeekly();
+  loadPredictions(PLAY);
   loadHubTeam();
   const recent = [...S.owned.entries()].sort((a, b) => b[1].at - a[1].at).slice(0, 6).map(([id]) => S.cat.cardById.get(id)).filter(Boolean);
   const kind = packKind(), credits = kind === 'credits';
@@ -609,6 +611,8 @@ function viewPacks(main) {
     + hubHTML()
     + '<section class="missions" id="missions"' + (S.missions ? '' : ' hidden') + '>' + (S.missions ? missionsHTML() : '') + '</section>'
     + '<section class="missions weekly" id="weekly"' + (S.weekly ? '' : ' hidden') + '>' + (S.weekly ? weeklyHTML() : '') + '</section>'
+    /* les pronostics sur les vrais matchs (pronostics.js) */
+    + predictionsSectionHTML()
     + '<section><h2 class="h2">Dernières cartes obtenues</h2>'
     + (recent.length ? '<div class="row-cards">' + recent.map((c) => tile(c)).join('') + '</div>' : '<p class="empty">Ta collection est vide. Ouvre ton premier pack !</p>')
     + '</section>'
