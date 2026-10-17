@@ -273,7 +273,7 @@ function showAuth(message) {
     + '<p class="hint" data-only="register" hidden>Aucune adresse e-mail n\'est demandée : note bien ton mot de passe, il ne pourra pas être retrouvé.</p>'
     + '<p class="form-error" role="alert">' + esc(message || '') + '</p>'
     + '<button class="btn primary big" type="submit">Entrer</button>'
-    + '<p class="legal">Projet de fan gratuit, sans lien avec Riot Games ni avec les équipes citées. <a href="legal.html">Mentions légales</a> · <a href="legal.html#confidentialite">Confidentialité</a> · <a href="../../">Bcorps Labs</a></p>'
+    + '<p class="legal">Projet de fan gratuit, sans lien avec Riot Games ni avec les équipes citées. <a href="legal.html">Mentions légales</a> · <a href="legal.html#confidentialite">Confidentialité</a></p>'
     + '</form></div>';
   const form = $('#authForm'), error = $('.form-error', form), submit = $('button[type=submit]', form);
   const setMode = (m) => {
@@ -1016,7 +1016,7 @@ async function viewProfile(main) {
     + 'Ambiance de tribune : un enregistrement de Félix Blume (<a href="https://freesound.org/people/felix.blume/sounds/500250/" target="_blank" rel="noopener">freesound.org</a>), versé au domaine public. Les autres sons sont fabriqués par le jeu.</p>'
     + '<p class="hint">Autographe de Faker : d\'après « Faker autograph.svg » (<a href="https://commons.wikimedia.org/wiki/File:Faker_autograph.svg" target="_blank" rel="noopener">Wikimedia Commons</a>), dans le domaine public. Ce n\'est pas une carte signée de sa main.</p>'
     + '<p class="hint">' + esc(GAME_NAME) + ' was created under Riot Games\' "Legal Jibber Jabber" policy using assets owned by Riot Games. Riot Games does not endorse or sponsor this project. Ce jeu n\'est ni approuvé ni sponsorisé par Riot Games, ni par les équipes et les joueurs cités.</p>'
-    + '<div class="actions"><a class="btn" href="../../">Retour à Bcorps Labs</a></div></section></div>';
+    + '</section></div>';
 
   loadClub(PLAY);
   loadProfile(PLAY);
