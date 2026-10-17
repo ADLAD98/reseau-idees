@@ -14,7 +14,7 @@ export const badgesHTML = (list) => (list || []).map((b) => '<span class="badge-
 export async function loadEvent(ctx) {
   G = ctx;
   let res = null;
-  try { res = await G.call('GET', '/api/event'); } catch (e) { return; }
+  try { res = await G.call('GET', '/api/evenement'); } catch (e) { return; }
   E = res && res.event;
   draw();
 }
@@ -43,7 +43,7 @@ document.addEventListener('click', async (e) => {
   const btn = e.target.closest('#event [data-eclaim]');
   if (!btn || btn.disabled || !G) return;
   btn.disabled = true;
-  const res = await G.guard(() => G.call('POST', '/api/event/claim', { goal: btn.dataset.eclaim }));
+  const res = await G.guard(() => G.call('POST', '/api/evenement/claim', { goal: btn.dataset.eclaim }));
   if (!res) { btn.disabled = false; return; }
   G.applyState(res);
   E = res.event;
