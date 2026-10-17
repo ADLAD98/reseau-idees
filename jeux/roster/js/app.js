@@ -234,6 +234,12 @@ async function boot() {
     if (await moveIfOld()) return;
   }
   await takeTransfer();
+  /* un lien de partage (?carte=…) : la carte s'ouvrira une fois le jeu prêt, même après la connexion ; l'adresse redevient propre */
+  const shared = new URLSearchParams(location.search).get('carte');
+  if (shared) {
+    try { sessionStorage.setItem(STORE + 'carte', shared); } catch (e) { /* tant pis */ }
+    history.replaceState(null, '', location.pathname + location.hash);
+  }
   try { S.fx = localStorage.getItem(STORE + 'fx') !== '0'; } catch (e) { S.fx = true; }
   try { S.pack = localStorage.getItem(STORE + 'booster') === 'credits' ? 'credits' : 'free'; } catch (e) { S.pack = 'free'; }
   try {
@@ -256,6 +262,7 @@ async function boot() {
   shell();
   route();
   remindRecovery();
+  openPendingCard();
 }
 
 /* ---------- connexion ---------- */
@@ -321,6 +328,7 @@ function showAuth(message) {
         toast('Bienvenue ' + S.player.name + ' ! ' + (packs > 1 ? packs + ' packs t\'attendent.' : 'Ton premier pack t\'attend.'));
       } else if (mode === 'recover') toast('Mot de passe changé : tu es connecté.');
       else remindRecovery();
+      openPendingCard();
     } catch (err) {
       error.textContent = err instanceof ApiError ? err.message : 'Un problème est survenu. Réessaie.';
       if (!(err instanceof ApiError)) console.error(err);
@@ -990,7 +998,9 @@ function showSheet(id) {
     + '<div class="sheet-card">' + cardHTML(card, cat, { eager: true, cls: own ? '' : 'missing', qty: own ? own.qty : 0, serial: own ? serialOf(card.id) : 0 })
     + '<span>' + (own ? (own.qty > 1 ? own.qty + ' exemplaires' : '1 exemplaire') + ' · depuis le ' + frDate(own.at) : 'Carte manquante') + '</span>'
     /* l'examiner : seule, en grand, on la tourne et on la retourne du doigt */
-    + (own ? '<button class="btn sheet-look" type="button" data-sheet="look">Examiner la carte</button>' : '') + '</div>'
+    + (own ? '<button class="btn sheet-look" type="button" data-sheet="look">Examiner la carte</button>'
+      /* la montrer aux autres : un lien dont l'aperçu présente la carte */
+      + '<button class="btn sheet-share" type="button" data-sheet="share">Partager</button>' : '') + '</div>'
     + '<div class="sheet-info"><div class="sheet-title"><div><h2>' + esc(card.name) + '</h2>'
     + '<p>' + (card.country ? '<img src="' + flagUrl(card.country) + '" alt="">' + esc(cat.countries[card.country]) + ' · ' : '') + esc(card.title || ROLE_NAME[card.role]) + ' · ' + esc(team ? team.name : card.team) + '</p></div>'
     + '<span class="spacer"></span><button class="close" type="button" aria-label="Fermer">' + icon('i-close') + '</button></div>'
@@ -1022,6 +1032,7 @@ function showSheet(id) {
     const act = e.target.closest('[data-sheet]');
     if (!act) return;
     if (act.dataset.sheet === 'look') { inspectCard(card, cat, { serial: own ? serialOf(card.id) : 0 }); return; }
+    if (act.dataset.sheet === 'share') { shareCard(card); return; }
     if (act.dataset.sheet === 'quick' || act.dataset.sheet === 'quickall') { close(); quickSell(card, act.dataset.sheet === 'quickall' ? S.owned.get(id).qty - 1 : 1); return; }
     close();
     /* les fenêtres ouvertes derrière (échange, marché) se referment : on change d'écran */
@@ -1033,6 +1044,28 @@ function showSheet(id) {
   document.body.appendChild(sheet);
   /* la carte s'incline sous le doigt ou la souris ; les reflets d'une version spéciale suivent le geste */
   if (S.fx && own) tiltCard($('.sheet-card .card', sheet), 22);
+}
+
+/* ---------- partager une carte ---------- */
+/* Le lien bcorpslabs.com/carte/<id>?de=<pseudo> : sur Discord, WhatsApp ou un réseau, son aperçu montre la carte (nom, rang, note,
+   illustration) ; ouvert, il mène au jeu, sur cette carte (openPendingCard). */
+const SHARE_HOME = 'https://bcorpslabs.com';
+async function shareCard(card) {
+  const url = SHARE_HOME + '/carte/' + encodeURIComponent(card.id) + '?de=' + encodeURIComponent(S.player.name);
+  const tier = S.cat.tierById.get(card.tier);
+  const text = card.name + ' · ' + (tier ? tier.name : '') + (card.variant ? ' ' + VARIANTS[card.variant].name : '') + ' · ' + card.ovr + ' : ma carte sur Roster';
+  /* sur un téléphone, son menu de partage (Discord, WhatsApp, Snapchat…) ; sur un ordinateur, le lien copié */
+  if (navigator.share && matchMedia('(pointer: coarse)').matches) {
+    try { await navigator.share({ title: 'Roster', text, url }); } catch (e) { /* partage annulé */ }
+    return;
+  }
+  try { await navigator.clipboard.writeText(url); toast('Lien copié : colle-le où tu veux (Discord, réseaux…).'); } catch (e) { window.prompt('Copie ce lien :', url); }
+}
+/** Une carte demandée par un lien de partage (?carte=…) s'ouvre dès que le jeu est prêt. */
+function openPendingCard() {
+  let id = null;
+  try { id = sessionStorage.getItem(STORE + 'carte'); sessionStorage.removeItem(STORE + 'carte'); } catch (e) { return; }
+  if (id && S.cat && S.cat.cardById.has(id)) showSheet(id);
 }
 
 /* ---------- écran Classement ---------- */

@@ -789,7 +789,8 @@ body.fx .sheet>*{animation:sheetIn .32s cubic-bezier(.2,.75,.25,1) backwards}
 .sheet-card{display:grid;place-items:center;align-content:start;gap:22px}
 .sheet-card .card{--w:310px}
 .sheet-card .card .card-in{transition:transform .12s ease-out}
-.sheet-look{margin-top:12px;height:38px;padding:0 16px;font-size:13px}
+.sheet-look,.sheet-share{margin-top:12px;height:38px;padding:0 16px;font-size:13px}
+.sheet-share{margin-top:8px}
 
 /* ---------- l'examen d'une carte : seule sous la lumière, on la tourne et on la retourne du doigt ---------- */
 .insp{position:fixed;inset:0;z-index:80;display:flex;flex-direction:column;overflow:hidden;animation:fade .25s;-webkit-user-select:none;user-select:none;touch-action:none;
