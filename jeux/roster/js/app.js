@@ -255,6 +255,7 @@ async function boot() {
   }
   shell();
   route();
+  remindRecovery();
 }
 
 /* ---------- connexion ---------- */
@@ -268,36 +269,43 @@ function showAuth(message) {
     + '<form class="auth-form panel" id="authForm" novalidate>'
     + '<div class="seg"><button type="button" data-mode="login" class="on">Connexion</button><button type="button" data-mode="register">Créer un compte</button></div>'
     + '<label class="field">Pseudo<input name="name" autocomplete="username" autocapitalize="off" spellcheck="false" maxlength="16" required></label>'
-    + '<label class="field">Mot de passe<input name="password" type="password" autocomplete="current-password" required></label>'
-    + '<label class="field" data-only="register" hidden>Mot de passe, une seconde fois<input name="password2" type="password" autocomplete="new-password"></label>'
-    + '<p class="hint" data-only="register" hidden>Aucune adresse e-mail n\'est demandée : note bien ton mot de passe, il ne pourra pas être retrouvé.</p>'
+    + '<label class="field" data-only="recover" hidden>Code de secours<input name="code" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="29" placeholder="XXXXX-XXXXX-XXXXX-XXXXX"></label>'
+    + '<label class="field"><span id="pwLabel">Mot de passe</span><input name="password" type="password" autocomplete="current-password" required></label>'
+    + '<label class="field" data-only="register recover" hidden>Mot de passe, une seconde fois<input name="password2" type="password" autocomplete="new-password"></label>'
+    + '<p class="hint" data-only="register" hidden>Aucune adresse e-mail n\'est demandée. Une fois inscrit, tu recevras un code de secours : garde-le, il te permettra de choisir un nouveau mot de passe si tu oublies le tien.</p>'
+    + '<p class="hint" data-only="recover" hidden>Le code de secours t\'a été donné à l\'inscription (ou dans ton Profil). Avec lui, tu choisis un nouveau mot de passe ; tu en recevras aussi un nouveau code.</p>'
     + '<p class="form-error" role="alert">' + esc(message || '') + '</p>'
     + '<button class="btn primary big" type="submit">Entrer</button>'
+    + '<button class="auth-link" type="button" data-mode="recover" data-only="login">Mot de passe oublié ?</button>'
+    + '<button class="auth-link" type="button" data-mode="login" data-only="recover" hidden>‹ Retour à la connexion</button>'
     + '<p class="legal">Projet de fan gratuit, sans lien avec Riot Games ni avec les équipes citées. <a href="legal.html">Mentions légales</a> · <a href="legal.html#confidentialite">Confidentialité</a></p>'
     + '</form></div>';
   const form = $('#authForm'), error = $('.form-error', form), submit = $('button[type=submit]', form);
   const setMode = (m) => {
     mode = m;
-    form.querySelectorAll('[data-mode]').forEach((b) => b.classList.toggle('on', b.dataset.mode === m));
-    form.querySelectorAll('[data-only]').forEach((el) => { el.hidden = el.dataset.only !== m; });
-    form.password.autocomplete = m === 'register' ? 'new-password' : 'current-password';
-    submit.textContent = m === 'register' ? 'Créer mon compte' : 'Entrer';
+    form.querySelectorAll('.seg [data-mode]').forEach((b) => b.classList.toggle('on', b.dataset.mode === m));
+    form.querySelectorAll('[data-only]').forEach((el) => { el.hidden = !el.dataset.only.split(' ').includes(m); });
+    form.password.autocomplete = m === 'login' ? 'current-password' : 'new-password';
+    $('#pwLabel').textContent = m === 'recover' ? 'Nouveau mot de passe' : 'Mot de passe';
+    submit.textContent = m === 'register' ? 'Créer mon compte' : m === 'recover' ? 'Valider' : 'Entrer';
     error.textContent = '';
   };
   form.addEventListener('click', (e) => { const b = e.target.closest('[data-mode]'); if (b) setMode(b.dataset.mode); });
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const name = form.name.value.trim(), password = form.password.value;
+    const name = form.name.value.trim(), password = form.password.value, code = form.code.value.toUpperCase().replace(/[^0-9A-Z]/g, '');
     if (!NAME_RULE.test(name)) { error.textContent = 'Pseudo : 3 à 16 caractères, lettres, chiffres, tiret ou tiret bas.'; return; }
+    if (mode === 'recover' && code.length !== 20) { error.textContent = 'Le code de secours compte 20 signes (4 groupes de 5).'; return; }
     if (password.length < 8) { error.textContent = 'Mot de passe : 8 caractères au minimum.'; return; }
-    if (mode === 'register' && password !== form.password2.value) { error.textContent = 'Les deux mots de passe sont différents.'; return; }
+    if (mode !== 'login' && password !== form.password2.value) { error.textContent = 'Les deux mots de passe sont différents.'; return; }
     const label = submit.textContent;
     submit.disabled = true;
     submit.textContent = 'Un instant…';
     error.textContent = '';
     try {
       const key = await deriveKey(name, password);
-      const data = await call('POST', mode === 'register' ? '/api/register' : '/api/login', { name, key });
+      const data = mode === 'recover' ? await call('POST', '/api/recover', { name, code, key })
+        : await call('POST', mode === 'register' ? '/api/register' : '/api/login', { name, key });
       S.session = { token: data.token, name: data.player.name };
       saveSession(S.session);
       /* (un autre compte sur le même écran : rien de l'équipe ni des missions du précédent ne doit rester) */
@@ -306,10 +314,13 @@ function showAuth(message) {
       location.hash = '#/packs';
       shell();
       route();
+      /* le code de secours, montré une seule fois : à l'inscription, et quand le précédent vient de servir */
+      if (data.recovery) await showRecovery(data.recovery, mode === 'recover' ? 'Mot de passe changé' : 'Bienvenue');
       if (mode === 'register') {
         const packs = 1 + (S.free.spare || 0);
         toast('Bienvenue ' + S.player.name + ' ! ' + (packs > 1 ? packs + ' packs t\'attendent.' : 'Ton premier pack t\'attend.'));
-      }
+      } else if (mode === 'recover') toast('Mot de passe changé : tu es connecté.');
+      else remindRecovery();
     } catch (err) {
       error.textContent = err instanceof ApiError ? err.message : 'Un problème est survenu. Réessaie.';
       if (!(err instanceof ApiError)) console.error(err);
@@ -328,6 +339,41 @@ function showAuth(message) {
     }
     fan.innerHTML = picks.map((c, i) => cardHTML(c, S.cat, { eager: true }).replace('<article class="', '<article style="--i:' + i + '" class="')).join('');
   }).catch(() => { /* pas grave : la page de connexion marche sans */ });
+}
+
+/* ---------- le code de secours ---------- */
+/** Montre le code de secours, une seule fois ; se résout quand le joueur dit l'avoir noté. */
+function showRecovery(code, why) {
+  return new Promise((done) => {
+    const veil = document.createElement('div');
+    veil.className = 'rc-veil';
+    veil.innerHTML = '<div class="rc-box panel" role="dialog" aria-modal="true" aria-labelledby="rcTitle">'
+      + '<span class="eyebrow">' + esc(why) + '</span><h3 id="rcTitle">Ton code de secours</h3>'
+      + '<p>Si tu oublies ton mot de passe, ce code te permettra d\'en choisir un nouveau (« Mot de passe oublié ? », à la connexion). '
+      + '<b>Note-le ou prends-le en photo maintenant : il ne sera plus jamais affiché.</b></p>'
+      + '<div class="rc-code" translate="no">' + esc(code) + '</div>'
+      + '<div class="actions"><button class="btn" type="button" data-rc="copy">Copier</button><button class="btn primary" type="button" data-rc="ok" disabled>Je l\'ai noté</button></div></div>';
+    document.body.append(veil);
+    /* le bouton attend un instant : qu'on ait le temps de lire avant de fermer */
+    setTimeout(() => { const ok = veil.querySelector('[data-rc="ok"]'); if (ok) ok.disabled = false; }, 1500);
+    veil.addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-rc]');
+      if (!b || b.disabled) return;
+      if (b.dataset.rc === 'copy') {
+        try { await navigator.clipboard.writeText(code); b.textContent = 'Copié'; } catch (err) { b.textContent = 'Copie impossible : recopie-le'; }
+        return;
+      }
+      veil.remove();
+      done();
+    });
+  });
+}
+/** Un joueur sans code de secours (compte créé avant lui) : un rappel, au plus une fois par jour sur cet appareil. */
+function remindRecovery() {
+  if (!S.player || !('hasRecovery' in S.player) || S.player.hasRecovery) return;
+  const today = new Date().toDateString();
+  try { if (localStorage.getItem(STORE + 'rappel-secours') === today) return; localStorage.setItem(STORE + 'rappel-secours', today); } catch (e) { /* tant pis : on rappelle */ }
+  toast('Crée ton code de secours dans ton Profil : sans lui, un mot de passe oublié ne se retrouve pas.');
 }
 
 /* ---------- ossature et navigation ---------- */
@@ -1007,6 +1053,13 @@ async function viewProfile(main) {
     + '<form id="deleteForm" hidden style="display:grid;gap:10px"><p class="hint">Ton compte et toutes tes cartes seront effacés pour de bon. Tape ton mot de passe pour confirmer.</p>'
     + '<input class="inp" name="password" type="password" autocomplete="current-password" placeholder="Mot de passe" required><p class="form-error" role="alert"></p>'
     + '<div class="actions"><button class="btn danger" type="submit">Effacer définitivement</button><button class="btn" type="button" id="cancelDelete">Annuler</button></div></form></section>'
+    /* le code de secours (face à un serveur qui ne le connaît pas encore : rien) */
+    + ('hasRecovery' in S.player ? '<section class="panel rc-panel' + (S.player.hasRecovery ? '' : ' rc-todo') + '"><h3>Code de secours</h3>'
+      + '<p class="hint">' + (S.player.hasRecovery
+        ? 'Tu as un code de secours : il te permet de choisir un nouveau mot de passe si tu oublies le tien. Tu l\'as perdu ? Fais-en un nouveau : l\'ancien ne marchera plus.'
+        : '<b>Tu n\'as pas encore de code de secours.</b> Aucune adresse e-mail n\'est demandée : sans ce code, un mot de passe oublié ne se retrouve pas. Crée-le maintenant et garde-le bien.') + '</p>'
+      + '<form id="rcForm" style="display:grid;gap:10px"><input class="inp" name="password" type="password" autocomplete="current-password" placeholder="Ton mot de passe" required><p class="form-error" role="alert"></p>'
+      + '<div class="actions"><button class="btn' + (S.player.hasRecovery ? '' : ' primary') + '" type="submit">' + (S.player.hasRecovery ? 'Faire un nouveau code' : 'Créer mon code de secours') + '</button></div></form></section>' : '')
     + '<section class="panel"><h3>Chances des boosters</h3><div id="odds"><p class="hint">Chargement…</p></div></section>'
     + '<section class="panel"><h3>À propos</h3>'
     + '<p class="hint"><a href="legal.html">Mentions légales</a> · <a href="legal.html#confidentialite">Confidentialité et données personnelles</a></p>'
@@ -1064,6 +1117,24 @@ async function viewProfile(main) {
     } catch (err) {
       error.textContent = err instanceof ApiError ? err.message : 'Un problème est survenu.';
     }
+  });
+  const rcForm = document.getElementById('rcForm');
+  if (rcForm) rcForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const error = $('.form-error', rcForm), btn = $('button[type=submit]', rcForm);
+    error.textContent = '';
+    btn.disabled = true;
+    try {
+      const key = await deriveKey(S.player.name, rcForm.password.value);
+      const res = await call('POST', '/api/account/recovery', { key });
+      rcForm.reset();
+      await showRecovery(res.recovery, S.player.hasRecovery ? 'Nouveau code' : 'Code créé');
+      S.player.hasRecovery = true;
+      route();
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'session') { clearSession(); S.session = null; showAuth('Ta connexion a expiré. Reconnecte-toi.'); return; }
+      error.textContent = err instanceof ApiError ? err.message : 'Un problème est survenu.';
+    } finally { btn.disabled = false; }
   });
 
   const data = await guard(() => call('GET', '/api/packs'));
