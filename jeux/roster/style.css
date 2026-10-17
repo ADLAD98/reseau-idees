@@ -971,3 +971,6 @@ body.fx .sheet>*{animation:sheetIn .32s cubic-bezier(.2,.75,.25,1) backwards}
   .board td{font-size:15.5px}
   .hide-s{display:none}
 }
+
+/* une carte hors de l'écran est au repos : ses animations s'arrêtent là où elles en sont (watchCards, cards.js) */
+.card.still,.card.still *,.card.still::before,.card.still::after,.card.still *::before,.card.still *::after{animation-play-state:paused!important}

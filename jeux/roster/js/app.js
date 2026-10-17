@@ -1,7 +1,7 @@
 /* Roster — le jeu. Six écrans : Packs, Jouer (matchs, Mondial), Collection, Marché, Joueurs (amis, échanges, défis, classement), Profil.
    Le serveur décide de tout (cartes tirées, délais, collection, matchs, ventes, échanges) ; cette page affiche et met en scène. */
 import { ApiError, call, clearSession, deriveKey, loadSession, saveSession } from './api.js';
-import { VARIANTS, autographOf, cardHTML, champName, esc, flagUrl, iconUrl, karmineEra, logoHTML, photoUrl, prepare, statsOf, tiltCard, variantRank } from './cards.js';
+import { VARIANTS, autographOf, cardHTML, champName, esc, flagUrl, iconUrl, karmineEra, logoHTML, photoUrl, prepare, statsOf, tiltCard, variantRank, watchCards } from './cards.js';
 import { clubSectionHTML, loadClub } from './club.js';
 import { GAME_NAME, LEGEND_ART_NOTE, ROLE_LABEL, ROLE_NAME, ROLE_ORDER, STORE } from './config.js';
 import { dailyLook, drawDaily, loadDaily } from './daily.js';
@@ -765,10 +765,12 @@ function rosterGroups(list) {
   };
   return groups.sort(orders[S.filters.rsort] || orders.league);
 }
+/* (une page de roster par morceau, précédée du titre de sa ligue : de quoi les poser peu à peu, fillGrid) */
 function rostersHTML(groups) {
-  const cat = S.cat, byLeague = S.filters.rsort === 'league';
-  let html = '', league = null;
+  const cat = S.cat, byLeague = S.filters.rsort === 'league', parts = [];
+  let league = null;
   for (const g of groups) {
+    let html = '';
     if (byLeague && g.team.league !== league) {
       league = g.team.league;
       const info = cat.leagues.find((l) => l.id === league), mine = groups.filter((x) => x.team.league === league);
@@ -782,8 +784,39 @@ function rostersHTML(groups) {
       + (g.special ? '<em title="Versions spéciales">' + g.haveSpecial + ' / ' + g.special + '</em>' : '')
       + '<span class="bar"><i style="width:' + pct(g.have, g.total) + '%"></i></span></span></summary>'
       + '<div class="grid">' + g.cards.map((c) => tile(c)).join('') + '</div></details>';
+    parts.push(html);
   }
-  return html;
+  return parts;
+}
+/* Le classeur compte des centaines de cartes, d'une quarantaine d'éléments chacune : les poser toutes d'un coup bloquait la page plus
+   d'un dixième de seconde à chaque filtre (bien plus sur un téléphone modeste). On n'en pose que « first », puis « step » de plus chaque
+   fois que le bas de la liste approche de l'écran (à 1 500 px près : on ne les voit jamais arriver). Le compte affiché, la recherche et
+   les filtres portent toujours sur toutes les cartes. Un nouveau dessin (un filtre changé) remplace le précédent. */
+let gridMore = null;
+function fillGrid(grid, parts, first = 96, step = 96) {
+  if (gridMore) { gridMore.disconnect(); gridMore = null; }
+  document.querySelectorAll('.grid-more').forEach((el) => el.remove());
+  grid.innerHTML = parts.slice(0, first).join('');
+  watchCards(grid);
+  let at = first;
+  if (at >= parts.length || typeof IntersectionObserver !== 'function') {
+    if (at < parts.length) grid.insertAdjacentHTML('beforeend', parts.slice(at).join(''));
+    return;
+  }
+  const mark = document.createElement('div');
+  mark.className = 'grid-more';
+  grid.after(mark);
+  const near = () => mark.getBoundingClientRect().top < innerHeight + 1500;
+  const more = () => {
+    while (at < parts.length && near()) {
+      grid.insertAdjacentHTML('beforeend', parts.slice(at, at + step).join(''));
+      at += step;
+    }
+    watchCards(grid);
+    if (at >= parts.length) { gridMore.disconnect(); gridMore = null; mark.remove(); }
+  };
+  gridMore = new IntersectionObserver((entries) => { if (entries.some((e) => e.isIntersecting) && grid.isConnected) more(); }, { rootMargin: '0px 0px 1500px 0px' });
+  gridMore.observe(mark);
 }
 /* ---------- l'onglet « Doublons » : revendre en deux clics, en gardant toujours un exemplaire ---------- */
 /** Ce que le jeu rachète d'un coup (« tout vendre ») : les doublons ordinaires des premiers rangs. Renvoie { count, gain }. */
@@ -830,7 +863,9 @@ function drawGrid() {
   $('#gridCount').textContent = list.length + (list.length > 1 ? ' cartes affichées' : ' carte affichée') + ' · ' + list.filter((c) => S.owned.has(c.id)).length + ' possédées'
     + (roster && groups.length ? ' · ' + groups.length + (groups.length > 1 ? ' rosters' : ' roster') : '');
   grid.className = roster ? 'rosters' : 'grid';
-  grid.innerHTML = !list.length ? '' : roster ? rostersHTML(groups) : dupes ? list.map((c) => dupeTile(c)).join('') : list.map((c) => tile(c)).join('');
+  /* (par roster, une équipe par morceau : huit d'abord, puis six par six) */
+  if (roster) fillGrid(grid, rostersHTML(groups), 8, 6);
+  else fillGrid(grid, list.map((c) => (dupes ? dupeTile(c) : tile(c))));
   $('#gridEmpty').hidden = list.length > 0 || dupes;
 }
 function viewCollection(main) {

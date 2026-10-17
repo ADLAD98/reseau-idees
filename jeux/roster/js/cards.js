@@ -257,6 +257,24 @@ export function cardHTML(card, cat, opts = {}) {
     + '</div>' + (opts.back ? BACK : '') + '</div><i class="card-gem"></i>' + (qty ? '<span class="card-qty">×' + qty + '</span>' : '') + '</article>';
 }
 
+/* Les reflets, rayons et lueurs des cartes tournent sans fin, et le navigateur les recalcule à chaque image : sur un classeur de
+   plusieurs centaines de cartes, il y passait tout son temps, même sans qu'on touche à rien. Une carte hors de l'écran (à 300 px
+   près) est donc mise au repos (classe « still » : ses animations s'arrêtent là où elles en sont) et repart dès qu'elle revient. */
+const watcher = typeof IntersectionObserver === 'function'
+  ? new IntersectionObserver((entries, self) => {
+    for (const e of entries) {
+      /* (une carte retirée de la page — un filtre changé — n'est plus surveillée) */
+      if (!e.target.isConnected) self.unobserve(e.target);
+      else e.target.classList.toggle('still', !e.isIntersecting);
+    }
+  }, { rootMargin: '300px 0px' })
+  : null;
+/** Surveille les cartes de « root » qui ne le sont pas encore. */
+export function watchCards(root) {
+  if (!watcher || !root) return;
+  for (const card of root.querySelectorAll('.card:not([data-watch])')) { card.dataset.watch = ''; watcher.observe(card); }
+}
+
 /** La carte s'incline sous la souris ou le doigt ; les reflets d'une carte holographique suivent le mouvement.
     Renvoie de quoi tout arrêter. */
 export function tiltCard(el, max = 20) {
