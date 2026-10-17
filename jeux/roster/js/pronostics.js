@@ -3,6 +3,7 @@
    Face à un serveur qui ne connaît pas les pronostics : rien. */
 import { esc, logoHTML } from './cards.js';
 import { STORE } from './config.js';
+import { liveDetail } from './direct.js';
 
 let G = null, D = null, all = false, busy = false;
 const SEEN = STORE + 'pronos-vus';
@@ -38,7 +39,9 @@ function pastHTML(m) {
 
 /* les matchs en cours (serveur récent : D.live) */
 const liveHTML = () => ((D.live || []).length ? '<div class="pr-live">' + D.live.map((m) => '<p><span class="pr-dot" aria-hidden="true"></span><b>En direct</b><span>' + esc(m.leagueName) + ' · '
-  + esc(m.teams[0].code) + ' <strong>' + m.teams[0].wins + '-' + m.teams[1].wins + '</strong> ' + esc(m.teams[1].code) + '</span></p>').join('') + '</div>' : '');
+  + esc(m.teams[0].code) + ' <strong>' + m.teams[0].wins + '-' + m.teams[1].wins + '</strong> ' + esc(m.teams[1].code)
+  /* la manche en cours (serveur récent : m.now) */
+  + ('game' in m ? '<small>' + esc(liveDetail(m)) + '</small>' : '') + '</span></p>').join('') + '</div>' : '');
 /* les prochains matchs dont une équipe reste à connaître (serveur récent : D.soon) : un par ligne quand l'une des deux est connue, les
    autres comptés ensemble, par compétition */
 const code = (t) => (t.code === 'TBD' ? '?' : esc(t.code));

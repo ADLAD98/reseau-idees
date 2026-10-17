@@ -628,3 +628,6 @@ body:not(.fx) .pr-dot{animation:none}
 .lt-close{position:absolute;top:50%;right:4px;width:22px;height:22px;margin-top:-11px;padding:0;border:0;background:none;color:var(--faint);font-size:17px;line-height:1;cursor:pointer}
 .lt-close:hover{color:var(--ink)}
 @media (max-width:860px){.live-tab{display:none}}
+.pr-live p>span{display:flex;flex-wrap:wrap;align-items:baseline;column-gap:6px}
+.pr-live small{flex-basis:100%;color:var(--faint);font-size:12.5px}
+#prono{scroll-margin-top:calc(var(--top) + 46px)}
