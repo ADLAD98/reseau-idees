@@ -495,6 +495,11 @@ body.fx #rstats{animation:tool-in .22s ease-out}
 .r-list li:last-child{border-bottom:0;padding-bottom:0}
 .r-list small{white-space:nowrap;color:var(--faint);font:11px/1.35 var(--mono)}
 .r-ok{color:var(--ok)}.r-warn{color:var(--warn)}.r-bad{color:var(--alert)}
+/* les bugs : le message sur sa ligne, où et quand en dessous */
+.r-bugs li{display:grid;gap:3px;justify-content:stretch}
+.r-bugs li span{overflow-wrap:anywhere}
+.r-bugs li b{color:var(--warn);margin-right:4px}
+.r-bugs small{white-space:normal}
 .r-empty{margin:0;color:var(--faint);font:13px/1.5 var(--ui)}
 .mini-bars{position:absolute;left:10px;right:10px;top:14px;bottom:10px;display:flex;align-items:flex-end;gap:3px}
 .mini-bars i{flex:1;min-height:2px;border:1px solid var(--acc-line);background:var(--acc-soft)}
@@ -3291,7 +3296,17 @@ function renderRoster(){
       +'<li><span>Marché</span><small>'+rsNum(d.market.open)+' en vente · '+rsNum(d.market.sold)+' vendues en 7 j</small></li>'
       +'<li><span>Rappel « pack prêt » activé</span><small>'+rsNum(d.reminders)+' joueur'+(d.reminders>1?'s':'')+'</small></li>'
       +'<li><span>Code de secours créé</span><small>'+rsNum(d.recovery)+' / '+rsNum(d.players)+'</small></li>'
-    +'</ul></div>';
+    +'</ul></div>'
+    /* les bugs remontés par le jeu, ces 7 derniers jours (serveur récent : d.errors) */
+    +(d.errors?'<div class="r-card wide"><h3>Bugs remontés · 7 jours · <span class="'+(d.errors.total?'r-warn':'r-ok')+'">'+rsNum(d.errors.total)+' fois</span></h3>'
+      +(d.errors.list.length?'<ul class="r-list r-bugs">'+d.errors.list.map(function(e){
+        return '<li><span><b>×'+rsNum(e.count)+'</b> '+rsEsc(e.msg)+'</span><small>'+rsEsc((e.src||'?')+(e.line?':'+e.line:''))+' · '+rsEsc(e.page||'#/')+' · '+rsEsc(e.browser)+' · '+rsAgo(e.last_at)+'</small></li>';}).join('')+'</ul>'
+      :'<p class="r-empty">Aucun bug remonté par le jeu cette semaine.</p>')+'</div>':'');
+}
+/* « il y a 2 h » */
+function rsAgo(t){
+  var m=Math.max(0,Math.round((Date.now()-t)/60000));
+  return m<1?'à l\'instant':m<60?'il y a '+m+' min':m<1440?'il y a '+Math.round(m/60)+' h':'il y a '+Math.round(m/1440)+' j';
 }
 function openRoster(){
   var h=$('hub');
