@@ -499,6 +499,11 @@ body.fx #rstats{animation:tool-in .22s ease-out}
 .mini-bars{position:absolute;left:10px;right:10px;top:14px;bottom:10px;display:flex;align-items:flex-end;gap:3px}
 .mini-bars i{flex:1;min-height:2px;border:1px solid var(--acc-line);background:var(--acc-soft)}
 .mini-bars i:last-child{background:var(--acc)}
+@media (max-width:600px){
+  #rWhen,#rstats .crumbs .c1,#rstats .crumbs>i,#rOpenGame{display:none}
+  #rstats .a-name{font-size:12px}
+  #rstats .a-bar .btn{height:30px;padding:0 12px}
+}
 .mini-cal .t{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc)}
 
 @media (max-width:1180px){
@@ -885,7 +890,7 @@ body.fx #patch{animation:tool-in .22s ease-out}
     <nav class="crumbs"><span class="c1">BL//NET</span><i>›</i><span class="a-name">Roster · tableau de bord</span></nav>
     <span id="rWhen"></span>
     <span class="spacer"></span>
-    <a class="btn" href="/jeux/roster/" target="_blank" rel="noopener">Ouvrir le jeu</a>
+    <a class="btn" id="rOpenGame" href="/jeux/roster/" target="_blank" rel="noopener">Ouvrir le jeu</a>
     <button id="rRefresh" class="btn solid">Actualiser</button>
   </header>
   <div class="r-body"><div class="r-grid" id="rGrid"></div></div>
