@@ -76,10 +76,11 @@ function boardHTML() {
 export function drawDaily(ctx) {
   if (ctx) G = ctx;
   const el = box();
-  if (!el || !G) return;
+  if (!G) return;
   const D = G.S.daily;
-  el.hidden = !D;
-  if (D) el.innerHTML = '<h2 class="h2">Champion du jour' + (D.tries && !D.solved ? ' · ' + tries(D.tries) : '') + '</h2><div class="dg panel"><div id="dgTop">' + topHTML() + '</div><div id="dgBoard">' + boardHTML() + '</div></div>';
+  /* (sur l'onglet Boosters, seulement la ligne qui y mène) */
+  if (el) el.hidden = !D;
+  if (el && D) el.innerHTML ='<h2 class="h2">Champion du jour' + (D.tries && !D.solved ? ' · ' + tries(D.tries) : '') + '</h2><div class="dg panel"><div id="dgTop">' + topHTML() + '</div><div id="dgBoard">' + boardHTML() + '</div></div>';
   teaser();
 }
 /** Sous le pack, une ligne qui mène au jeu tant que le champion du jour n'est pas trouvé (ou qu'un booster du jour attend). */
@@ -179,11 +180,16 @@ document.addEventListener('click', (e) => {
   if (option) { propose(option.dataset.champ); return; }
   if (e.target.closest('#dgOpen')) { G.openDaily(document.querySelector('#dgPack .pack')); return; }
   if (e.target.closest('#dgGo')) {
-    const el = box(), D = G.S.daily;
-    if (!el) return;
-    el.scrollIntoView({ behavior: document.body.classList.contains('fx') ? 'smooth' : 'auto', block: 'start' });
-    const q = document.getElementById('dgQ');
-    if (q && D && !D.pack.count) setTimeout(() => q.focus({ preventScroll: true }), 450);
+    /* le champion du jour est dans l'onglet Défis : on y va, puis on descend jusqu'à lui */
+    const reach = () => {
+      const el = box(), D = G.S.daily;
+      if (!el || el.hidden) return false;
+      el.scrollIntoView({ behavior: document.body.classList.contains('fx') ? 'smooth' : 'auto', block: 'start' });
+      const q = document.getElementById('dgQ');
+      if (q && D && !D.pack.count) setTimeout(() => q.focus({ preventScroll: true }), 450);
+      return true;
+    };
+    if (!reach()) { location.hash = '#/packs/defis'; let n = 0; const wait = () => { if (!reach() && ++n < 30) setTimeout(wait, 120); }; setTimeout(wait, 150); }
   }
 });
 /* le temps qui reste avant le prochain champion ; à l'heure dite, le tableau du nouveau jour est demandé */

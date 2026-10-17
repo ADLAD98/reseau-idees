@@ -8,6 +8,7 @@ import { runMatch } from './match.js';
 import { bindOnline, onlineHTML } from './online.js';
 import { winChance } from './rules.js';
 import { worldsBanner } from './worlds.js';
+import { loadSeason, seasonSectionHTML } from './saisons.js';
 
 const SLOTS = [['top', 'TOP'], ['jgl', 'JGL'], ['mid', 'MID'], ['bot', 'BOT'], ['sup', 'SUP'], ['coach', 'COACH']];
 const POSTE = { TOP: 'ton toplaner', JGL: 'ton jungler', MID: 'ton midlaner', BOT: 'ton ADC', SUP: 'ton support', COACH: 'ton coach' };
@@ -19,8 +20,11 @@ const minutes = (sec) => Math.round(sec / 60) + ' min';
 let G = null;
 const onTab = () => /^#\/?jouer/.test(location.hash) && !!document.getElementById('main');
 
-export async function viewPlay(main, ctx) {
+/* la rubrique affichée : '' (mon équipe), 'adversaires' (les équipes à affronter, mes dernières parties), 'en-ligne' (rapide, classé) */
+let part = '';
+export async function viewPlay(main, ctx, sub = '') {
   G = ctx;
+  part = sub === 'adversaires' || sub === 'en-ligne' ? sub : '';
   const S = G.S;
   if (S.play) draw(main);
   else main.innerHTML = '<div class="col-head"><div><h1 class="h1">Jouer</h1><p>Compose ton équipe, mène la draft, regarde la partie.</p></div></div><div class="center" style="min-height:30dvh"><div class="spin"></div></div>';
@@ -59,12 +63,44 @@ function draw(main) {
   const active = P.active;
   const foeName = (id) => (cat.teamById.get(id) || { name: id }).name;
 
-  main.innerHTML = '<div class="col-head"><div><h1 class="h1">Jouer</h1><p>Compose ton équipe, mène la draft, regarde la partie.</p></div>'
+  const head = '<div class="col-head"><div><h1 class="h1">Jouer</h1><p>Compose ton équipe, mène la draft, regarde la partie.</p></div>'
     + '<div class="tally"><div><b>' + S.player.wins + '</b><span>' + (S.player.wins > 1 ? 'victoires' : 'victoire') + '</span></div><div><b>' + S.player.losses + '</b><span>' + (S.player.losses > 1 ? 'défaites' : 'défaite') + '</span></div>'
     + '<div class="gold"><b>' + S.player.coins + '</b><span>crédits</span></div></div></div>'
-    + (S.live ? worldsBanner(S) : '')
-    + (active ? '<div class="resume panel"><div><b>Draft en cours</b><span>contre ' + esc(foeName(active.opp)) + ' · ' + plural(active.step, 'choix fait', 'choix faits') + ' sur 20</span></div>'
-      + '<button class="btn primary" type="button" id="resume">Reprendre</button></div>' : '')
+    /* les rubriques de l'écran (app.js) : Équipe, Adversaires, En ligne, Mondial */
+    + (G.jouerNav ? G.jouerNav(part) : (S.live ? worldsBanner(S) : ''))
+    + (active && part !== 'en-ligne' ? '<div class="resume panel"><div><b>Draft en cours</b><span>contre ' + esc(foeName(active.opp)) + ' · ' + plural(active.step, 'choix fait', 'choix faits') + ' sur 20</span></div>'
+      + '<button class="btn primary" type="button" id="resume">Reprendre</button></div>' : '');
+  /* En ligne : la partie rapide et le classé */
+  if (part === 'en-ligne') {
+    /* la saison du classé (saisons.js), puis la partie rapide et le classé */
+    main.innerHTML = head + seasonSectionHTML() + (onlineHTML(G) || '<p class="empty">Les parties en ligne ne sont pas encore ouvertes.</p>');
+    bindOnline(main);
+    loadSeason(G);
+    return;
+  }
+  /* Adversaires : les équipes à affronter, puis mes dernières parties */
+  if (part === 'adversaires') {
+    main.innerHTML = head
+      + '<section><h2 class="h2">Adversaires</h2><div class="foe-bar"><div class="pills" id="leagues">'
+      + [['', 'Toutes']].concat(cat.leagues.map((l) => [l.id, l.name])).map((l) => '<button type="button" data-league="' + l[0] + '"' + ((S.playLeague || '') === l[0] ? ' class="on"' : '') + '>' + esc(l[1]) + '</button>').join('')
+      + '</div><span class="count">La première victoire contre une équipe rapporte un pack.</span></div><div class="foes" id="foes"></div></section>'
+      + '<section><h2 class="h2">Dernières parties</h2>' + (P.history.length ? '<div class="hist">' + P.history.map(histHTML).join('') + '</div>'
+        : '<p class="empty">Aucune partie jouée. Choisis un adversaire ci-dessus.</p>') + '</section>';
+    drawFoes();
+    $('#leagues').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-league]');
+      if (!b) return;
+      S.playLeague = b.dataset.league;
+      $('#leagues').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+      drawFoes();
+    });
+    $('#foes').addEventListener('click', (e) => { const b = e.target.closest('[data-foe]'); if (b) showFoe(b.dataset.foe); });
+    if (active) $('#resume').addEventListener('click', () => playMatch(active));
+    main.querySelectorAll('[data-replay]').forEach((b) => b.addEventListener('click', () => watch(Number(b.dataset.replay), b)));
+    return;
+  }
+  /* Équipe : mes six cartes, leurs synergies */
+  main.innerHTML = head
     + '<section class="squad panel"><div class="sq-head"><div class="sq-rating"><b>' + L.rating + '</b><span>Note<br>d\'équipe</span></div>'
     + '<div class="sq-traits">' + (L.traits.length ? L.traits.map(traitHTML).join('')
       : '<p class="hint">' + (!S.owned.size ? 'Tu n\'as pas encore de cartes : ouvre tes packs dans l\'onglet Packs, puis reviens composer ton équipe.' : filled < 2 ? 'Aligne tes cartes : cinq joueurs et un coach.' : 'Aucune synergie pour l\'instant : aligne des joueurs du même club, du même pays ou de la même ligue.') + '</p>') + '</div>'
@@ -77,15 +113,8 @@ function draw(main) {
     + '<li><b>Coach</b> — +' + R.coach + ' à chaque joueur de son club. Sa propre note compte pour 8 % de la note d\'équipe.</li>'
     + '<li>Un joueur ne gagne jamais plus de ' + R.max + ' points. Un poste laissé vide est tenu par un remplaçant noté ' + R.sub + '.</li>'
     + '</ul></details></section>'
-    /* les parties en ligne : rapide, classée (rien si le serveur ne les propose pas) */
-    + onlineHTML(G)
-    + '<section><h2 class="h2">Adversaires</h2><div class="foe-bar"><div class="pills" id="leagues">'
-    + [['', 'Toutes']].concat(cat.leagues.map((l) => [l.id, l.name])).map((l) => '<button type="button" data-league="' + l[0] + '"' + ((S.playLeague || '') === l[0] ? ' class="on"' : '') + '>' + esc(l[1]) + '</button>').join('')
-    + '</div><span class="count">La première victoire contre une équipe rapporte un pack.</span></div><div class="foes" id="foes"></div></section>'
-    + '<section><h2 class="h2">Dernières parties</h2>' + (P.history.length ? '<div class="hist">' + P.history.map(histHTML).join('') + '</div>'
-      : '<p class="empty">Aucune partie jouée. Choisis un adversaire ci-dessus.</p>') + '</section>';
-  drawFoes();
-  bindOnline(main);
+    /* et ce qui l'attend : un mot vers les adversaires */
+    + '<a class="sq-next panel" href="#/jouer/adversaires"><span>Ton équipe est prête ? <b>Choisis un adversaire</b></span><i>›</i></a>';
 
   main.querySelectorAll('[data-slot]').forEach((b) => b.addEventListener('click', () => pickSlot(b.dataset.slot)));
   $('#auto').addEventListener('click', async (e) => {
@@ -94,16 +123,7 @@ function draw(main) {
     if (data) { setPlay(data); G.toast('Meilleure équipe alignée : note ' + data.lineup.rating + '.'); }
     if (onTab()) draw($('#main'));
   });
-  $('#leagues').addEventListener('click', (e) => {
-    const b = e.target.closest('[data-league]');
-    if (!b) return;
-    S.playLeague = b.dataset.league;
-    $('#leagues').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
-    drawFoes();
-  });
-  $('#foes').addEventListener('click', (e) => { const b = e.target.closest('[data-foe]'); if (b) showFoe(b.dataset.foe); });
   if (active) $('#resume').addEventListener('click', () => playMatch(active));
-  main.querySelectorAll('[data-replay]').forEach((b) => b.addEventListener('click', () => watch(Number(b.dataset.replay), b)));
 }
 
 function traitHTML(t) {

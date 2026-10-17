@@ -32,12 +32,14 @@ export async function viewWorlds(main, ctx) {
 /* ---------- le tableau ---------- */
 function draw(main) {
   const S = G.S, W = S.worlds, D = W.data;
-  const head = '<div class="col-head"><div><a class="back" href="#/jouer">‹ Jouer</a><h1 class="h1">Mondial</h1><p>Seize équipes, une seule couronne. Poules, quarts, demies, finale.</p></div>'
+  const head = '<div class="col-head"><div><h1 class="h1">Mondial</h1><p>Seize équipes, une seule couronne. Poules, quarts, demies, finale.</p></div>'
     + (D ? '<div class="tally"><div class="gold"><b>' + D.record.titles + '</b><span>' + (D.record.titles > 1 ? 'titres' : 'titre') + '</span></div><div><b>' + D.record.runs + '</b><span>' + (D.record.runs > 1 ? 'participations' : 'participation') + '</span></div></div>' : '') + '</div>';
-  if (!D) { main.innerHTML = '<div id="wd">' + head + '<div class="center" style="min-height:30dvh"><div class="spin"></div></div></div>'; return; }
+  /* (les rubriques de l'écran Jouer, dont celle-ci) */
+  const nav = G.jouerNav ? G.jouerNav('mondial') : '';
+  if (!D) { main.innerHTML = '<div id="wd">' + head + nav + '<div class="center" style="min-height:30dvh"><div class="spin"></div></div></div>'; return; }
   /* le parcours en cours, ou celui qui vient de se terminer (gardé à l'écran tant qu'on n'en relance pas un) */
   const run = D.run || W.done;
-  main.innerHTML = '<div id="wd">' + head + (run ? runHTML(run, !D.run) : '') + (D.run ? '' : introHTML(D, !!run)) + '</div>';
+  main.innerHTML = '<div id="wd">' + head + nav + (run ? runHTML(run, !D.run) : '') + (D.run ? '' : introHTML(D, !!run)) + '</div>';
   const root = $('#wd', main);
   root.addEventListener('click', onClick);
 }

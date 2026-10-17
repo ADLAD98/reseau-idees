@@ -29,12 +29,26 @@ function matchHTML(m) {
   return '<div class="pr-match' + (m.bonus > 1 ? ' big' : '') + '" data-match="' + esc(m.id) + '"><div class="pr-meta"><span>' + esc(m.leagueName) + (m.block ? ' · ' + esc(m.block) : '') + ' · Bo' + m.bestOf + (m.bonus > 1 ? ' <b class="pr-x2">gains ×' + m.bonus + '</b>' : '') + '</span><time>' + esc(WHEN.format(m.start)) + '</time></div>'
     + '<div class="pr-vs">' + side(0) + '<i>contre</i>' + side(1) + '</div>'
     + (scores.length ? '<div class="pr-scores"><span>Score exact (+' + D.prize.exact + ') :</span>' + scores.map((s) => '<button type="button" class="pr-score' + (score === s ? ' on' : '') + '" data-score="' + s + '">' + s + '</button>').join('') + '</div>' : '')
+    + mvpHTML(m, pick)
     + '</div>';
+}
+/* le joueur du match (serveur récent : m.roster, les titulaires des deux équipes) : au choix, une fois le vainqueur désigné */
+const ROLE = { TOP: 'top', JGL: 'jungle', MID: 'mid', BOT: 'ADC', SUP: 'support' };
+const playerName = (id) => { const c = G.S.cat.cardById.get(id); return c ? c.name : id; };
+function mvpHTML(m, pick) {
+  if (!pick || !m.roster || !m.roster[0] || !m.roster[1] || !D.mvpPrize) return '';
+  const mine = m.mine ? m.mine.mvp : '', cat = G.S.cat;
+  const opt = (id) => { const c = cat.cardById.get(id); return c ? '<option value="' + esc(id) + '"' + (mine === id ? ' selected' : '') + '>' + esc(c.name) + ' · ' + (ROLE[c.role] || '') + '</option>' : ''; };
+  return '<label class="pr-mvp"><span>Joueur du match <b>+' + D.mvpPrize * (m.bonus || 1) + '</b></span><select data-mvp aria-label="Joueur du match">'
+    + '<option value="">— au choix —</option>' + m.roster.map((ids, k) => '<optgroup label="' + esc(m.teams[k].code) + '">' + ids.map(opt).join('') + '</optgroup>').join('') + '</select></label>';
 }
 function pastHTML(m) {
   const good = m.reward > 0, open = m.reward === null || m.reward === undefined;
-  return '<li class="' + (open ? 'open' : good ? 'good' : 'bad') + '"><span>' + esc(m.teams[0].code) + ' ' + (m.state === 'completed' ? m.teams[0].wins + '-' + m.teams[1].wins : 'contre') + ' ' + esc(m.teams[1].code)
-    + ' · ton choix : <b>' + esc(m.teams[m.mine.pick - 1].code) + (m.mine.score ? ' ' + esc(m.mine.score) : '') + '</b></span><em>' + (open ? 'en attente' : good ? '+' + m.reward + ' crédits' : 'raté') + '</em></li>';
+  /* le joueur du match : mon choix, et celui qui l'a été (serveur récent) */
+  const mvp = m.mine.mvp ? ' · joueur du match : <b>' + esc(playerName(m.mine.mvp)) + '</b>' + (m.mvpReward > 0 ? ' ✓' : m.mvp ? ' (c\'était ' + esc(playerName(m.mvp)) + ')' : m.mvp === '' ? ' (non désigné)' : '') : '';
+  const won = (m.reward || 0) + (m.mvpReward || 0);
+  return '<li class="' + (open ? 'open' : won > 0 ? 'good' : 'bad') + '"><span>' + esc(m.teams[0].code) + ' ' + (m.state === 'completed' ? m.teams[0].wins + '-' + m.teams[1].wins : 'contre') + ' ' + esc(m.teams[1].code)
+    + ' · ton choix : <b>' + esc(m.teams[m.mine.pick - 1].code) + (m.mine.score ? ' ' + esc(m.mine.score) : '') + '</b>' + mvp + '</span><em>' + (open ? 'en attente' : won > 0 ? '+' + won + ' crédits' : 'raté') + '</em></li>';
 }
 
 /* les matchs en cours (serveur récent : D.live) */
@@ -89,10 +103,11 @@ function announce() {
   if (fresh.length) G.toast((fresh.length > 1 ? fresh.length + ' pronostics gagnés' : 'Pronostic gagné') + ' : +' + fresh.reduce((s, m) => s + m.reward, 0) + ' crédits');
 }
 
-async function send(id, pick, score) {
+/* mvp : le joueur du match choisi ('' : aucun ; absent : le choix précédent est gardé) */
+async function send(id, pick, score, mvp) {
   if (busy) return;
   busy = true;
-  const res = await G.guard(() => G.call('POST', '/api/predictions', { match: id, pick, score }));
+  const res = await G.guard(() => G.call('POST', '/api/predictions', { match: id, pick, score, ...(mvp === undefined ? {} : { mvp }) }));
   busy = false;
   if (!res) return;
   D = res;
@@ -109,4 +124,10 @@ document.addEventListener('click', (e) => {
   const p = e.target.closest('[data-pick]'), s = e.target.closest('[data-score]');
   if (p) send(m.id, Number(p.dataset.pick), '');
   else if (s && m.mine) send(m.id, m.mine.pick, m.mine.score === s.dataset.score ? '' : s.dataset.score);
+});
+document.addEventListener('change', (e) => {
+  const sel = e.target.closest('#prono [data-mvp]');
+  if (!sel || !G || !D) return;
+  const box = sel.closest('[data-match]'), m = box && D.upcoming.find((x) => x.id === box.dataset.match);
+  if (m && m.mine) send(m.id, m.mine.pick, m.mine.score, sel.value);
 });

@@ -1,6 +1,6 @@
 /* « En direct » : sur ordinateur, une fine bande accrochée sous la barre du haut, à droite, sur toutes les pages, quand un vrai match
    pro suivi par les pronostics se joue (serveur : GET /api/live, public) : le score des manches et la manche en cours (temps,
-   éliminations, écart d'or), relevés au plus toutes les deux minutes. Un clic mène aux pronostics (écran Packs) ; la croix la cache
+   éliminations, écart d'or), relevés au plus toutes les deux minutes. Un clic mène aux pronostics (Packs › Vrais matchs) ; la croix la cache
    jusqu'au match suivant. Sur téléphone : rien (le bloc des pronostics montre le match). Face à un serveur sans /api/live : rien. */
 import { esc, logoHTML } from './cards.js';
 import { STORE } from './config.js';
@@ -57,7 +57,7 @@ function draw() {
   el.hidden = false;
   /* une seule ligne, pour ne rien cacher du haut des pages (les chiffres de la Collection, du Profil…) */
   const title = m.leagueName + (m.block ? ' · ' + m.block : '') + ' · ' + m.teams[0].name + ' contre ' + m.teams[1].name + (m.bestOf > 1 ? ' · Bo' + m.bestOf : '') + ' — voir les pronostics';
-  el.innerHTML = '<a class="lt-link" href="#/packs" title="' + esc(title) + '">'
+  el.innerHTML = '<a class="lt-link" href="#/packs/matchs" title="' + esc(title) + '">'
     + '<i class="pr-dot" aria-hidden="true"></i><b class="lt-live">En direct</b>'
     + '<span class="lt-score"><span class="lt-team">' + team(m.teams[0]) + '</span><strong>' + m.teams[0].wins + ' – ' + m.teams[1].wins + '</strong><span class="lt-team">' + team(m.teams[1]) + '</span></span>'
     + '<span class="lt-foot">' + esc(liveDetail(m)) + (list.length > 1 ? ' · +' + (list.length - 1) : '') + '</span></a>'
@@ -77,7 +77,7 @@ function onClick(e) {
   if (!link) return;
   e.preventDefault();
   if (G && G.sfx) G.sfx.click();
-  if (location.hash !== '#/packs') location.hash = '#/packs';
+  if (location.hash !== '#/packs/matchs') location.hash = '#/packs/matchs';
   /* l'écran Packs pose le bloc des pronostics dès que le serveur a répondu : on y descend alors */
   const begun = Date.now();
   const reach = () => {

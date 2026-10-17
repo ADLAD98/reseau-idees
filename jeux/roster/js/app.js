@@ -25,8 +25,13 @@ import { inspectCard } from './inspect.js';
 import { confirmSheet, num } from './ui.js';
 import { viewWorlds } from './worlds.js';
 import { startLive } from './direct.js';
-import { badgesHTML, eventSectionHTML, loadEvent } from './evenement.js';
+import { badgesHTML, eventSectionHTML, eventWaiting, loadEvent } from './evenement.js';
 import { startTutorial } from './tuto.js';
+import { startRecap } from './recap.js';
+import { draw as drawInstall, installBannerHTML, installRowHTML, startInstall } from './installer.js';
+import { loadTeamWeek, teamWeekSectionHTML } from './equipe-type.js';
+import { loadSeason, pastSeasonsSectionHTML } from './saisons.js';
+import { publicHTML, publicLiveHTML } from './accueil-public.js';
 
 const app = document.getElementById('app');
 const $ = (sel, root) => (root || document).querySelector(sel);
@@ -309,13 +314,15 @@ function showAuth(message) {
     + '<label class="field" data-only="register recover" hidden>Mot de passe, une seconde fois<input name="password2" type="password" autocomplete="new-password"></label>'
     + '<p class="hint" data-only="register" hidden>Aucune adresse e-mail n\'est demandée. Une fois inscrit, tu recevras un code de secours : garde-le, il te permettra de choisir un nouveau mot de passe si tu oublies le tien.</p>'
     + (sponsorCode() ? '<p class="hint sponsor" data-only="register" hidden><b>Invité par un ami</b> : après ton premier match, vous gagnez chacun un pack.</p>' : '')
-    + '<p class="hint" data-only="recover" hidden>Le code de secours t\'a été donné à l\'inscription (ou dans ton Profil). Avec lui, tu choisis un nouveau mot de passe ; tu en recevras aussi un nouveau code.</p>'
+    + '<p class="hint" data-only="recover" hidden>Le code de secours t\'a été donné à l\'inscription (ou dans ton Profil, rubrique Réglages). Avec lui, tu choisis un nouveau mot de passe ; tu en recevras aussi un nouveau code.</p>'
     + '<p class="form-error" role="alert">' + esc(message || '') + '</p>'
     + '<button class="btn primary big" type="submit">Entrer</button>'
     + '<button class="auth-link" type="button" data-mode="recover" data-only="login">Mot de passe oublié ?</button>'
     + '<button class="auth-link" type="button" data-mode="login" data-only="recover" hidden>‹ Retour à la connexion</button>'
     + '<p class="legal">Projet de fan gratuit, sans lien avec Riot Games ni avec les équipes citées. <a href="legal.html">Mentions légales</a> · <a href="legal.html#confidentialite">Confidentialité</a></p>'
-    + '</form></div>';
+    + '</form></div>'
+    /* sous la connexion : ce qu'on fait dans Roster, pour un visiteur venu d'un lien (accueil-public.js) */
+    + publicHTML(S.cat ? S.cat.cards.length : 600, null);
   const form = $('#authForm'), error = $('.form-error', form), submit = $('button[type=submit]', form);
   const setMode = (m) => {
     mode = m;
@@ -329,6 +336,13 @@ function showAuth(message) {
   form.addEventListener('click', (e) => { const b = e.target.closest('[data-mode]'); if (b) setMode(b.dataset.mode); });
   /* venu par le lien d'un ami : directement sur l'inscription */
   if (sponsorCode()) setMode('register');
+  /* « Jouer gratuitement » : l'inscription, à l'écran */
+  app.querySelectorAll('[data-public="join"]').forEach((b) => b.addEventListener('click', () => { setMode('register'); form.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => form.name.focus({ preventScroll: true }), 500); }));
+  /* un vrai match en cours : une ligne « En direct » en tête de la présentation */
+  call('GET', '/api/live').then((r) => {
+    const m = r && r.live && r.live[0], pub = app.querySelector('.pub');
+    if (m && pub && !pub.querySelector('.pub-live')) pub.insertAdjacentHTML('afterbegin', publicLiveHTML(m));
+  }).catch(() => { /* pas de direct */ });
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const name = form.name.value.trim(), password = form.password.value, code = form.code.value.toUpperCase().replace(/[^0-9A-Z]/g, '');
@@ -414,7 +428,7 @@ function remindRecovery() {
   if (!S.player || !('hasRecovery' in S.player) || S.player.hasRecovery) return;
   const today = new Date().toDateString();
   try { if (localStorage.getItem(STORE + 'rappel-secours') === today) return; localStorage.setItem(STORE + 'rappel-secours', today); } catch (e) { /* tant pis : on rappelle */ }
-  toast('Crée ton code de secours dans ton Profil : sans lui, un mot de passe oublié ne se retrouve pas.');
+  toast('Crée ton code de secours dans Profil › Réglages : sans lui, un mot de passe oublié ne se retrouve pas.');
 }
 
 /* ---------- ossature et navigation ---------- */
@@ -436,6 +450,9 @@ function shell() {
   startLive(PLAY);
   /* un nouveau joueur : le tutoriel de la première partie (tuto.js) */
   startTutorial(PLAY);
+  /* ce qui s'est passé depuis la dernière visite (recap.js) ; l'installation de l'appli (installer.js) */
+  startRecap(PLAY);
+  startInstall(PLAY);
 }
 /* ce que l'application prête aux autres écrans (Jouer, Marché, Joueurs, Mondial) */
 const PLAY = {
@@ -452,9 +469,11 @@ const PLAY = {
 };
 const DUELS = createDuels(PLAY);
 PLAY.duel = DUELS;
+/* les rubriques de l'écran Jouer (play.js, worlds.js) */
+PLAY.jouerNav = (cur) => subnavHTML('jouer', cur, [['', 'Équipe'], ['adversaires', 'Adversaires'], ...(S.player && S.player.ranked ? [['en-ligne', 'En ligne']] : []), ...(S.live ? [['mondial', 'Mondial']] : [])]);
 const VIEWS = {
   packs: viewPacks, collection: viewCollection, classement: viewBoard, profil: viewProfile,
-  jouer: (main, sub) => (sub === 'mondial' && S.live ? viewWorlds(main, PLAY) : viewPlay(main, PLAY)),
+  jouer: (main, sub) => (sub === 'mondial' && S.live ? viewWorlds(main, PLAY) : viewPlay(main, PLAY, sub)),
   marche: (main) => viewMarket(main, PLAY),
   joueurs: (main) => viewSocial(main, PLAY),
 };
@@ -615,40 +634,64 @@ function packActionHTML() {
 }
 /* « 10 minutes », « 9 min 30 » : le délai du pack gratuit (le centre de formation du club le raccourcit) */
 const every = (ms) => { const m = Math.floor(ms / 60000), s = Math.round((ms % 60000) / 1000); return s ? m + ' min ' + s : m + ' minutes'; };
-function viewPacks(main) {
-  /* les missions avancent en jouant : on les redemande à chaque passage sur cet écran */
+/* Les sous-catégories d'une page chargée (Packs, Jouer, Profil) : des onglets sous l'en-tête, chacun son adresse (#/packs/defis…).
+   items : [identifiant ('' : la première), libellé]. */
+function subnavHTML(base, current, items) {
+  return '<nav class="subnav" aria-label="Rubriques">' + items.map(([id, label]) => '<a href="#/' + base + (id ? '/' + id : '') + '" data-sub="' + (id || 'main') + '"'
+    + (current === id ? ' class="on" aria-current="page"' : '') + '>' + label + '<i class="pip" hidden></i></a>').join('') + '</nav>';
+}
+/* une récompense attend dans les défis (missions, défis de la semaine, événement) : une pastille sur leur onglet */
+const rewardWaiting = () => [...(S.missions ? S.missions.missions.concat([S.missions.bonus]) : []), ...(S.weekly ? S.weekly.challenges.concat([S.weekly.bonus]) : [])].some((x) => x.done && !x.claimed) || eventWaiting();
+setInterval(() => { const pip = document.querySelector('.subnav [data-sub="defis"] .pip'); if (pip) pip.hidden = !rewardWaiting(); }, 800);
+document.addEventListener('click', (e) => { if (e.target.closest('.subnav a:not(.on)')) sfx.click(); });
+
+function viewPacks(main, sub) {
+  const part = sub === 'defis' || sub === 'matchs' ? sub : '';
+  const nav = subnavHTML('packs', part, [['', 'Boosters'], ['defis', 'Défis'], ['matchs', 'Vrais matchs']]);
+  /* les missions avancent en jouant : on les redemande à chaque passage sur cet écran (et la pastille des défis en dépend) */
   loadMissions();
   loadWeekly();
   loadEvent(PLAY);
-  loadPredictions(PLAY);
+  loadDaily(PLAY);
+  /* Défis : l'événement du moment, les missions du jour, les défis de la semaine, le champion du jour */
+  if (part === 'defis') {
+    main.innerHTML = nav + eventSectionHTML()
+      + '<section class="missions" id="missions"' + (S.missions ? '' : ' hidden') + '>' + (S.missions ? missionsHTML() : '') + '</section>'
+      + '<section class="missions weekly" id="weekly"' + (S.weekly ? '' : ' hidden') + '>' + (S.weekly ? weeklyHTML() : '') + '</section>'
+      + '<section class="daily" id="daily" hidden></section>';
+    drawDaily(PLAY);
+    return;
+  }
+  /* Vrais matchs : le direct, les pronostics, l'équipe type de la semaine (pronostics.js) */
+  if (part === 'matchs') {
+    main.innerHTML = nav + predictionsSectionHTML() + teamWeekSectionHTML();
+    loadPredictions(PLAY);
+    loadTeamWeek(PLAY);
+    return;
+  }
   loadHubTeam();
   const recent = [...S.owned.entries()].sort((a, b) => b[1].at - a[1].at).slice(0, 6).map(([id]) => S.cat.cardById.get(id)).filter(Boolean);
   const kind = packKind(), credits = kind === 'credits';
   /* le menu des boosters : le pack gratuit, ou celui qui se paie en crédits */
   const menu = S.shop ? '<div class="seg pack-menu" id="packMenu"><button type="button" data-pack="free"' + (credits ? '' : ' class="on"') + '>Pack gratuit</button>'
     + '<button type="button" data-pack="credits"' + (credits ? ' class="on"' : '') + '>Booster · ' + S.shop.credits.price + ' crédits</button></div>' : '';
-  main.innerHTML = '<section class="home"><div class="home-pack' + (credits ? ' credits' : '') + '" id="packBox">' + packHTML(packReady() ? 'ready' : 'waiting', S.cat.season, S.free.size, packLook(kind)) + '</div>'
+  main.innerHTML = nav + '<section class="home"><div class="home-pack' + (credits ? ' credits' : '') + '" id="packBox">' + packHTML(packReady() ? 'ready' : 'waiting', S.cat.season, S.free.size, packLook(kind)) + '</div>'
     + '<div class="home-side">' + menu + '<div class="eyebrow">' + (credits ? 'Booster à crédits · un toutes les ' + Math.round(S.shop.credits.cooldownMs / 60000) + ' minutes' : 'Pack gratuit · toutes les ' + every(S.free.cooldownMs)) + '</div>'
     + '<h1 class="h1">' + S.free.size + ' cartes ' + (credits ? 'de plus' : 'à découvrir') + '</h1>'
-    + '<p class="lead">' + (credits ? 'Un booster en plus du pack gratuit, payé avec tes crédits. Ses chances sont un peu plus faibles que celles du pack gratuit (le détail est dans ton profil).'
+    + '<p class="lead">' + (credits ? 'Un booster en plus du pack gratuit, payé avec tes crédits. Ses chances sont un peu plus faibles que celles du pack gratuit (le détail est dans Profil › Réglages).'
       /* (sur un téléphone, seulement l'essentiel : le bouton doit tenir sur le premier écran) */
       : 'Joueurs et coachs pros de la saison ' + S.cat.season + '. La dernière carte du pack est une carte bonus<span class="hide-s"> : rang Titulaire au minimum. Les plus belles cartes existent aussi en version holographique et en full art' + (S.cat.cards.some((c) => c.variant === 'kc') ? ', et les joueurs passés par la Karmine en édition KC' : '') + '</span>.') + '</p>'
     + '<div id="packAction" data-sig="' + packSig() + '">' + packActionHTML() + '</div></div></section>'
     + '<div class="dg-teaser" id="dailyTeaser" hidden></div>'
+    /* sur téléphone, une fois : « installe Roster sur ton écran d'accueil » (installer.js) */
+    + installBannerHTML()
     + hubHTML()
-    /* l'événement du moment (evenement.js) : le Mondial 2026 */
-    + eventSectionHTML()
-    + '<section class="missions" id="missions"' + (S.missions ? '' : ' hidden') + '>' + (S.missions ? missionsHTML() : '') + '</section>'
-    + '<section class="missions weekly" id="weekly"' + (S.weekly ? '' : ' hidden') + '>' + (S.weekly ? weeklyHTML() : '') + '</section>'
-    /* les pronostics sur les vrais matchs (pronostics.js) */
-    + predictionsSectionHTML()
     + '<section><h2 class="h2">Dernières cartes obtenues</h2>'
     + (recent.length ? '<div class="row-cards">' + recent.map((c) => tile(c)).join('') + '</div>' : '<p class="empty">Ta collection est vide. Ouvre ton premier pack !</p>')
-    + '</section>'
-    /* tout en bas : le champion du jour (affiché d'après ce qu'on sait déjà, puis redemandé au serveur) */
-    + '<section class="daily" id="daily" hidden></section>';
+    + '</section>';
+  /* (le champion du jour est dans les Défis : ici, une ligne y mène) */
   drawDaily(PLAY);
-  loadDaily(PLAY);
+  drawInstall();
 }
 /* ---------- les missions du jour ---------- */
 function missionsHTML() {
@@ -867,6 +910,8 @@ function rostersHTML(groups) {
     const done = g.have === g.total;
     html += '<details class="ros' + (done ? ' done' : '') + '" open data-team="' + esc(g.team.id) + '"><summary class="ros-head">'
       + '<span class="ros-name">' + logoHTML(g.team.id, 'logo', 80) + '<b>' + esc(g.team.name) + '</b>' + (done ? '<u>Complet</u>' : '') + '<i>' + esc(g.team.league) + ' · note ' + g.rating + '</i></span>'
+      /* l'album de l'équipe : ses cinq titulaires (rempli quand le serveur a répondu) */
+      + '<span class="ros-album" data-album="' + esc(g.team.id) + '">' + albumHTML(g.team.id) + '</span>'
       + '<span class="ros-meter"><span><b>' + g.have + '</b> / ' + g.total + '</span>'
       + (g.special ? '<em title="Versions spéciales">' + g.haveSpecial + ' / ' + g.special + '</em>' : '')
       + '<span class="bar"><i style="width:' + pct(g.have, g.total) + '%"></i></span></span></summary>'
@@ -955,8 +1000,57 @@ function drawGrid() {
   else fillGrid(grid, list.map((c) => (dupes ? dupeTile(c) : tile(c))));
   $('#gridEmpty').hidden = list.length > 0 || dupes;
 }
+/* ---------- les albums d'équipes (serveur : albums.ts) ----------
+   Réunir les cinq titulaires d'une équipe (n'importe quelle version de leur carte) : une récompense, une fois. Dans la Collection rangée
+   par roster, chaque équipe dit où en est son album ; le Profil › Succès montre les albums complétés. */
+async function loadAlbums() {
+  if (S.albums === false) return;
+  let data = null;
+  try { data = await call('GET', '/api/albums'); } catch (e) { if (e instanceof ApiError && e.status === 404) S.albums = false; return; }
+  S.albums = { reward: data.reward, byTeam: new Map(data.albums.map((a) => [a.team, a])) };
+  drawAlbums();
+}
+function albumHTML(team) {
+  const a = S.albums && S.albums.byTeam.get(team);
+  if (!a) return '';
+  if (a.claimed) return '<span class="alb done" title="Les cinq titulaires réunis">Album complété</span>';
+  if (a.have >= 5) return '<button class="btn primary alb-claim" type="button" data-album-claim="' + esc(team) + '">Album complet · +' + S.albums.reward + '</button>';
+  return '<span class="alb" title="Réunis les cinq titulaires de l\'équipe : +' + S.albums.reward + ' crédits">Album · ' + a.have + ' / 5 titulaires</span>';
+}
+function drawAlbums() {
+  document.querySelectorAll('[data-album]').forEach((el) => { el.innerHTML = albumHTML(el.dataset.album); });
+  drawAlbumsDone();
+}
+function drawAlbumsDone() {
+  const box = document.getElementById('albumsDone');
+  if (!box) return;
+  if (!S.albums) { if (S.albums !== false) loadAlbums(); return; }
+  const all = [...S.albums.byTeam.values()], done = all.filter((a) => a.claimed), near = all.filter((a) => !a.claimed && a.have >= 3).sort((a, b) => b.have - a.have).slice(0, 4);
+  const name = (t) => esc((S.cat.teamById.get(t) || { name: t }).name);
+  box.hidden = false;
+  box.innerHTML = '<h2 class="h2">Albums d\'équipes</h2><p class="ms-sub">' + done.length + ' sur ' + all.length + ' complétés. Réunis les cinq titulaires d\'une équipe (Collection, rangée par roster) : +' + S.albums.reward + ' crédits.</p>'
+    + (done.length ? '<div class="alb-logos">' + done.map((a) => '<span title="' + name(a.team) + '">' + logoHTML(a.team, 'logo', 80) + '</span>').join('') + '</div>' : '')
+    + (near.length ? '<p class="alb-near">Presque : ' + near.map((a) => '<b>' + name(a.team) + '</b> ' + a.have + '/5').join(' · ') + '</p>' : '');
+}
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-album-claim]');
+  if (!b) return;
+  /* (le bouton est dans l'en-tête repliable du roster : il ne doit pas le replier) */
+  e.preventDefault();
+  if (b.disabled) return;
+  b.disabled = true;
+  const res = await guard(() => call('POST', '/api/albums/claim', { team: b.dataset.albumClaim }));
+  if (!res) { b.disabled = false; return; }
+  applyState(res);
+  S.albums = { reward: res.reward, byTeam: new Map(res.albums.map((a) => [a.team, a])) };
+  sfx.done();
+  toast('Album ' + ((S.cat.teamById.get(res.team) || { name: res.team }).name) + ' complété : +' + res.reward + ' crédits');
+  drawAlbums();
+});
+
 function viewCollection(main) {
   const f = S.filters, cat = S.cat;
+  loadAlbums();
   /* première visite : on montre d'abord ce que le joueur possède, l'album complet est à un clic */
   if (!f.own) f.own = S.owned.size ? 'owned' : 'all';
   const option = (value, text, current) => '<option value="' + esc(value) + '"' + (String(current) === String(value) ? ' selected' : '') + '>' + esc(text) + '</option>';
@@ -1200,8 +1294,10 @@ async function quickSell(card, qty, sure) {
 }
 
 /* ---------- écran Profil ---------- */
-async function viewProfile(main) {
+async function viewProfile(main, sub) {
   const p = S.player;
+  /* trois rubriques : mon profil (blason, vitrine, club, parrainage), mes succès, les réglages */
+  const part = sub === 'succes' || sub === 'reglages' ? sub : '';
   /* en tête : le losange du joueur, son équipe, puis ses chiffres */
   const games = p.wins + p.losses, titles = p.titles || 0;
   main.innerHTML = '<div class="col-head"><div class="pf-id">' + avatarHTML(p.avatar, p.name, 'pf-av') + '<div><h1 class="h1" style="--n:' + Math.max(6, p.name.length) + '">' + esc(p.name) + '</h1>'
@@ -1213,12 +1309,12 @@ async function viewProfile(main) {
     + (S.live ? '<div class="gold"><b>' + titles + '</b><span>' + (titles > 1 ? 'Mondiaux' : 'Mondial') + '</span></div>' : '') + '</div></div>'
     /* mon club : sa carte et ses infrastructures (rempli quand le serveur a répondu) */
     /* mon profil : mon blason et ma vitrine (rempli quand le serveur a répondu) */
-    + profileSectionHTML()
+    + subnavHTML('profil', part, [['', 'Profil'], ['succes', 'Succès'], ['reglages', 'Réglages']])
+    + (part === '' ? profileSectionHTML() + (S.club ? clubSectionHTML() : '') + referralSectionHTML() : '')
     /* mes succès (remplis quand le serveur a répondu) */
-    + achievementsSectionHTML()
-    /* mon lien de parrainage */
-    + referralSectionHTML()
-    + (S.club ? clubSectionHTML() : '') + '<div class="panels">'
+    + (part === 'succes' ? achievementsSectionHTML() + '<section class="albums-done" id="albumsDone" hidden></section>' + pastSeasonsSectionHTML() : '')
+    /* les réglages : mon compte, le son, les rappels, le code de secours, les chances des boosters, les mentions */
+    + (part !== 'reglages' ? '' : '<div class="panels">'
     + '<section class="panel"><h3>Mon compte</h3><div class="kv"><span>Packs ouverts</span><b>' + p.packsOpened + '</b><span>Cartes différentes</span><b>' + p.cardsUnique + ' / ' + S.cat.cards.length + '</b><span>Exemplaires</span><b>' + p.cardsTotal + '</b><span>Parties gagnées</span><b>' + p.wins + ' sur ' + (p.wins + p.losses) + '</b>'
     + (S.live ? '<span>Défis entre joueurs</span><b>' + (p.duelWins || 0) + ' V – ' + (p.duelLosses || 0) + ' D</b><span>Mondiaux remportés</span><b>' + (p.titles || 0) + '</b>' : '')
     + '<span>Crédits</span><b>' + p.coins + '</b></div>'
@@ -1230,6 +1326,8 @@ async function viewProfile(main) {
     + '<div class="switch setting"><span>Son<small>musique de fond et effets</small></span><button class="btn" type="button" id="volBtn" aria-haspopup="dialog">Régler le volume</button></div>'
     /* le rappel « pack prêt » (rappels.js) : montré seulement si cet appareil peut le recevoir, ou dire comment */
     + '<div class="switch setting" id="pushRow" hidden><span>Rappel « pack prêt »<small id="pushHint">une notification sur cet appareil quand ton pack gratuit est disponible</small></span><button class="btn" type="button" id="pushBtn">Activer</button></div>'
+    /* installer Roster comme une appli (installer.js) : montré si l'appareil le permet */
+    + installRowHTML()
     /* le Discord de Roster : une fois qu'il existe (config.js), et face à un serveur qui connaît le réglage */
     + (DISCORD_INVITE && 'discordOk' in S.player ? '<div class="switch setting"><span>Discord de Roster<small>les cartes très rares tirées par les joueurs y sont annoncées</small></span><a class="btn" id="discordJoin" href="' + esc(DISCORD_INVITE) + '" target="_blank" rel="noopener">Rejoindre</a></div>'
       + '<div class="switch setting"><span>Mon pseudo dans les annonces<small>sinon, le Discord dit « un joueur »</small></span><button type="button" id="discordSwitch" aria-pressed="' + !!S.player.discordOk + '" aria-label="Mon pseudo dans les annonces du Discord"></button></div>' : '')
@@ -1253,12 +1351,10 @@ async function viewProfile(main) {
     + 'Ambiance de tribune : un enregistrement de Félix Blume (<a href="https://freesound.org/people/felix.blume/sounds/500250/" target="_blank" rel="noopener">freesound.org</a>), versé au domaine public. Les autres sons sont fabriqués par le jeu.</p>'
     + '<p class="hint">Autographe de Faker : d\'après « Faker autograph.svg » (<a href="https://commons.wikimedia.org/wiki/File:Faker_autograph.svg" target="_blank" rel="noopener">Wikimedia Commons</a>), dans le domaine public. Ce n\'est pas une carte signée de sa main.</p>'
     + '<p class="hint">' + esc(GAME_NAME) + ' was created under Riot Games\' "Legal Jibber Jabber" policy using assets owned by Riot Games. Riot Games does not endorse or sponsor this project. Ce jeu n\'est ni approuvé ni sponsorisé par Riot Games, ni par les équipes et les joueurs cités.</p>'
-    + '</section></div>';
+    + '</section></div>');
 
-  loadClub(PLAY);
-  loadProfile(PLAY);
-  loadAchievements(PLAY);
-  loadReferral(PLAY);
+  if (part === '') { loadClub(PLAY); loadProfile(PLAY); loadReferral(PLAY); return; }
+  if (part === 'succes') { loadAchievements(PLAY); loadSeason(PLAY); drawAlbumsDone(); return; }
   $('#fxSwitch').addEventListener('click', (e) => {
     S.fx = !S.fx;
     e.currentTarget.setAttribute('aria-pressed', String(S.fx));
@@ -1267,6 +1363,7 @@ async function viewProfile(main) {
   });
   $('#volBtn').addEventListener('click', (e) => { sfx.click(); toggleVolume(e.currentTarget, syncTune); });
   drawPush();
+  drawInstall();
   const discord = document.getElementById('discordSwitch');
   if (discord) discord.addEventListener('click', async () => {
     const on = discord.getAttribute('aria-pressed') !== 'true';
@@ -1349,8 +1446,8 @@ async function viewProfile(main) {
     + '</tbody></table>';
   /* Ce qu'on a de chances de trouver dans un pack, en pourcentage (quand le serveur le dit) : au moins une carte de chaque rang, de chaque
      version spéciale. C'est ce qui compte pour le joueur ; le détail carte par carte reste dessous, replié. */
-  const part = (x) => (!x ? '—' : frNum(x >= 0.1 ? Math.round(x * 100) : x >= 0.01 ? Math.round(x * 1000) / 10 : x >= 0.001 ? Math.round(x * 10000) / 100 : Math.round(x * 100000) / 1000) + ' %');
-  const cell = (x) => '<td>' + part(x) + (x && x < 0.2 ? '<i>1 sur ' + num(Math.round(1 / x)) + '</i>' : '') + '</td>';
+  const share = (x) => (!x ? '—' : frNum(x >= 0.1 ? Math.round(x * 100) : x >= 0.01 ? Math.round(x * 1000) / 10 : x >= 0.001 ? Math.round(x * 10000) / 100 : Math.round(x * 100000) / 1000) + ' %');
+  const cell = (x) => '<td>' + share(x) + (x && x < 0.2 ? '<i>1 sur ' + num(Math.round(1 / x)) + '</i>' : '') + '</td>';
   const perPack = data.packs.every((p) => p.chances && p.chances.tiers);
   const line = (label, tc, pick, cls) => (data.packs.some((p) => pick(p.chances) > 0)
     ? '<tr' + (cls ? ' class="' + cls + '"' : '') + ' style="--tc:' + tc + '"><td>' + label + '</td>' + data.packs.map((p) => cell(pick(p.chances))).join('') + '</tr>' : '');

@@ -51,3 +51,6 @@ document.addEventListener('click', async (e) => {
   else { G.sfx.click(); G.toast('+' + res.reward + ' crédits'); }
   draw();
 });
+
+/** Une récompense de l'événement attend d'être touchée (la pastille de l'onglet « Défis »). */
+export const eventWaiting = () => !!E && (E.goals.some((g) => g.done && !g.claimed) || (E.bonus.done && !E.bonus.claimed));

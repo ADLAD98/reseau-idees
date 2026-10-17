@@ -6,13 +6,16 @@
 import { STORE } from './config.js';
 
 let G = null, timer = 0, ring = null, bubble = null, shown = '', current = null, scrolled = '';
-const NUMBER = { pack: 1, back: 1, play: 2, team: 3, foe: 4, sim: 5, go: 5, draft: 5 };
+const NUMBER = { pack: 1, back: 1, boosters: 1, play: 2, team: 3, 'team-tab': 3, foe: 4, 'foes-tab': 4, sim: 5, go: 5, draft: 5 };
 const key = () => STORE + 'tuto-' + (G && G.S.player ? G.S.player.id : 0);
 const load = () => { try { return JSON.parse(localStorage.getItem(key()) || '{}') || {}; } catch (e) { return {}; } };
 const save = (st) => { try { localStorage.setItem(key(), JSON.stringify(st)); } catch (e) { /* il reprendra du début */ } };
 const visible = (el) => !!el && el.getClientRects().length > 0;
 const first = (sel) => [...document.querySelectorAll(sel)].find(visible) || null;
 const page = () => location.hash.replace(/^#\/?/, '').split('/')[0] || 'packs';
+/* la rubrique de la page (Packs › Défis…) : '' pour la première ; et son onglet */
+const sub = () => location.hash.replace(/^#\/?/, '').split('/')[1] || '';
+const subTab = (id) => first('.subnav [data-sub="' + id + '"]');
 /* l'onglet d'une page : dans la barre du haut sur ordinateur, dans celle du bas sur téléphone */
 const tab = (name) => first('.top .nav [data-tab="' + name + '"]') || first('.tabs [data-tab="' + name + '"]');
 
@@ -55,11 +58,14 @@ function step() {
   }
   if (!(p.packsOpened > 0)) {
     if (page() !== 'packs') return { id: 'back', el: tab('packs'), text: 'Ton premier pack t\'attend sur l\'écran Packs.' };
+    if (sub()) return { id: 'boosters', el: subTab('main'), text: 'Ton premier pack t\'attend dans « Boosters ».' };
     return { id: 'pack', el: first('#openPack'), text: 'Bienvenue sur Roster ! Ouvre ton premier pack : des cartes de vrais joueurs pros.' };
   }
   if (page() !== 'jouer') return { id: 'play', el: tab('jouer'), text: 'Tes cartes forment déjà une équipe. Va sur « Jouer » pour ton premier match.' };
   if (!G.S.play) return null;
+  if (!st.team && sub()) return { id: 'team-tab', el: subTab('main'), text: 'Regarde d\'abord ton équipe, dans « Équipe ».' };
   if (!st.team) return { id: 'team', el: first('.squad'), text: 'Voici ton équipe : la meilleure possible avec tes cartes. Plus tard, touche une carte pour la changer.', next: 'Compris' };
+  if (sub() !== 'adversaires') return { id: 'foes-tab', el: subTab('adversaires'), text: 'Place au premier match : va dans « Adversaires ».' };
   /* l'adversaire le plus faible de la liste affichée (un nouveau joueur n'en a souvent aucun « Abordable ») */
   const foes = (G.S.play.opponents || []).filter((o) => document.querySelector('#foes [data-foe="' + o.id + '"]')).sort((a, b) => a.rating - b.rating);
   const weakest = foes[0] ? first('#foes [data-foe="' + foes[0].id + '"]') : first('#foes .foe');
