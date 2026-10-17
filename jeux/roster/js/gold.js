@@ -342,16 +342,18 @@ export function planGold({ ev, at, casts, state, deaths, gameAt, tauOfGame, leve
   const S = P.map((p, i) => {
     const kit = kits[i] || {}, b = (kit.build || []).map(Number);
     return { inv: [], spent: 0, visits: 0, last: -Infinity, start: ITEMS[b[0]] ? b[0] : 0, boots: ITEMS[b[1]] ? b[1] : 0, core: b.slice(2).filter((id) => ITEMS[id]),
-      final: ITEMS[Number(kit.sup)] ? Number(kit.sup) : 0, shelf: [[0, []]], ledger: [[0, 0]], buys: [], auto: 0 };
+      final: ITEMS[Number(kit.sup)] ? Number(kit.sup) : 0, shelf: [[0, []]], ledger: [[0, 0]], buys: [], auto: 0, role: p.role };
   });
   const ORDER = { f: 0, b: 1, c: 2, s: 3 };
   /* l'inventaire, rangé pour l'affichage : objets complets, bottes, composants (les plus chers d'abord), objet de départ */
   const tidy = (inv) => inv.map((id, k) => [id, k]).sort((a, b) => ORDER[kindOf(a[0])] - ORDER[kindOf(b[0])] || (kindOf(a[0]) === 'c' ? price(b[0]) - price(a[0]) : 0) || a[1] - b[1]).map((q) => q[0]);
   const snap = (s, x) => { s.shelf.push([x, tidy(s.inv)]); };
   const hasBoots = (s) => s.inv.some((id) => kindOf(id) === 'b' && id !== 1001);
-  /* ce qu'il vise : son premier objet, ses bottes, puis la suite de son build */
+  /* Ce qu'il vise : son premier objet, ses bottes, puis la suite de son build — sauf le midlaner, qui commence par ses bottes. Mesuré sur
+     31 parties de LCK et de LEC (septembre 2026, inventaires minute par minute du site officiel lolesports) : le midlaner a ses bottes
+     de rang 2 vers 8 minutes, avant son premier objet (14 minutes) ; les autres postes les finissent après le leur. */
   function target(s) {
-    const order = s.core.length ? [s.core[0], s.boots, ...s.core.slice(1)] : [s.boots];
+    const order = s.core.length ? (s.role === 2 ? [s.boots, ...s.core] : [s.core[0], s.boots, ...s.core.slice(1)]) : [s.boots];
     for (const id of order) {
       if (!id) continue;
       if (id === s.boots) { if (!hasBoots(s)) return id; continue; }
@@ -417,6 +419,9 @@ export function planGold({ ev, at, casts, state, deaths, gameAt, tauOfGame, leve
     /* la forme finale de l'objet de support : gratuite, une fois la quête finie */
     const bw = s.inv.indexOf(BOUNTY);
     if (bw >= 0 && s.final) { s.inv[bw] = s.final; s.buys.push([x, s.final, 0]); }
+    /* le toplaner et l'ADC prennent de simples bottes avant leur premier objet : vers 8 et 9 minutes chez les pros (même mesure) */
+    const early = p.role === 0 ? 480 : p.role === 3 ? 540 : Infinity;
+    if (s.boots && g >= early && !s.inv.some((id) => kindOf(id) === 'b') && pocket() >= price(1001) && room(i, 1001, g, x)) take(i, 1001, x, g);
     for (let guard = 0; guard < 14; guard++) {
       const t = target(s);
       if (!t) break;
@@ -450,17 +455,17 @@ export function planGold({ ev, at, casts, state, deaths, gameAt, tauOfGame, leve
   /** A-t-il de quoi faire un achat qui vaille un retour à la base ? */
   function wants(i, x) {
     const s = S[i], g = gameAt(x);
-    /* comme les pros : on rentre dès qu'on peut finir son objet, ou s'offrir son plus gros composant (dès 900 PO), et jamais avec plus de
-       1 600 PO en poche ; pas deux retours à moins de deux minutes d'écart */
-    if (!s.visits || g < 150 || g - s.last < 120) return false;
+    /* comme les pros : on rentre dès qu'on peut finir son objet, ou s'offrir son plus gros composant (dès 800 PO), et jamais avec plus de
+       1 300 PO en poche ; pas deux retours à moins d'une minute et demie d'écart (réglé le 17/10/2026 sur les objets des pros : outils/mesure-objets-pros.mjs du serveur) */
+    if (!s.visits || g < 150 || g - s.last < 90) return false;
     const t = target(s);
     if (!t) return false;
     const pocket = goldAt(i, x) - s.spent, whole = quote(t, s.inv.slice()).cost;
-    if (whole <= pocket || pocket >= 1600) return true;
+    if (whole <= pocket || pocket >= 1300) return true;
     if (whole <= 1500) return false;
     let big = 0;
     for (const c of new Set(missing(t, s.inv.slice(), []))) big = Math.max(big, quote(c, s.inv.slice()).cost);
-    return pocket >= clamp(big, 900, 1300);
+    return pocket >= clamp(big, 800, 1300);
   }
   /** À la fin : les dernières transformations. */
   function finish() { for (let i = 0; i < 10; i++) sync(i, total); }
