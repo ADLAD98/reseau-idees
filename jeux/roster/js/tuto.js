@@ -1,7 +1,7 @@
 /* Le tutoriel de la première partie, pour un nouveau joueur : un halo autour du bon bouton et une bulle qui dit quoi faire, en cinq
    étapes — ouvrir son premier pack, aller sur Jouer, découvrir son équipe (alignée d'office), choisir un adversaire, laisser son coach
    faire la draft — jusqu'au premier match joué. Il suit ce que le joueur fait (rien n'est bloqué) et se tait pendant l'ouverture d'un
-   pack, la partie ou une fenêtre qui n'est pas la sienne. « Passer le tutoriel » l'arrête pour de bon. Seulement pour un compte de moins
+   pack, la partie ou une fenêtre qui n'est pas la sienne. « Passer le tutoriel » l'arrête pour de bon. Seulement pour un compte de moins
    de quatorze jours qui n'a encore joué aucun match ; où il en est se garde dans ce navigateur. */
 import { STORE } from './config.js';
 
@@ -48,25 +48,25 @@ function step() {
   const sheet = document.querySelector('.sheet');
   if (sheet) {
     const sim = sheet.querySelector('#goSim'), go = sheet.querySelector('#go');
-    if (sim) return { id: 'sim', el: sim, text: 'Pour ton premier match, laisse ton coach faire la draft : « Simuler la draft » lance directement la partie.' };
+    if (sim) return { id: 'sim', el: sim, text: 'Pour ton premier match, laisse ton coach faire la draft : « Simuler la draft » lance directement la partie.' };
     if (go) return { id: 'go', el: go, text: 'Lance la draft : chaque équipe choisit ses champions, puis la partie se joue.' };
     return null;
   }
   if (document.querySelector('.dr')) {
     const t = first('.dr-sim') || first('.dr-auto');
-    return t ? { id: 'draft', el: t, text: 'La draft : chaque équipe choisit ses champions à tour de rôle. Pour cette fois, laisse ton coach finir : « Simuler ».' } : null;
+    return t ? { id: 'draft', el: t, text: 'La draft : chaque équipe choisit ses champions à tour de rôle. Pour cette fois, laisse ton coach finir : « Simuler ».' } : null;
   }
   if (!(p.packsOpened > 0)) {
     if (page() !== 'packs') return { id: 'back', el: tab('packs'), text: 'Ton premier pack t\'attend sur l\'écran Packs.' };
-    if (sub()) return { id: 'boosters', el: subTab('main'), text: 'Ton premier pack t\'attend dans « Boosters ».' };
+    if (sub()) return { id: 'boosters', el: subTab('main'), text: 'Ton premier pack t\'attend dans « Boosters ».' };
     return { id: 'pack', el: first('#openPack'), text: 'Bienvenue sur Roster ! Ouvre ton premier pack : des cartes de vrais joueurs pros.' };
   }
-  if (page() !== 'jouer') return { id: 'play', el: tab('jouer'), text: 'Tes cartes forment déjà une équipe. Va sur « Jouer » pour ton premier match.' };
+  if (page() !== 'jouer') return { id: 'play', el: tab('jouer'), text: 'Tes cartes forment déjà une équipe. Va sur « Jouer » pour ton premier match.' };
   if (!G.S.play) return null;
-  if (!st.team && sub()) return { id: 'team-tab', el: subTab('main'), text: 'Regarde d\'abord ton équipe, dans « Équipe ».' };
+  if (!st.team && sub()) return { id: 'team-tab', el: subTab('main'), text: 'Regarde d\'abord ton équipe, dans « Équipe ».' };
   if (!st.team) return { id: 'team', el: first('.squad'), text: 'Voici ton équipe : la meilleure possible avec tes cartes. Plus tard, touche une carte pour la changer.', next: 'Compris' };
-  if (sub() !== 'adversaires') return { id: 'foes-tab', el: subTab('adversaires'), text: 'Place au premier match : va dans « Adversaires ».' };
-  /* l'adversaire le plus faible de la liste affichée (un nouveau joueur n'en a souvent aucun « Abordable ») */
+  if (sub() !== 'adversaires') return { id: 'foes-tab', el: subTab('adversaires'), text: 'Place au premier match : va dans « Adversaires ».' };
+  /* l'adversaire le plus faible de la liste affichée (un nouveau joueur n'en a souvent aucun « Abordable ») */
   const foes = (G.S.play.opponents || []).filter((o) => document.querySelector('#foes [data-foe="' + o.id + '"]')).sort((a, b) => a.rating - b.rating);
   const weakest = foes[0] ? first('#foes [data-foe="' + foes[0].id + '"]') : first('#foes .foe');
   return { id: 'foe', el: weakest, text: 'Commence par l\'adversaire le plus faible de la liste : ta première victoire contre une équipe rapporte un pack.' };

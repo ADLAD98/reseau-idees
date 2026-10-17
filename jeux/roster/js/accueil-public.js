@@ -15,7 +15,7 @@ export function publicHTML(n, live) {
   const round = Math.floor(n / 50) * 50;
   return '<section class="pub">'
     + (live ? publicLiveHTML(live) : '')
-    + '<h2 class="pub-title">Le jeu de cartes de l\'e-sport League of Legends</h2>'
+    + '<h2 class="pub-title">Le jeu de cartes de l\'e‑sport League of Legends</h2>'
     + '<p class="pub-lead">Gratuit, sans publicité, sans achat : tout se gagne en jouant. Il suffit d\'un pseudo et d\'un mot de passe, aucune adresse e-mail.</p>'
     + '<div class="pub-grid">' + FEATURES.map(([icon, title, text]) => '<article class="pub-card panel"><b>' + esc(title) + '</b><p>' + esc(text(round)) + '</p></article>').join('') + '</div>'
     + '<div class="pub-cta"><button class="btn primary big" type="button" data-public="join">Jouer gratuitement</button></div>'

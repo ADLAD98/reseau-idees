@@ -765,7 +765,7 @@ body.fx .subnav a.on::after{animation:segIn .3s cubic-bezier(.2,.75,.25,1)}
 /* ---------- « Pendant ton absence » (js/recap.js) ---------- */
 .recap{display:grid;gap:8px;margin:6px 0 18px;padding:0;list-style:none}
 .recap li{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 14px;border-left:2px solid var(--gold-lo);background:rgba(1,10,19,.45);font-size:15px}
-.recap li b{color:var(--gold-hi)}
+.recap li b{color:var(--gold-hi);white-space:nowrap}
 .recap .btn{flex:none;height:34px;padding:0 14px;font-size:13px}
 .recap-box{max-width:520px}
 
