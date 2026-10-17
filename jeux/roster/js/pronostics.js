@@ -66,8 +66,8 @@ function draw() {
   const list = all ? D.upcoming : D.upcoming.slice(0, 4);
   el.hidden = false;
   el.innerHTML = '<h2 class="h2">Pronostics</h2>'
-    + '<p class="ms-sub">Trouve le vainqueur d\'un vrai match pro : +' + D.prize.win + ' crédits, et +' + D.prize.exact + ' si le score est exact. ' + D.perDay + ' pronostics au plus par jour de matchs.</p>'
-    + liveHTML()
+    /* sur ordinateur, le match en direct se tient à droite de la présentation (habillage.css, .pr-head) */
+    + '<div class="pr-head"><p class="ms-sub">Trouve le vainqueur d\'un vrai match pro : +' + D.prize.win + ' crédits, et +' + D.prize.exact + ' si le score est exact. ' + D.perDay + ' pronostics au plus par jour de matchs.</p>' + liveHTML() + '</div>'
     + (list.length ? '<div class="pr-list">' + list.map(matchHTML).join('') + '</div>'
       + (D.upcoming.length > 4 ? '<button type="button" class="btn slim pr-more" id="prMore">' + (all ? 'Moins de matchs' : 'Tous les matchs de la semaine (' + D.upcoming.length + ')') + '</button>' : '')
       : '<p class="empty">Aucun match à pronostiquer pour l\'instant' + ((D.soon || []).length ? '.' : ' : les prochains apparaîtront dès que leurs équipes seront connues.') + '</p>')

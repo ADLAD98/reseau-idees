@@ -604,3 +604,10 @@ body:not(.fx) .pr-dot{animation:none}
 .pr-soon li{display:flex;justify-content:space-between;gap:10px;padding:8px 10px;border-left:2px solid var(--line2);background:rgba(1,10,19,.35);color:var(--mut);font:14px/1.35 var(--text)}
 .pr-soon time{color:var(--gold);white-space:nowrap;font-size:13px}
 .pr-note{margin:8px 0 0;color:var(--faint);font-size:13px}
+/* sur ordinateur : le match en direct à droite de la présentation, les matchs à venir en colonnes */
+@media (min-width:861px){
+  .pr-head{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin-bottom:14px}
+  .pr-head .ms-sub{flex:1;margin-bottom:0}
+  .pr-head .pr-live{flex:none;width:min(380px,42%);margin:-8px 0 0}
+  .pr-soon{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+}
