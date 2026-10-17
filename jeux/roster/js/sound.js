@@ -5,6 +5,15 @@ import { STORE } from './config.js';
 /* le curseur du joueur va de 0 à 1 (volume.js) ; le volume réel suit son carré, l'oreille entendant en proportion (0,7 : le réglage d'origine) */
 const DEFAULT = 0.7;
 let ctx = null, out = null, noiseBuf = null, on = true, level = DEFAULT;
+/* les sons en train de jouer : au-delà de MAX_VOICES (une déchirure de sachet très vive, une fin de partie chargée), les suivants sont
+   sautés plutôt que de s'empiler */
+let voices = 0, stale = false;
+const MAX_VOICES = 48;
+/* Le limiteur, en bout de chaîne : au-dessus de LIMIT_DB, le son est écrasé (rapport 20 pour 1) au lieu de dépasser le maximum et de
+   saturer. Le navigateur remonte ensuite tout le son d'un « gain de rattrapage » fixé par la norme Web Audio
+   (rattrapage = (1 / gain à pleine échelle) ^ 0,6) : on le retire juste après, pour qu'un son ordinaire garde exactement son volume. */
+const LIMIT_DB = -6, LIMIT_RATIO = 20;
+const MAKEUP = Math.pow(10, (-0.6 * LIMIT_DB * (1 - 1 / LIMIT_RATIO)) / 20);
 try {
   on = localStorage.getItem(STORE + 'son') !== '0';
   const saved = localStorage.getItem(STORE + 'volume-sons');
@@ -39,28 +48,62 @@ function audio() {
   if (!ctx) {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return null;
-    ctx = new AC();
-    out = ctx.createGain();
+    const c = new AC();
+    ctx = c;
+    voices = 0;
+    const limit = c.createDynamicsCompressor(), after = c.createGain();
+    limit.threshold.value = LIMIT_DB; limit.knee.value = 0; limit.ratio.value = LIMIT_RATIO;
+    limit.attack.value = 0.003; limit.release.value = 0.25;
+    after.gain.value = 1 / MAKEUP;
+    limit.connect(after); after.connect(c.destination);
+    out = c.createGain();
     out.gain.value = loud();
-    out.connect(ctx.destination);
+    out.connect(limit);
     /* un écho court et discret, pour donner de l'air aux notes (très peu de retour : des sons qui s'enchaînent ne s'empilent pas) */
-    const delay = ctx.createDelay(0.5), back = ctx.createGain(), wet = ctx.createGain();
+    const delay = c.createDelay(0.5), back = c.createGain(), wet = c.createGain();
     delay.delayTime.value = 0.13; back.gain.value = 0.2; wet.gain.value = 0.14;
-    out.connect(delay); delay.connect(back); back.connect(delay); delay.connect(wet); wet.connect(ctx.destination);
-    noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+    out.connect(delay); delay.connect(back); back.connect(delay); delay.connect(wet); wet.connect(limit);
+    noiseBuf = c.createBuffer(1, c.sampleRate, c.sampleRate);
     const data = noiseBuf.getChannelData(0);
     for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    /* sur iPhone, un appel ou une autre appli « interrompt » le son : ce contexte-là ne sera plus fiable */
+    c.onstatechange = () => { if (c.state === 'interrupted') stale = true; };
   }
   if (ctx.state === 'suspended') ctx.resume();
   return ctx;
 }
+/* compte une source de son jusqu'à ce qu'elle se taise */
+function track(src) {
+  voices++;
+  src.onended = () => { voices = Math.max(0, voices - 1); };
+}
+
+/* Un contexte audio peut rester déréglé — le son grésille ou sature jusqu'au rechargement de la page — après un changement de sortie
+   (casque, Bluetooth), un appel, une vidéo jouée par-dessus (la carte légendaire) ou un passage en arrière-plan. Dans ces cas on le note
+   usé, et au geste suivant du joueur on en crée un neuf (un navigateur ne laisse démarrer le son qu'à un geste). */
+export function soundStale() { if (ctx) stale = true; }
+let video = false;
+function renew() {
+  /* la vidéo d'une carte légendaire (lecteur YouTube) a joué par-dessus le jeu : à refaire aussi, une fois la vidéo fermée */
+  if (document.querySelector('.op-song')) video = true;
+  else if (video) { video = false; soundStale(); }
+  if (!stale) return;
+  stale = false;
+  const old = ctx;
+  ctx = null; out = null; noiseBuf = null; voices = 0;
+  try { old.close().catch(() => { /* déjà fermé */ }); } catch (e) { /* navigateur sans close() */ }
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden) soundStale(); });
+try { navigator.mediaDevices.addEventListener('devicechange', soundStale); } catch (e) { /* pas de détection des sorties audio */ }
+for (const type of ['pointerdown', 'keydown', 'touchstart']) document.addEventListener(type, renew, { capture: true, passive: true });
 
 /** Une note. to : fréquence d'arrivée (glissé) ; swell : la note enfle au lieu de s'éteindre. */
 function tone(freq, o = {}) {
   const c = audio();
-  if (!c) return;
+  if (!c || voices >= MAX_VOICES) return;
   const t0 = c.currentTime + (o.t || 0), dur = o.dur || 0.4, vol = o.vol || 0.15;
   const osc = c.createOscillator(), gain = c.createGain();
+  track(osc);
   osc.type = o.type || 'sine';
   osc.frequency.setValueAtTime(freq, t0);
   if (o.to) osc.frequency.exponentialRampToValueAtTime(o.to, t0 + dur);
@@ -79,9 +122,10 @@ function tone(freq, o = {}) {
 /** Un souffle : du bruit filtré. to : fréquence d'arrivée du filtre. */
 function noise(o = {}) {
   const c = audio();
-  if (!c) return;
+  if (!c || voices >= MAX_VOICES) return;
   const t0 = c.currentTime + (o.t || 0), dur = o.dur || 0.2, vol = o.vol || 0.15;
   const src = c.createBufferSource(), filter = c.createBiquadFilter(), gain = c.createGain();
+  track(src);
   src.buffer = noiseBuf; src.loop = true;
   filter.type = o.type || 'bandpass';
   filter.Q.value = o.q || 0.9;

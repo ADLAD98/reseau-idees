@@ -38,14 +38,19 @@ function save() {
    boutons de l'appareil comptent). Sans précaution, la musique y joue à plein volume, sans pouvoir être baissée ni coupée. Là, chaque
    lecteur passe par un nœud de gain de l'API Web Audio, qui, lui, se règle ; vol() et setVol() cachent la différence au reste du fichier. */
 const FIXED = (() => { try { const probe = new Audio(); probe.volume = 0.5; return probe.volume !== 0.5; } catch (e) { return false; } })();
-let actx = null;
+let actx = null, stale = false;
 const gains = new WeakMap(), told = new WeakMap();
 /* branche un lecteur sur son nœud de gain, une fois pour toutes */
 function wire(el) {
   if (!FIXED || gains.has(el)) return;
   try {
     const AC = window.AudioContext || window.webkitAudioContext;
-    if (!actx) actx = new AC();
+    if (!actx) {
+      const c = new AC();
+      actx = c;
+      /* un appel, une autre appli : ce circuit-là ne sera plus fiable (voir rebuild) */
+      c.onstatechange = () => { if (c.state === 'interrupted') stale = true; };
+    }
     const gain = actx.createGain();
     gain.gain.value = 0;
     actx.createMediaElementSource(el).connect(gain);
@@ -61,6 +66,43 @@ function setVol(el, value) {
   told.set(el, value);
   const gain = gains.get(el);
   if (gain) gain.gain.value = value; else el.muted = value < 0.0005;
+}
+/* Ce circuit peut se dérégler — la musique grésille ou sature jusqu'au rechargement de la page — après un appel, une vidéo jouée
+   par-dessus (la carte légendaire), un changement de sortie ou un passage en arrière-plan : on le note usé, et au geste suivant
+   (startMusic) on le refait à neuf, avec de nouveaux lecteurs (un lecteur ne se branche qu'une fois), là où la musique en était. */
+function musicStale() { if (actx) stale = true; }
+document.addEventListener('visibilitychange', () => { if (document.hidden) musicStale(); });
+try { navigator.mediaDevices.addEventListener('devicechange', musicStale); } catch (e) { /* pas de détection des sorties audio */ }
+function rebuild() {
+  stale = false;
+  if (!actx) return;
+  const old = actx;
+  actx = null;
+  clearInterval(fade);
+  switching = false;
+  if (audio) {
+    if (audio.src) spot[scene].time = audio.currentTime || spot[scene].time;
+    const playing = !audio.paused;
+    audio.pause();
+    audio = player();
+    if (playing) play();
+  }
+  if (crowd) {
+    crowd.pause();
+    crowd = null;
+    clearInterval(crowdTick); crowdTick = 0; swell = 0;
+    crowdMood();
+  }
+  try { old.close().catch(() => { /* déjà fermé */ }); } catch (e) { /* navigateur sans close() */ }
+}
+/* le lecteur de la musique : à un morceau fini, le suivant du même moment (ou le même, s'il est seul) */
+function player() {
+  const el = new Audio();
+  el.preload = 'none';
+  wire(el);
+  setVol(el, 0);
+  el.addEventListener('ended', () => { const s = spot[scene]; s.index = (s.index + 1) % SCENES[scene].tracks.length; s.time = 0; load(); play(); });
+  return el;
 }
 
 export const musicOn = () => on;
@@ -114,8 +156,10 @@ function change(next) {
   });
 }
 function mood() {
-  const now = look();
+  const now = look(), was = hush;
   hush = now === 'hush';
+  /* la vidéo d'une carte légendaire vient de jouer par-dessus : le circuit de la musique est à refaire au prochain geste */
+  if (was && !hush) musicStale();
   if (!hush && now !== scene && !switching) { change(now); crowdMood(); return; }
   const next = wanted();
   if (next !== goal) { goal = next; if (audio && on && started && !switching) ramp(goal); }
@@ -152,6 +196,7 @@ export function cheer(power = 1) { swell = Math.min(2.2, swell + 0.7 * power); }
 /** À appeler à chaque geste du joueur : lance la musique si elle n'est pas coupée (un navigateur ne laisse rien jouer avant le premier geste),
     et relance ce qu'il aurait empêché de démarrer. */
 export function startMusic() {
+  if (stale) rebuild();
   wake();
   if (started) {
     if (on && audio && audio.paused && !document.hidden && !switching) play();
@@ -161,14 +206,9 @@ export function startMusic() {
   if (!on) return;
   started = true;
   if (!audio) {
-    audio = new Audio();
-    audio.preload = 'none';
-    wire(audio);
+    audio = player();
     wake();
-    setVol(audio, 0);
     spot.home.index = Math.floor(Math.random() * SCENES.home.tracks.length);
-    /* un morceau fini : le suivant du même moment (ou le même, s'il est seul) */
-    audio.addEventListener('ended', () => { const s = spot[scene]; s.index = (s.index + 1) % SCENES[scene].tracks.length; s.time = 0; load(); play(); });
     /* la musique ne continue pas dans un onglet qu'on ne regarde plus */
     document.addEventListener('visibilitychange', () => {
       if (crowd) { if (document.hidden) crowd.pause(); else crowdMood(); }
