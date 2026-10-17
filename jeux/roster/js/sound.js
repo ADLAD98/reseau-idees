@@ -4,7 +4,9 @@ import { STORE } from './config.js';
 
 /* le curseur du joueur va de 0 à 1 (volume.js) ; le volume réel suit son carré, l'oreille entendant en proportion (0,7 : le réglage d'origine) */
 const DEFAULT = 0.7;
-let ctx = null, out = null, noiseBuf = null, on = true, level = DEFAULT;
+/* out : le volume des notes, qui passent aussi par l'écho ; dry : le même volume pour les souffles, sans écho (l'écho d'un souffle n'est
+   qu'un chuintement, et quand les souffles s'enchaînent il s'étale en un grésillement continu) */
+let ctx = null, out = null, dry = null, noiseBuf = null, on = true, level = DEFAULT;
 /* les sons en train de jouer : au-delà de MAX_VOICES (une déchirure de sachet très vive, une fin de partie chargée), les suivants sont
    sautés plutôt que de s'empiler */
 let voices = 0, stale = false;
@@ -37,14 +39,24 @@ export function setSound(value) {
   on = !!value;
   if (on && level <= 0) level = DEFAULT;
   save();
-  if (out) out.gain.value = loud();
+  if (out) { out.gain.value = loud(); dry.gain.value = loud(); }
 }
 /** Règle le volume des effets, de 0 à 1 : à zéro ils sont coupés. */
 export function setSoundLevel(value) {
   level = Math.min(1, Math.max(0, Number(value) || 0));
   on = level > 0;
   save();
-  if (out) out.gain.value = loud();
+  if (out) { out.gain.value = loud(); dry.gain.value = loud(); }
+}
+/* Les sons de l'interface ne se répètent pas plus vite que « ms » : quand on enchaîne les clics (changer de page à toute vitesse), ils
+   se recouvraient en un bruit continu. Les suivants, trop rapprochés, sont sautés. Rend 0 (à sauter) ou le temps écoulé depuis le
+   précédent, en millisecondes. */
+const lastPlayed = {};
+function spaced(name, ms) {
+  const now = performance.now(), gap = now - (lastPlayed[name] ?? -1e9);
+  if (gap < ms) return 0;
+  lastPlayed[name] = now;
+  return gap;
 }
 
 /* Le navigateur n'autorise le son qu'après un geste du joueur : tout est créé au premier son demandé. */
@@ -67,6 +79,9 @@ function audio() {
     out = c.createGain();
     out.gain.value = loud();
     out.connect(limit);
+    dry = c.createGain();
+    dry.gain.value = loud();
+    dry.connect(limit);
     /* un écho court et discret, pour donner de l'air aux notes (très peu de retour : des sons qui s'enchaînent ne s'empilent pas) */
     const delay = c.createDelay(0.5), back = c.createGain(), wet = c.createGain();
     delay.delayTime.value = 0.13; back.gain.value = 0.2; wet.gain.value = 0.14;
@@ -99,7 +114,7 @@ function renew() {
   if (!stale) return;
   stale = false;
   const old = ctx;
-  ctx = null; out = null; noiseBuf = null; voices = 0;
+  ctx = null; out = null; dry = null; noiseBuf = null; voices = 0;
   try { old.close().catch(() => { /* déjà fermé */ }); } catch (e) { /* navigateur sans close() */ }
   audio();
 }
@@ -150,7 +165,7 @@ function noise(o = {}) {
     gain.gain.exponentialRampToValueAtTime(vol, t0 + (o.attack || 0.01));
     gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
   }
-  src.connect(filter); filter.connect(gain); gain.connect(out);
+  src.connect(filter); filter.connect(gain); gain.connect(dry);
   src.start(t0); src.stop(t0 + dur + 0.1);
 }
 
@@ -203,20 +218,24 @@ export const sfx = {
   /** Un battement de cœur, avant une carte très rare : deux coups sourds. */
   heart() { tone(64, { dur: 0.17, to: 44, vol: 0.34 }); tone(56, { t: 0.18, dur: 0.22, to: 38, vol: 0.24 }); },
   /** La carte glisse (mise en valeur, retour à sa place). */
-  whoosh() { noise({ dur: 0.32, vol: 0.1, freq: 500, to: 2600, q: 0.7 }); },
+  whoosh() { if (spaced('whoosh', 150)) noise({ dur: 0.32, vol: 0.1, freq: 500, to: 2600, q: 0.7 }); },
   /** Une page cartonnée qui se tourne (on change de page, on ouvre la fiche d'une carte) : le carton fend l'air, puis se pose. Discret. */
   page() {
-    noise({ dur: 0.2, vol: 0.05, freq: 700, to: 2200, q: 0.8, attack: 0.07 });
-    noise({ t: 0.03, dur: 0.15, vol: 0.018, type: 'highpass', freq: 3800 });
-    noise({ t: 0.19, dur: 0.06, vol: 0.06, type: 'lowpass', freq: 620, to: 260 });
-    tone(170, { t: 0.19, dur: 0.07, to: 95, vol: 0.04, type: 'triangle' });
+    const gap = spaced('page', 220);
+    if (!gap) return;
+    /* des pages tournées en rafale : chacune plus bas, pour rester au fond */
+    const k = gap < 700 ? 0.45 : 1;
+    noise({ dur: 0.2, vol: 0.05 * k, freq: 700, to: 2200, q: 0.8, attack: 0.07 });
+    noise({ t: 0.03, dur: 0.15, vol: 0.018 * k, type: 'highpass', freq: 3800 });
+    noise({ t: 0.19, dur: 0.06, vol: 0.06 * k, type: 'lowpass', freq: 620, to: 260 });
+    tone(170, { t: 0.19, dur: 0.07, to: 95, vol: 0.04 * k, type: 'triangle' });
   },
   /** Toutes les cartes sont retournées. */
   done() { bell(E5, 0, 0.08, 0.9); bell(B5, 0.09, 0.07, 0.9); bell(E6, 0.18, 0.07, 1.2); },
   /** Un bouton, un champion désigné : un petit « toc » de bois, grave et bref (pas un bip). */
-  click() { tone(420, { dur: 0.045, to: 300, vol: 0.03, type: 'triangle' }); noise({ dur: 0.018, vol: 0.012, type: 'highpass', freq: 2600 }); },
+  click() { if (spaced('click', 70)) { tone(420, { dur: 0.045, to: 300, vol: 0.03, type: 'triangle' }); noise({ dur: 0.018, vol: 0.012, type: 'highpass', freq: 2600 }); } },
   /** Un choix qui se fait tout seul (draft automatique) : presque rien, pour ne pas lasser quand ils s'enchaînent. */
-  tick() { tone(300, { dur: 0.06, to: 210, vol: 0.022, type: 'triangle' }); },
+  tick() { if (spaced('tick', 45)) tone(300, { dur: 0.06, to: 210, vol: 0.022, type: 'triangle' }); },
 
   /* ---------- le sachet ---------- */
   /** Le papier crisse quand on saisit le sachet. */
@@ -239,7 +258,7 @@ export const sfx = {
   /** Les cartes glissent hors du sachet. */
   slideOut() { noise({ dur: 0.55, vol: 0.07, freq: 700, to: 2600, q: 0.6, attack: 0.1 }); },
   /** Une carte part se ranger. */
-  slide() { noise({ dur: 0.2, vol: 0.05, freq: 1300, to: 3000, q: 0.7 }); },
+  slide() { if (spaced('slide', 80)) noise({ dur: 0.2, vol: 0.05, freq: 1300, to: 3000, q: 0.7 }); },
 
   /* ---------- le combat ---------- */
   /** C'est au joueur de choisir : deux notes douces, une octave plus bas qu'avant. */
