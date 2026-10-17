@@ -47,6 +47,7 @@ const S = {
   shop: null,             // booster à crédits et barème de la vente rapide (null : le serveur ne les propose pas)
   pack: 'free',           // booster choisi sur l'écran Packs : 'free' ou 'credits'
   missions: null,         // les missions du jour (false : le serveur ne les connaît pas)
+  weekly: null,           // les défis de la semaine (false : le serveur ne les connaît pas)
   daily: null,            // le « Champion du jour » : mon tableau du jour (false : le serveur ne connaît pas ce jeu)
   dailyOn: false,         // le serveur annonce des boosters du jour : le « Champion du jour » est proposé
   dailyPool: null,        // la liste des champions pour la saisie, et le nom des régions
@@ -318,7 +319,7 @@ function showAuth(message) {
       S.session = { token: data.token, name: data.player.name };
       saveSession(S.session);
       /* (un autre compte sur le même écran : rien de l'équipe ni des missions du précédent ne doit rester) */
-      S.play = null; S.missions = null; hubAsked = false; S.daily = null; S.dailyOn = false; S.club = null; S.clubView = null;
+      S.play = null; S.missions = null; S.weekly = null; hubAsked = false; S.daily = null; S.dailyOn = false; S.club = null; S.clubView = null;
       await loadGame();
       location.hash = '#/packs';
       shell();
@@ -582,6 +583,7 @@ const every = (ms) => { const m = Math.floor(ms / 60000), s = Math.round((ms % 6
 function viewPacks(main) {
   /* les missions avancent en jouant : on les redemande à chaque passage sur cet écran */
   loadMissions();
+  loadWeekly();
   loadHubTeam();
   const recent = [...S.owned.entries()].sort((a, b) => b[1].at - a[1].at).slice(0, 6).map(([id]) => S.cat.cardById.get(id)).filter(Boolean);
   const kind = packKind(), credits = kind === 'credits';
@@ -598,6 +600,7 @@ function viewPacks(main) {
     + '<div class="dg-teaser" id="dailyTeaser" hidden></div>'
     + hubHTML()
     + '<section class="missions" id="missions"' + (S.missions ? '' : ' hidden') + '>' + (S.missions ? missionsHTML() : '') + '</section>'
+    + '<section class="missions weekly" id="weekly"' + (S.weekly ? '' : ' hidden') + '>' + (S.weekly ? weeklyHTML() : '') + '</section>'
     + '<section><h2 class="h2">Dernières cartes obtenues</h2>'
     + (recent.length ? '<div class="row-cards">' + recent.map((c) => tile(c)).join('') + '</div>' : '<p class="empty">Ta collection est vide. Ouvre ton premier pack !</p>')
     + '</section>'
@@ -636,6 +639,39 @@ document.addEventListener('click', async (e) => {
   toast('+' + res.reward + ' crédits');
   const box = document.getElementById('missions');
   if (box) box.innerHTML = missionsHTML();
+});
+
+/* ---------- les défis de la semaine (serveur : semaine.ts) ---------- */
+function weeklyHTML() {
+  const w = S.weekly, left = Math.max(0, w.resetAt - now()), d = Math.floor(left / 86_400_000), h = Math.floor((left % 86_400_000) / 3_600_000);
+  const row = (x) => '<div class="ms' + (x.claimed ? ' claimed' : x.done ? ' done' : '') + '"><div class="ms-t"><b>' + esc(x.label) + '</b>'
+    + '<span class="bar"><i style="width:' + Math.round((100 * x.progress) / x.goal) + '%"></i></span></div><em class="num">' + x.progress + ' / ' + x.goal + '</em>'
+    + (x.claimed ? '<span class="ms-ok">+' + x.reward + ' touchés</span>' : '<button class="btn' + (x.done ? ' primary' : '') + '" type="button" data-wclaim="' + x.slot + '"' + (x.done ? '' : ' disabled') + '>+' + x.reward + ' crédits</button>') + '</div>';
+  const n = w.challenges.filter((x) => x.done).length;
+  return '<h2 class="h2">Défis de la semaine</h2><p class="ms-sub">De nouveaux défis dans ' + (d ? d + ' j ' : '') + h + ' h.</p><div class="ms-list">' + w.challenges.map(row).join('')
+    + '<div class="ms bonus' + (w.bonus.claimed ? ' claimed' : w.bonus.done ? ' done' : '') + '"><div class="ms-t"><b>Les trois défis de la semaine</b><span class="bar"><i style="width:' + Math.round((100 * n) / w.challenges.length) + '%"></i></span></div>'
+    + '<em class="num">' + n + ' / ' + w.challenges.length + '</em>'
+    + (w.bonus.claimed ? '<span class="ms-ok">+' + w.bonus.reward + ' touchés</span>' : '<button class="btn' + (w.bonus.done ? ' primary' : '') + '" type="button" data-wclaim="bonus"' + (w.bonus.done ? '' : ' disabled') + '>+' + w.bonus.reward + ' crédits</button>') + '</div></div>';
+}
+/** Redemande les défis au serveur et les affiche si l'écran Packs est ouvert (un serveur plus ancien ne les connaît pas). */
+async function loadWeekly() {
+  if (S.weekly === false || !S.shop) return;
+  try { S.weekly = await call('GET', '/api/weekly'); } catch (e) { if (e instanceof ApiError && e.status === 404) S.weekly = false; return; }
+  const box = document.getElementById('weekly');
+  if (box && S.weekly) { box.innerHTML = weeklyHTML(); box.hidden = false; }
+}
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('#weekly [data-wclaim]');
+  if (!b || b.disabled) return;
+  b.disabled = true;
+  const res = await guard(() => call('POST', '/api/weekly/claim', { slot: b.dataset.wclaim === 'bonus' ? 'bonus' : Number(b.dataset.wclaim) }));
+  if (!res) { b.disabled = false; return; }
+  applyState(res);
+  S.weekly = res;
+  sfx.click();
+  toast('+' + res.reward + ' crédits');
+  const box = document.getElementById('weekly');
+  if (box) box.innerHTML = weeklyHTML();
 });
 
 /* compte à rebours : mis à jour chaque seconde, sans redessiner l'écran */
