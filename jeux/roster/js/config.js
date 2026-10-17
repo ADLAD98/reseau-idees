@@ -5,7 +5,8 @@ export const GAME_NAME = 'Roster';
    jeu déménage (Cloudflare Pages, nom de domaine…) : la page des mentions légales se met à jour d'elle-même. L'adresse du site, elle,
    est lue dans la barre d'adresse. */
 export const HOSTS = [
-  { role: 'Les pages du site', name: 'GitHub, Inc. (service GitHub Pages)', address: '88 Colin P. Kelly Jr. Street, San Francisco, CA 94107, États-Unis', site: 'https://github.com' },
+  { role: 'Les pages du site, à bcorpslabs.com', name: 'Cloudflare, Inc. (service Workers)', address: '101 Townsend Street, San Francisco, CA 94107, États-Unis', site: 'https://www.cloudflare.com' },
+  { role: 'Les pages du site, à l\'ancienne adresse adlad98.github.io', name: 'GitHub, Inc. (service GitHub Pages)', address: '88 Colin P. Kelly Jr. Street, San Francisco, CA 94107, États-Unis', site: 'https://github.com' },
   { role: 'Le serveur du jeu et sa base de données', name: 'Cloudflare, Inc. (services Workers et D1)', address: '101 Townsend Street, San Francisco, CA 94107, États-Unis', site: 'https://www.cloudflare.com', note: 'les données des comptes sont stockées dans l\'Union européenne' },
 ];
 

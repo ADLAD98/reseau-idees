@@ -5,5 +5,9 @@ import { HOSTS } from './config.js';
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const home = new URL('./', location.href).href;
 for (const a of document.querySelectorAll('[data-site]')) { a.href = home; a.textContent = home.replace(/\/$/, ''); }
+/* l'adresse de contact, assemblée ici plutôt qu'écrite dans la page, pour que les robots qui ramassent les adresses ne la trouvent pas
+   (sans JavaScript, le lien GitHub reste) */
+const MAIL = ['contact', 'bcorpslabs.com'].join('@');
+for (const a of document.querySelectorAll('[data-mail]')) { a.href = 'mailto:' + MAIL; a.textContent = MAIL; a.removeAttribute('target'); }
 document.getElementById('hosts').innerHTML = HOSTS.map((h) => '<li><b>' + esc(h.role) + '</b> : ' + esc(h.name) + ', ' + esc(h.address)
   + ' — <a href="' + esc(h.site) + '" target="_blank" rel="noopener">' + esc(h.site.replace(/^https:\/\//, '')) + '</a>' + (h.note ? ' (' + esc(h.note) + ')' : '') + '.</li>').join('');
