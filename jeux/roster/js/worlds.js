@@ -45,11 +45,11 @@ function draw(main) {
 }
 function introHTML(D, after) {
   const R = D.rules, S = G.S, short = D.fee > S.player.coins;
-  /* les packs d'un tour ne se gagnent qu'une fois par jour (D.packs, quand le serveur applique cette règle) : ceux d'aujourd'hui sont
-     déjà pris, ou pas ; les crédits se gagnent à chaque parcours */
+  /* la prime d'un tour (crédits et packs) ne se gagne qu'une fois par jour (D.packs : ce qui est déjà pris aujourd'hui) */
   const P = D.packs || null, gone = (key) => !!(P && P.got.includes(key));
-  const prize = (key, label) => '<div><span>' + label + '</span><b>+' + num(R.bonus[key][0]) + ' crédits</b>'
-    + (gone(key) ? '<em class="dim">' + plural(R.bonus[key][1], 'pack déjà gagné', 'packs déjà gagnés') + ' aujourd\'hui</em>' : '<em>+ ' + plural(R.bonus[key][1], 'pack', 'packs') + '</em>') + '</div>';
+  const prize = (key, label) => '<div><span>' + label + '</span>'
+    + (gone(key) ? '<b class="dim">Déjà gagnée</b><em class="dim">aujourd\'hui · revient à minuit</em>'
+      : '<b>+' + num(R.bonus[key][0]) + ' crédits</b><em>+ ' + plural(R.bonus[key][1], 'pack', 'packs') + '</em>') + '</div>';
   const past = Object.entries(D.record.past || {}).filter(([k]) => BEST[k]).map(([k, n]) => n + ' × ' + BEST[k]).join(' · ');
   return '<section class="panel wd-intro">' + (after ? '' : '<h3>Le tournoi</h3><ul>'
     + '<li><b>Seize équipes</b> — la tienne et les quinze meilleures des six ligues majeures : ' + Object.entries(R.slots).map(([l, n]) => n + ' de ' + l).join(', ') + '.</li>'
@@ -58,7 +58,7 @@ function introHTML(D, after) {
     + '<li><b>Ton équipe</b> — celle que tu alignes dans l\'onglet Jouer ; tu peux la retoucher entre deux rencontres.</li>'
     + '<li>Chaque manche gagnée rapporte ses crédits, comme un match ordinaire. S\'y ajoutent les primes ci-dessous.</li></ul>'
     + '<div class="prizes wd-prizes">' + prize('quarter', 'Sortir des poules') + prize('semi', 'Demi-finale') + prize('final', 'Finale') + prize('champion', 'Champion') + '</div>'
-    + (P ? '<p class="hint wd-daily">Les packs d\'un tour se gagnent <b>une fois par jour</b> : ils reviennent à minuit, heure française (dans ' + span(P.resetAt - P.now) + '). Les crédits, eux, se gagnent à chaque parcours.</p>' : ''))
+    + (P ? '<p class="hint wd-daily">La prime de chaque tour (crédits et packs) se gagne <b>une fois par jour</b> : elle revient à minuit, heure française (dans ' + span(P.resetAt - P.now) + '). Les manches gagnées rapportent toujours leurs crédits.</p>' : ''))
     + (past ? '<p class="hint">Tes parcours passés : ' + esc(past) + '.</p>' : '')
     + '<div class="actions"><button class="btn primary big" type="button" data-wd="start"' + (short ? ' disabled' : '') + '>' + (after ? 'Nouveau Mondial' : 'S\'inscrire') + '</button>'
     + '<p class="note">' + (D.fee ? 'Inscription : ' + num(D.fee) + ' crédits' + (short ? ' — il t\'en manque ' + num(D.fee - S.player.coins) + '.' : ' (tu en as ' + num(S.player.coins) + ').') : 'Ta première participation est offerte. Les suivantes coûteront ' + num(R.fee) + ' crédits.') + '</p></div></section>';
@@ -135,7 +135,10 @@ async function onClick(e) {
 /* le résultat affiché après une manche */
 function rewardsFor(res) {
   const run = res.run, p = res.played, sv = run.series, last = run.path[run.path.length - 1];
-  const bonus = p.bonus ? '<div class="prize bonus"><span>' + esc(REACHED[p.bonus.stage] || 'Prime') + '</span><b>+' + num(p.bonus.coins) + ' crédits</b>'
+  /* la prime de ce tour déjà gagnée aujourd'hui (serveur récent : cappedCoins) : rien de plus que la manche */
+  const bonus = p.bonus && p.bonus.cappedCoins && !p.bonus.coins ? '<div class="prize bonus"><span>' + esc(REACHED[p.bonus.stage] || 'Prime') + '</span><b class="dim">Prime déjà gagnée</b>'
+      + '<i>La prime de ce tour se gagne une fois par jour : elle revient à minuit.</i></div>'
+    : p.bonus ? '<div class="prize bonus"><span>' + esc(REACHED[p.bonus.stage] || 'Prime') + '</span><b>+' + num(p.bonus.coins) + ' crédits</b>'
     + (p.bonus.packs ? '<i>+ ' + plural(p.bonus.packs, 'pack', 'packs') + ' : ' + (p.bonus.packs > 1 ? 'ils t\'attendent' : 'il t\'attend') + ' dans l\'onglet Packs.</i>'
       /* les packs de ce tour ont déjà été gagnés aujourd'hui : il reste les crédits */
       : p.bonus.capped ? '<i>' + (p.bonus.capped > 1 ? 'Les packs de ce tour sont déjà gagnés aujourd\'hui : ils reviennent' : 'Le pack de ce tour est déjà gagné aujourd\'hui : il revient') + ' à minuit.</i>' : '') + '</div>' : '';
