@@ -101,7 +101,8 @@ function draw(main) {
   }
   /* Équipe : mes six cartes, leurs synergies */
   main.innerHTML = head
-    + '<section class="squad panel"><div class="sq-head"><div class="sq-rating"><b>' + L.rating + '</b><span>Note<br>d\'équipe</span></div>'
+    /* (sans aucune carte alignée, la note serait celle de six remplaçants : un tiret plutôt qu'un chiffre qui ne veut rien dire) */
+    + '<section class="squad panel"><div class="sq-head"><div class="sq-rating"><b>' + (filled ? L.rating : '—') + '</b><span>Note<br>d\'équipe</span></div>'
     + '<div class="sq-traits">' + (L.traits.length ? L.traits.map(traitHTML).join('')
       : '<p class="hint">' + (!S.owned.size ? 'Tu n\'as pas encore de cartes : ouvre tes packs dans l\'onglet Packs, puis reviens composer ton équipe.' : filled < 2 ? 'Aligne tes cartes : cinq joueurs et un coach.' : 'Aucune synergie pour l\'instant : aligne des joueurs du même club, du même pays ou de la même ligue.') + '</p>') + '</div>'
     + '<button class="btn" type="button" id="auto"' + (S.owned.size ? '' : ' disabled') + '>Meilleure équipe</button></div>'

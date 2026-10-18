@@ -58,7 +58,7 @@ function draw() {
   el.innerHTML = '<div class="cb-card panel">' + crestHTML(team.name, team.short)
     + '<div class="cb-id"><span class="label">Mon club</span><h2>' + esc(team.name) + '</h2><p>Fondé le ' + frDate(p.createdAt) + ' · sigle ' + esc(team.short) + '</p>'
     + '<div class="cb-level"><b>Niveau ' + V.level + '</b><span class="bar"><i style="width:' + Math.round((100 * V.level) / V.max) + '%"></i></span><em>' + V.level + ' / ' + V.max + '</em></div></div>'
-    + '<div class="cb-stats">' + (S.play ? cell(S.play.lineup.rating, 'note d\'équipe') : '') + cell(p.wins + ' – ' + p.losses, 'matchs')
+    + '<div class="cb-stats">' + (S.play ? cell(Object.values(S.play.deck || {}).some(Boolean) ? S.play.lineup.rating : '—', 'note d\'équipe') : '') + cell(p.wins + ' – ' + p.losses, 'matchs')
     + (R ? '<div class="cb-rank">' + emblemHTML(R.rank, 'small') + '<span>' + esc(R.rank.label) + '</span></div>' : '')
     + cell(p.titles || 0, (p.titles || 0) > 1 ? 'Mondiaux' : 'Mondial', 'gold') + '</div></div>'
     + '<h3 class="h2">Infrastructures</h3><div class="cb-list">' + V.structures.map((s) => structureHTML(s, V)).join('') + '</div>'

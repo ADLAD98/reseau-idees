@@ -3284,6 +3284,8 @@ function renderRoster(){
       +'<div><b>'+rsNum(d.active.month)+'</b><span>actifs 30 jours</span></div>'
       +'<div><b class="'+useCls+'">'+use+' %</b><span>de la limite gratuite</span></div>'
     +'</div></div>'
+    /* le parcours des nouveaux et ce qui sert (serveur récent : d.journey, d.features) */
+    +(d.journey?rsJourney(d.journey):'')+(d.features?rsFeatures(d.features):'')
     +rsBars('Nouveaux joueurs',d.days.fresh)+rsBars('Packs ouverts',d.days.packs)+rsBars('Matchs joués',d.days.matches)+rsBars('Défis entre joueurs',d.days.duels)
     +'<div class="r-card"><h3>Plus belles cartes de la semaine</h3>'+(d.pulls.length?'<ul class="r-list">'+d.pulls.map(function(p){
         return '<li><span><b>'+rsEsc(p.card)+'</b> · '+rsEsc(p.label)+'</span><small>'+rsEsc(p.player)+'</small></li>';}).join('')+'</ul>'
@@ -3302,6 +3304,21 @@ function renderRoster(){
       +(d.errors.list.length?'<ul class="r-list r-bugs">'+d.errors.list.map(function(e){
         return '<li><span><b>×'+rsNum(e.count)+'</b> '+rsEsc(e.msg)+'</span><small>'+rsEsc((e.src||'?')+(e.line?':'+e.line:''))+' · '+rsEsc(e.page||'#/')+' · '+rsEsc(e.browser)+' · '+rsAgo(e.last_at)+'</small></li>';}).join('')+'</ul>'
       :'<p class="r-empty">Aucun bug remonté par le jeu cette semaine.</p>')+'</div>':'');
+}
+/* le parcours des joueurs inscrits ces 30 jours : chaque étape, sur combien elle pouvait l'être */
+function rsJourney(j){
+  var steps=[['Inscrits',j.signed,j.signed],['Premier pack ouvert',j.pack,j.signed],['Cinq packs ouverts',j.packs5,j.signed],
+    ['Premier match joué (fin du tutoriel)',j.match,j.signed],['Revenus le lendemain',j.d1,j.d1Base],['Revenus une semaine après',j.d7,j.d7Base]];
+  return '<div class="r-card"><h3>Parcours des nouveaux · 30 jours</h3><ul class="r-list">'+steps.map(function(s,k){
+    var pct=s[2]?Math.round(100*s[1]/s[2]):0, cls=!k||!s[2]?'':pct>=60?'r-ok':pct>=30?'r-warn':'r-bad';
+    return '<li><span>'+rsEsc(s[0])+'</span><small'+(cls?' class="'+cls+'"':'')+'>'+(s[2]?rsNum(s[1])+(k?' / '+rsNum(s[2])+' · '+pct+' %':''):'pas encore mesurable')+'</small></li>';}).join('')
+    +'</ul></div>';
+}
+/* ce qui sert : combien de joueurs ont touché à chaque partie du jeu ces 7 jours */
+function rsFeatures(f){
+  return '<div class="r-card"><h3>Ce qui sert · 7 jours</h3><ul class="r-list">'+f.map(function(x){
+    return '<li><span>'+rsEsc(x.name)+'</span><small'+(x.players?'':' class="r-warn"')+'>'+rsNum(x.players)+' joueur'+(x.players>1?'s':'')+'</small></li>';}).join('')
+    +'</ul></div>';
 }
 /* « il y a 2 h » */
 function rsAgo(t){

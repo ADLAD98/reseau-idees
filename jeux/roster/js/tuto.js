@@ -61,7 +61,10 @@ function step() {
     if (sub()) return { id: 'boosters', el: subTab('main'), text: 'Ton premier pack t\'attend dans « Boosters ».' };
     return { id: 'pack', el: first('#openPack'), text: 'Bienvenue sur Roster ! Ouvre ton premier pack : des cartes de vrais joueurs pros.' };
   }
-  if (page() !== 'jouer') return { id: 'play', el: tab('jouer'), text: 'Tes cartes forment déjà une équipe. Va sur « Jouer » pour ton premier match.' };
+  /* (sur téléphone, la bulle couvre la ligne de la réserve : elle la redit) */
+  const spare = G.S.free ? G.S.free.spare || 0 : 0;
+  if (page() !== 'jouer') return { id: 'play', el: tab('jouer'), text: (spare ? (spare > 1 ? spare + ' autres packs t\'attendent' : 'Un autre pack t\'attend') + ' en réserve : ouvre-les quand tu veux. ' : '')
+    + 'Tes cartes forment déjà une équipe. Va sur « Jouer » pour ton premier match.' };
   if (!G.S.play) return null;
   if (!st.team && sub()) return { id: 'team-tab', el: subTab('main'), text: 'Regarde d\'abord ton équipe, dans « Équipe ».' };
   if (!st.team) return { id: 'team', el: first('.squad'), text: 'Voici ton équipe : la meilleure possible avec tes cartes. Plus tard, touche une carte pour la changer.', next: 'Compris' };
@@ -107,7 +110,8 @@ function tick() {
   const w = Math.min(340, innerWidth - 32), h = bubble.offsetHeight || 120;
   const below = r.bottom + pad + 12, above = r.top - pad - 12 - h;
   const tall = r.height > (innerHeight - barH - bottomH) * 0.6;
-  const y = tall ? barH + 12 : below + h <= innerHeight - bottomH - 8 ? below : above >= barH + 8 ? above : Math.max(barH + 8, innerHeight - bottomH - h - 8);
+  /* un onglet de la barre du bas (téléphone) : la bulle en haut, sinon elle cacherait les boutons de l'écran (« Ouvrir un pack en réserve ») */
+  const y = tall || s.el.closest('.tabs') ? barH + 12 : below + h <= innerHeight - bottomH - 8 ? below : above >= barH + 8 ? above : Math.max(barH + 8, innerHeight - bottomH - h - 8);
   const x = Math.min(innerWidth - w - 16, Math.max(16, r.left + r.width / 2 - w / 2));
   Object.assign(bubble.style, { width: w + 'px', left: x + 'px', top: y + 'px' });
 }

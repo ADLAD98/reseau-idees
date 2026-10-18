@@ -580,7 +580,7 @@ function teamHubHTML() {
       + '<i>' + ROLE_LABEL[role] + '</i></span>';
   };
   const last = (P.history || []).slice(0, 5);
-  return '<div class="hub-rating"><b>' + L.rating + '</b><span>Note<br>d\'équipe</span>'
+  return '<div class="hub-rating"><b>' + (filled ? L.rating : '—') + '</b><span>Note<br>d\'équipe</span>'
     + (last.length ? '<em class="hub-form" title="Tes dernières parties, de la plus récente à la plus ancienne">' + last.map((m) => '<i class="' + (m.won ? 'w' : 'l') + '">' + (m.won ? 'V' : 'D') + '</i>').join('') + '</em>' : '') + '</div>'
     + '<div class="hub-line">' + L.players.map((p) => face(p.id, p.role)).join('') + face(coachId, 'COACH') + '</div>'
     + '<a class="btn" href="#/jouer">' + (filled < 6 ? 'Composer mon équipe' : 'Jouer un match') + '</a>';
