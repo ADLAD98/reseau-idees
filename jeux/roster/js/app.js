@@ -30,6 +30,7 @@ import { startTutorial } from './tuto.js';
 import { startRecap } from './recap.js';
 import { draw as drawInstall, installBannerHTML, installRowHTML, startInstall } from './installer.js';
 import { loadTeamWeek, teamWeekSectionHTML } from './equipe-type.js';
+import { bracketSectionHTML, loadBracket } from './tableau.js';
 import { loadSeason, pastSeasonsSectionHTML } from './saisons.js';
 import { publicHTML, publicLiveHTML } from './accueil-public.js';
 
@@ -662,9 +663,11 @@ function viewPacks(main, sub) {
     drawDaily(PLAY);
     return;
   }
-  /* Vrais matchs : le direct, les pronostics, l'équipe type de la semaine (pronostics.js) */
+  /* Vrais matchs : le tableau final des Worlds et le classement des pronostiqueurs (tableau.js), le direct, les pronostics (pronostics.js),
+     l'équipe type de la semaine */
   if (part === 'matchs') {
-    main.innerHTML = nav + predictionsSectionHTML() + teamWeekSectionHTML();
+    main.innerHTML = nav + bracketSectionHTML() + predictionsSectionHTML() + teamWeekSectionHTML();
+    loadBracket(PLAY);
     loadPredictions(PLAY);
     loadTeamWeek(PLAY);
     return;
