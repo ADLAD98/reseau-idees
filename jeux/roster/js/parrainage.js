@@ -14,7 +14,9 @@ export async function loadReferral(G) {
   const link = SHORT + d.code, won = Math.min(d.rewarded, d.max);
   el.hidden = false;
   el.innerHTML = '<h3>Parrainage</h3>'
-    + '<p class="hint">Invite tes amis avec ton lien : quand un ami a joué son premier match, vous gagnez chacun un pack (pour tes ' + d.max + ' premiers amis).</p>'
+    /* (serveur récent : les packs gratuits s'accumulent, S.free.cap ; chaque ami qui a fini le tutoriel ajoute une place) */
+    + '<p class="hint">Invite tes amis avec ton lien : quand un ami a joué son premier match, vous gagnez chacun un pack'
+    + (G.S.free && G.S.free.capMax ? ', et tu peux garder un pack gratuit de plus de côté pendant ton absence (jusqu\'à ' + G.S.free.capMax + ' ; ' + G.S.free.cap + ' en ce moment)' : '') + ' — pour tes ' + d.max + ' premiers amis.</p>'
     + '<div class="ref-link"><code translate="no">' + esc(link) + '</code><button class="btn primary" type="button" id="refShare">Partager</button></div>'
     + '<p class="ref-stats">' + (d.invited
       ? '<b>' + d.invited + '</b> ami' + (d.invited > 1 ? 's' : '') + ' inscrit' + (d.invited > 1 ? 's' : '') + ' par ton lien · <b>' + won + '</b> pack' + (won > 1 ? 's' : '') + ' gagné' + (won > 1 ? 's' : '')

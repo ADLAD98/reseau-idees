@@ -372,7 +372,7 @@ function showAuth(message) {
       /* le code de secours, montré une seule fois : à l'inscription, et quand le précédent vient de servir */
       if (data.recovery) await showRecovery(data.recovery, mode === 'recover' ? 'Mot de passe changé' : 'Bienvenue');
       if (mode === 'register') {
-        const packs = 1 + (S.free.spare || 0);
+        const packs = freeStack() + (S.free.spare || 0);
         toast('Bienvenue ' + S.player.name + ' ! ' + (packs > 1 ? packs + ' packs t\'attendent.' : 'Ton premier pack t\'attend.'));
       } else if (mode === 'recover') toast('Mot de passe changé : tu es connecté.');
       else remindRecovery();
@@ -547,9 +547,16 @@ const packKind = () => (S.pack === 'credits' && S.shop ? 'credits' : 'free');
 const packWait = () => (packKind() === 'credits' ? S.shop.credits.cooldownMs : S.free.cooldownMs);
 /* le pack gratuit peut s'ouvrir si son délai est écoulé, ou s'il reste des packs en réserve ; le booster à crédits, si son délai est écoulé et qu'on peut le payer */
 const timeLeft = () => (packKind() === 'credits' ? S.shop.credits.readyAt : S.free.readyAt) - now();
-const packReady = () => (packKind() === 'credits' ? timeLeft() <= 0 && S.player.coins >= S.shop.credits.price : timeLeft() <= 0 || S.free.spare > 0);
+/* les packs gratuits s'accumulent pendant l'absence (serveur récent : S.free.cap ; sinon un seul) : un de plus à chaque délai, jusqu'au
+   plafond — cinq, plus un par filleul qui a fini le tutoriel */
+const freeCapOf = () => S.free.cap || 1;
+const freeStack = () => { const late = now() - S.free.readyAt; return late < 0 ? 0 : Math.min(freeCapOf(), 1 + Math.floor(late / S.free.cooldownMs)); };
+/* le délai avant le prochain pack gratuit (0 : le plafond est atteint, rien ne s'ajoute plus) */
+const freeNext = () => { const n = freeStack(); return n >= freeCapOf() ? 0 : S.free.readyAt + n * S.free.cooldownMs - now(); };
+const countLeft = () => (packKind() === 'credits' ? timeLeft() : freeNext());
+const packReady = () => (packKind() === 'credits' ? timeLeft() <= 0 && S.player.coins >= S.shop.credits.price : freeStack() > 0 || S.free.spare > 0);
 /* résumé de la situation : quand il change, on redessine le bouton ; sinon seul le compte à rebours bouge */
-const packSig = () => packKind() + '/' + (timeLeft() <= 0 ? 'pret' : 'attente') + '/' + (packKind() === 'credits' ? (S.player.coins >= S.shop.credits.price ? 'ok' : 'court') : S.free.spare || 0);
+const packSig = () => packKind() + '/' + (packKind() === 'credits' ? (timeLeft() <= 0 ? 'pret' : 'attente') + '/' + (S.player.coins >= S.shop.credits.price ? 'ok' : 'court') : freeStack() + '/' + (S.free.spare || 0));
 /* ---------- le tableau de bord de l'accueil : la collection, mon équipe, ma saison ---------- */
 /** La collection : un anneau (la part des cartes possédées), puis une barre par rang et par version spéciale. */
 function progressHTML() {
@@ -624,14 +631,20 @@ function packActionHTML() {
     if (missing > 0) return '<button class="btn primary big" type="button" disabled>Il te manque ' + missing + ' crédits</button><p class="reserve">Gagne des matchs, vends tes doublons : il en faut <b>' + shop.price + '</b>.</p>';
     return '<button class="btn primary big" type="button" id="openPack">Acheter et ouvrir · ' + shop.price + ' crédits</button><p class="reserve">Tu as <b>' + S.player.coins + '</b> crédits.</p>';
   }
-  const left = timeLeft(), spare = S.free.spare || 0;
-  if (left > 0 && !spare) {
-    return '<div class="wait"><div class="wait-time"><b id="count">' + clock(left) + '</b><span>avant le prochain pack</span></div>'
-      + '<div class="bar"><i id="countBar" style="width:' + Math.min(100, 100 - (100 * left) / S.free.cooldownMs) + '%"></i></div></div>';
+  const stack = freeStack(), cap = freeCapOf(), next = freeNext(), spare = S.free.spare || 0;
+  if (!stack && !spare) {
+    return '<div class="wait"><div class="wait-time"><b id="count">' + clock(next) + '</b><span>avant le prochain pack</span></div>'
+      + '<div class="bar"><i id="countBar" style="width:' + Math.min(100, 100 - (100 * next) / S.free.cooldownMs) + '%"></i></div></div>'
+      + (cap > 1 ? '<p class="reserve">Les packs gratuits s\'accumulent pendant ton absence : jusqu\'à <b>' + cap + '</b>.</p>'
+        /* (une seule place : le parrainage en ajoute, jusqu'à S.free.capMax) */
+        : S.free.capMax > 1 ? '<p class="reserve">Chaque ami parrainé qui finit le tutoriel te laisse garder un pack gratuit de plus de côté, jusqu\'à <b>' + S.free.capMax + '</b>. <a href="#/profil">Mon lien</a></p>' : '');
   }
+  /* les packs gratuits de côté (et le suivant), puis la réserve */
+  const stacked = cap > 1 && stack ? '<p class="reserve"><b>' + stack + '</b> pack' + (stack > 1 ? 's' : '') + ' gratuit' + (stack > 1 ? 's' : '') + ' de côté sur ' + cap
+    + (next > 0 ? ' · le suivant dans <b id="count">' + clock(next) + '</b>' : ' · <b>c\'est plein</b> : ouvre-les pour que d\'autres s\'ajoutent') + '</p>' : '';
   const reserve = spare ? '<p class="reserve"><b>' + spare + '</b> pack' + (spare > 1 ? 's' : '') + ' en réserve'
-    + (left > 0 ? ' · prochain pack gratuit dans <b id="count">' + clock(left) + '</b>' : '') + '</p>' : '';
-  return '<button class="btn primary big" type="button" id="openPack">' + (left > 0 ? 'Ouvrir un pack en réserve' : 'Ouvrir le pack') + '</button>' + reserve;
+    + (!stack && next > 0 ? ' · prochain pack gratuit dans <b id="count">' + clock(next) + '</b>' : '') + '</p>' : '';
+  return '<button class="btn primary big" type="button" id="openPack">' + (stack ? 'Ouvrir le pack' : 'Ouvrir un pack en réserve') + '</button>' + stacked + reserve;
 }
 /* « 10 minutes », « 9 min 30 » : le délai du pack gratuit (le centre de formation du club le raccourcit) */
 const every = (ms) => { const m = Math.floor(ms / 60000), s = Math.round((ms % 60000) / 1000); return s ? m + ' min ' + s : m + ' minutes'; };
@@ -681,7 +694,7 @@ function viewPacks(main, sub) {
   main.innerHTML = nav + '<section class="home"><div class="home-pack' + (credits ? ' credits' : '') + '" id="packBox">' + packHTML(packReady() ? 'ready' : 'waiting', S.cat.season, S.free.size, packLook(kind)) + '</div>'
     + '<div class="home-side">' + menu + '<div class="eyebrow">' + (credits ? 'Booster à crédits · un toutes les ' + Math.round(S.shop.credits.cooldownMs / 60000) + ' minutes' : 'Pack gratuit · toutes les ' + every(S.free.cooldownMs)) + '</div>'
     + '<h1 class="h1">' + S.free.size + ' cartes ' + (credits ? 'de plus' : 'à découvrir') + '</h1>'
-    + '<p class="lead">' + (credits ? 'Un booster en plus du pack gratuit, payé avec tes crédits. Ses chances sont un peu plus faibles que celles du pack gratuit (le détail est dans Profil › Réglages).'
+    + '<p class="lead">' + (credits ? 'Un booster en plus du pack gratuit, payé avec tes crédits. Ses chances sont un peu meilleures que celles du pack gratuit (le détail est dans Profil › Réglages).'
       /* (sur un téléphone, seulement l'essentiel : le bouton doit tenir sur le premier écran) */
       : 'Joueurs et coachs pros de la saison ' + S.cat.season + '. La dernière carte du pack est une carte bonus<span class="hide-s"> : rang Titulaire au minimum. Les plus belles cartes existent aussi en version holographique et en full art' + (S.cat.cards.some((c) => c.variant === 'kc') ? ', et les joueurs passés par la Karmine en édition KC' : '') + '</span>.') + '</p>'
     + '<div id="packAction" data-sig="' + packSig() + '">' + packActionHTML() + '</div></div></section>'
@@ -772,7 +785,7 @@ setInterval(() => {
     if (pack) pack.className = 'pack ' + (packReady() ? 'ready' : 'waiting') + ' k-' + packKind();
     return;
   }
-  const left = timeLeft(), count = document.getElementById('count'), bar = document.getElementById('countBar');
+  const left = countLeft(), count = document.getElementById('count'), bar = document.getElementById('countBar');
   if (count) count.textContent = clock(left);
   if (bar) bar.style.width = Math.min(100, 100 - (100 * left) / packWait()) + '%';
 }, 1000);
